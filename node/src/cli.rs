@@ -1,5 +1,31 @@
-use structopt::StructOpt;
-use sc_cli::RunCmd;
+use structopt::{StructOpt, clap::arg_enum};
+
+arg_enum! {
+	/// Available Sealing methods.
+	#[allow(missing_docs)]
+	#[derive(Debug, Copy, Clone, StructOpt)]
+	pub enum Sealing {
+		// Seal using rpc method.
+		Manual,
+		// Seal when transaction is executed.
+		Instant,
+	}
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, StructOpt)]
+pub struct RunCmd {
+	#[allow(missing_docs)]
+	#[structopt(flatten)]
+	pub base: sc_cli::RunCmd,
+
+	/// Choose sealing method.
+	#[structopt(long = "sealing")]
+	pub sealing: Option<Sealing>,
+
+	#[structopt(long = "enable-dev-signer")]
+	pub enable_dev_signer: bool,
+}
 
 #[derive(Debug, StructOpt)]
 pub struct Cli {
@@ -12,6 +38,8 @@ pub struct Cli {
 
 #[derive(Debug, StructOpt)]
 pub enum Subcommand {
+	/// Key management cli utilities
+	Key(sc_cli::KeySubcommand),
 	/// Build a chain specification.
 	BuildSpec(sc_cli::BuildSpecCmd),
 
@@ -21,7 +49,7 @@ pub enum Subcommand {
 	/// Export blocks.
 	ExportBlocks(sc_cli::ExportBlocksCmd),
 
-	/// Export the state of a given block into a chain spec.
+	/// Export the state of a given block into a chain specs.
 	ExportState(sc_cli::ExportStateCmd),
 
 	/// Import blocks.

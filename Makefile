@@ -12,8 +12,13 @@ test:
 
 .PHONY: run
 run:
-	 cargo run --release -- --dev --tmp
+	 cargo run --release -- --dev --tmp --sealing=Manual
 
 .PHONY: build
 build:
 	 cargo build --release
+
+.PHONY: spec
+spec:
+	./target/release/polkafoundry build-spec --disable-default-bootnode --chain local > tests/specs/polka-spec.json
+

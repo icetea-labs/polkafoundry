@@ -1,11 +1,11 @@
 use sp_core::{Pair, Public, sr25519};
 use polkafoundry_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, SystemConfig, WASM_BINARY, Signature, EVMConfig
+	SudoConfig, SystemConfig, WASM_BINARY, Signature, EVMConfig, EthereumConfig
 };
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_finality_grandpa::AuthorityId as GrandpaId;
-use sp_runtime::traits::{Verify, IdentifyAccount};
+use sp_runtime::traits::{BlakeTwo256, Verify, IdentifyAccount};
 use sc_service::ChainType;
 use std::collections::BTreeMap;
 
@@ -40,7 +40,7 @@ pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
 }
 
 pub fn development_config() -> Result<ChainSpec, String> {
-	let wasm_binary = WASM_BINARY.ok_or("Development wasm binary not available".to_string())?;
+	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm binary not available".to_string())?;
 
 	Ok(ChainSpec::from_genesis(
 		// Name
@@ -79,7 +79,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 }
 
 pub fn local_testnet_config() -> Result<ChainSpec, String> {
-	let wasm_binary = WASM_BINARY.ok_or("Development wasm binary not available".to_string())?;
+	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm binary not available".to_string())?;
 
 	Ok(ChainSpec::from_genesis(
 		// Name
@@ -157,5 +157,6 @@ fn testnet_genesis(
 		pallet_evm: Some(EVMConfig {
 			accounts: BTreeMap::new(),
 		}),
+		pallet_ethereum: Some(EthereumConfig {}),
 	}
 }
