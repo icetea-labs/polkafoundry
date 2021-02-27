@@ -1,3 +1,4 @@
+
 [package]
 authors = ['Polkafoundry']
 build = 'build.rs'
@@ -5,54 +6,64 @@ description = 'A fresh FRAME-based Substrate node, ready for hacking.'
 edition = '2018'
 homepage = 'https://polkafoundry.com'
 license = 'Unlicense'
-name = 'node-template'
+name = 'polkafoundry'
 repository = 'https://github.com/polkafoundry/newpolka/'
 version = '0.0.1'
 
 [[bin]]
-name = 'node-template'
+name = 'polkafoundry'
 
 [package.metadata.docs.rs]
 targets = ['x86_64-unknown-linux-gnu']
 
 [build-dependencies]
-substrate-build-script-utils = '3.0.0'
+substrate-build-script-utils = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
 [dependencies]
 jsonrpc-core = '15.1.0'
+jsonrpc-pubsub = '15.1.0'
 structopt = '0.3.8'
+futures = { version = '0.3.4' }
+log = '0.4.8'
 
 # local dependencies
 polkafoundry-runtime = { path = '../runtime', version = '0.0.1' }
 
 # Substrate dependencies
-#frame-benchmarking = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-#frame-benchmarking-cli = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-pallet-transaction-payment-rpc = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-basic-authorship = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-cli = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master', features = ["wasmtime"] }
-sc-client-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-consensus = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-consensus-aura = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-executor = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master', features = ["wasmtime"] }
-sc-finality-grandpa = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-rpc = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-rpc-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-service = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-transaction-pool = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-block-builder = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-blockchain = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-consensus = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-consensus-aura = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-finality-grandpa = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-inherents = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sp-transaction-pool = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-substrate-frame-rpc-system = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-keystore = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
-sc-telemetry = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+frame-benchmarking = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+frame-benchmarking-cli = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+
+pallet-transaction-payment-rpc = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+
+sc-basic-authorship = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-cli = { git = 'https://github.com/paritytech/substrate.git', branch = 'master', features = ['wasmtime'] }
+sc-client-api = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-consensus = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-consensus-aura = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-executor = { git = 'https://github.com/paritytech/substrate.git', branch = 'master', features = ['wasmtime'] }
+sc-finality-grandpa = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-keystore = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-rpc = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-rpc-api = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-service = { git = 'https://github.com/paritytech/substrate.git', branch = 'master', features = ['wasmtime'] }
+sc-transaction-pool = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-telemetry = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-network = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-consensus-manual-seal = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+
+sp-api = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-block-builder = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-blockchain = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-consensus = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-consensus-aura = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-core = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-finality-grandpa = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-inherents = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-runtime = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-transaction-pool = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-timestamp = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+
+substrate-frame-rpc-system = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
 fc-consensus = { default-features = false, git = 'https://github.com/thanhtung6824/frontier.git', branch = 'v0.1-polka' }
 fp-consensus = { default-features = false, git = 'https://github.com/thanhtung6824/frontier.git', branch = 'v0.1-polka' }
@@ -62,4 +73,4 @@ fc-rpc-core = { default-features = false, git = 'https://github.com/thanhtung682
 
 [features]
 default = []
-#runtime-benchmarks = ['polkafoundry-runtime/runtime-benchmarks']
+runtime-benchmarks = ['polkafoundry-runtime/runtime-benchmarks']
