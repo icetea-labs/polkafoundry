@@ -308,7 +308,7 @@ impl pallet_evm::Config for Runtime {
 	type Currency = Balances;
 	type Event = Event;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
-	type Precompiles = ();
+	type Precompiles = precompiles::PolkafoundryPrecompiles<Self>;
 	type ChainId = ChainId;
 }
 
