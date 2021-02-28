@@ -35,6 +35,7 @@ frame-system = { default-features = false, git = 'https://github.com/paritytech/
 frame-system-benchmarking = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master', optional = true }
 frame-system-rpc-runtime-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
+precompiles = { default-features = false, path = 'precompiles/' }
 pallet-aura = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 pallet-grandpa = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
