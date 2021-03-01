@@ -65,11 +65,11 @@ sp-timestamp = { git = 'https://github.com/paritytech/substrate.git', branch = '
 
 substrate-frame-rpc-system = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
-fc-consensus = { default-features = false, git = 'https://github.com/thanhtung6824/frontier.git', branch = 'v0.1-polka' }
-fp-consensus = { default-features = false, git = 'https://github.com/thanhtung6824/frontier.git', branch = 'v0.1-polka' }
-fp-rpc = { default-features = false, git = 'https://github.com/thanhtung6824/frontier.git', branch = 'v0.1-polka' }
-fc-rpc = { default-features = false, git = 'https://github.com/thanhtung6824/frontier.git', branch = 'v0.1-polka' }
-fc-rpc-core = { default-features = false, git = 'https://github.com/thanhtung6824/frontier.git', branch = 'v0.1-polka' }
+fc-consensus = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+fp-consensus = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+fc-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+fc-rpc-core = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
 
 [features]
 default = []
