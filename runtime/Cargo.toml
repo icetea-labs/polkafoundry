@@ -62,7 +62,7 @@ pallet-ethereum = { default-features = false, git = 'https://github.com/polkafou
 
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
 
-cumulus-pallet-parachain-system = { git = 'https://github.com/paritytech/cumulus',  default-features = false, branch = 'master' }
+cumulus-pallet-parachain-system = { git = 'https://github.com/paritytech/cumulus',  default-features = false, branch = 'rococo-v1' }
 
 [features]
 default = ['std']
