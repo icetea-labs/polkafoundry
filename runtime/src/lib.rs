@@ -10,7 +10,7 @@ use sp_std::prelude::*;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256, H160, H256};
 use sp_runtime::{
 	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys, MultiSignature,
-	transaction_validity::{TransactionValidity, TransactionSource},
+	transaction_validity::{TransactionValidity, TransactionSource, TransactionPriority},
 };
 use sp_runtime::traits::{
 	AccountIdLookup, BlakeTwo256, Block as BlockT, Verify, IdentifyAccount, NumberFor,
@@ -312,6 +312,18 @@ impl pallet_evm::Config for Runtime {
 	type ChainId = ChainId;
 }
 
+parameter_types! {
+    pub const EcdsaUnsignedPriority: TransactionPriority = TransactionPriority::max_value() / 2;
+}
+
+impl pallet_custom_signatures::Config for Runtime {
+    type Event = Event;
+    type Call = Call;
+    type Signature = pallet_custom_signatures::ethereum::EthereumSignature;
+    type Signer = <Signature as Verify>::Signer;
+    type UnsignedPriority = EcdsaUnsignedPriority;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -331,6 +343,7 @@ construct_runtime!(
 		TemplateModule: pallet_template::{Module, Call, Storage, Event<T>},
 		EVM: pallet_evm::{Module, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Module, Call, Storage, Event, Config, ValidateUnsigned},
+		EthCall: pallet_custom_signatures::{Module, Call, Event<T>, ValidateUnsigned},
 	}
 );
 

@@ -26,6 +26,7 @@ serde = { features = ['derive'], optional = true, version = '1.0.119' }
 
 # local dependencies
 pallet-template = { path = '../pallets/template', default-features = false, version = '0.0.1' }
+pallet-custom-signatures = { path = '../pallets/custom-signatures', default-features = false, version = '0.0.1' }
 
 # Substrate dependencies
 frame-benchmarking = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master', optional = true }
@@ -45,6 +46,7 @@ pallet-timestamp = { default-features = false, git = 'https://github.com/parityt
 pallet-transaction-payment = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 pallet-transaction-payment-rpc-runtime-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
+
 sp-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 sp-block-builder = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 sp-consensus-aura = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
@@ -59,7 +61,6 @@ sp-version = { default-features = false, git = 'https://github.com/paritytech/su
 
 pallet-evm = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
 pallet-ethereum = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
-
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
 
 [features]
@@ -104,4 +105,5 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
+    'pallet-custom-signatures/std',
 ]

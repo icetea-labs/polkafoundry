@@ -1,0 +1,35 @@
+[package]
+name = "pallet-custom-signatures"
+version = "0.0.1"
+authors = ["kyberliem <cyberliem.civil@gmail.com>"]
+edition = "2018"
+description = "FRAME pallet for user defined extrinsic signatures"
+
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "2.0.0", features = ["derive"], default-features = false }
+serde = { features = ['derive'], optional = true, version = '1.0.119' }
+sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+
+[dev-dependencies]
+pallet-balances = "3.0.0"
+libsecp256k1 = "0.3.2"
+hex-literal = "0.2.1"
+
+[features]
+default = ["std"]
+std = [
+    "serde",
+    "codec/std",
+    "sp-io/std",
+    "sp-std/std",
+    "sp-core/std",
+    "sp-runtime/std",
+    "frame-support/std",
+    "frame-system/std",
+]
