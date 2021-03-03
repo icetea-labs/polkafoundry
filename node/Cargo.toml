@@ -25,6 +25,8 @@ jsonrpc-pubsub = '15.1.0'
 structopt = '0.3.8'
 futures = { version = '0.3.4' }
 log = '0.4.8'
+codec = { package = 'parity-scale-codec', version = '2.0.0' }
+serde = { features = ['derive'], version = '1.0.119' }
 
 # local dependencies
 polkafoundry-runtime = { path = '../runtime', version = '0.0.1' }
@@ -50,6 +52,8 @@ sc-transaction-pool = { git = 'https://github.com/paritytech/substrate.git', bra
 sc-telemetry = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 sc-network = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 sc-consensus-manual-seal = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-chain-spec = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sc-tracing = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
 sp-api = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 sp-block-builder = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
@@ -62,6 +66,7 @@ sp-inherents = { git = 'https://github.com/paritytech/substrate.git', branch = '
 sp-runtime = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 sp-transaction-pool = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 sp-timestamp = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-trie = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
 substrate-frame-rpc-system = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
@@ -70,6 +75,17 @@ fp-consensus = { default-features = false, git = 'https://github.com/polkafoundr
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
 fc-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
 fc-rpc-core = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+
+cumulus-client-consensus-relay-chain = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-client-service = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-client-network = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-primitives-core = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+
+polkadot-primitives = { git = 'https://github.com/paritytech/polkadot', branch = 'master' }
+polkadot-service = { git = 'https://github.com/paritytech/polkadot', branch = 'master' }
+polkadot-cli = { git = 'https://github.com/paritytech/polkadot', branch = 'master' }
+polkadot-test-service = { git = 'https://github.com/paritytech/polkadot', branch = 'master' }
+polkadot-parachain = { git = 'https://github.com/paritytech/polkadot', branch = 'master' }
 
 [features]
 default = []

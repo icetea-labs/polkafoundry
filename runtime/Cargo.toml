@@ -62,6 +62,16 @@ pallet-ethereum = { default-features = false, git = 'https://github.com/polkafou
 
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
 
+cumulus-pallet-parachain-system = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-primitives-core = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-pallet-xcm-handler =  { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+parachain-info = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+
+polkadot-parachain = { default-features = false, git = 'https://github.com/paritytech/polkadot', branch = 'master' }
+xcm = { default-features = false, git = 'https://github.com/paritytech/polkadot', branch = 'master' }
+xcm-executor = { default-features = false, git = 'https://github.com/paritytech/polkadot', branch = 'master' }
+xcm-builder = { default-features = false, git = 'https://github.com/paritytech/polkadot', branch = 'master' }
+
 [features]
 default = ['std']
 runtime-benchmarks = [
@@ -104,4 +114,11 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
+    'parachain-info/std',
+    'cumulus-pallet-parachain-system/std',
+    'cumulus-primitives-core/std',
+    'xcm/std',
+    'xcm-builder/std',
+    'xcm-executor/std',
+    'cumulus-pallet-xcm-handler/std',
 ]

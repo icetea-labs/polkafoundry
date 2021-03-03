@@ -41,8 +41,6 @@ pub struct FullDeps<C, P> {
 	pub deny_unsafe: DenyUnsafe,
 	/// The Node authority flag
 	pub is_authority: bool,
-	/// Whether to enable dev signer
-	pub enable_dev_signer: bool,
 	/// Network service
 	pub network: Arc<NetworkService<Block, Hash>>,
 	/// Ethereum pending transactions.
@@ -88,7 +86,6 @@ pub fn create_full<C, P, BE>(
 		pending_transactions,
 		filter_pool,
 		command_sink,
-		enable_dev_signer,
 	} = deps;
 
 	io.extend_with(
@@ -99,9 +96,7 @@ pub fn create_full<C, P, BE>(
 	);
 
 	let mut signers = Vec::new();
-	if enable_dev_signer {
-		signers.push(Box::new(EthDevSigner::new()) as Box<dyn EthSigner>);
-	}
+
 	io.extend_with(
 		EthApiServer::to_delegate(EthApi::new(
 			client.clone(),
