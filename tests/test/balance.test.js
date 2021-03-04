@@ -3,7 +3,7 @@ const { step } = require("mocha-steps");
 
 const { createAndFinalizeBlock, customRequest, describeWithPolkafoundry } = require("./utils");
 
-describeWithPolkafoundry("Frontier RPC (Balance)", 'polka-spec.json', (context) => {
+describeWithPolkafoundry("Polkafoundry RPC (Balance)", 'polka-spec.json', (context) => {
   const GENESIS_ACCOUNT = "0x6be02d1d3665660d22ff9624b7be0551ee1ac91b";
   const GENESIS_ACCOUNT_BALANCE = "340282366920938463463374607431768211455";
   const GENESIS_ACCOUNT_PRIVATE_KEY =
