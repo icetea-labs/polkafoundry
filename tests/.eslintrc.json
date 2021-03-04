@@ -1,19 +1,29 @@
 {
     "env": {
         "browser": true,
-        "es2021": true
+        "node": true,
+        "es2021": true,
+        "mocha": true
     },
     "parserOptions": {
         "ecmaVersion": 12,
         "sourceType": "module"
     },
-    
+    "plugins": ["mocha"],
     "extends": [
-        "airbnb",
-        "eslint:recommended",
-        "prettier"
+        "eslint:recommended", 
+        "plugin:mocha/recommended"
     ],
+    "settings": {
+        "mocha/additionalCustomNames": [
+            { "name": "describeModule", "type": "suite", "interfaces": [ "BDD" ] },
+            { "name": "testModule", "type": "testCase", "interfaces": [ "TDD" ] }
+        ]
+    },
     "rules": {
+        "camelcase": 0,
+        "mocha/no-skipped-tests": "error",
+        "mocha/no-exclusive-tests": "error",
         "indent": [
             2,
             2,
@@ -36,12 +46,6 @@
         "curly": [
             2,
             "all"
-        ],
-        "camelcase": [
-            2,
-            {
-                "properties": "always"
-            }
         ],
         "eqeqeq": [
             2,
