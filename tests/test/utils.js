@@ -49,12 +49,11 @@ const startPolkafoundryNode = async (specFileName, provider) => {
         `--no-telemetry`,
         `--no-prometheus`,
         `--sealing=Manual`,
-        `--no-grandpa`,
-        `--force-authoring`,
         `-linfo`,
         `--port=${PORT}`,
         `--rpc-port=${RPC_PORT}`,
         `--ws-port=${WS_PORT}`,
+        '--start-dev',
         `--tmp`,
     ];
     const binary = spawn(cmd, args);
@@ -66,6 +65,7 @@ const startPolkafoundryNode = async (specFileName, provider) => {
             );
         } else {
             console.error(err);
+            binary.kill();
         }
         process.exit(1);
     });
@@ -76,14 +76,18 @@ const startPolkafoundryNode = async (specFileName, provider) => {
             console.error(`Command: ${cmd} ${args.join(" ")}`);
             console.error(`Logs:`);
             console.error(binaryLogs.map((chunk) => chunk.toString()).join("\n"));
+            binary.kill();
             process.exit(1);
         }, SPAWNING_TIME - 2000);
         const onData = async (chunk) => {
+            const log = chunk.toString()
             if (process.env.DISPLAY_LOG) {
-                console.log(chunk.toString());
+                console.log(log);
             }
+
             binaryLogs.push(chunk);
-            if (chunk.toString().match(/Manual Seal Ready/)) {
+
+            if (log.match(/Polkafoundry dev ready/)) {
                 if (!provider || provider === 'http') {
                     // This is needed as the EVM runtime needs to warmup with a first call
                     await web3.eth.getChainId();

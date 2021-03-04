@@ -70,16 +70,18 @@ sp-trie = { git = 'https://github.com/paritytech/substrate.git', branch = 'maste
 
 substrate-frame-rpc-system = { git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
-fc-consensus = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
-fp-consensus = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
-fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
-fc-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
-fc-rpc-core = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+fc-consensus = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+fp-consensus = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+fp-rpc = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+fc-rpc = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
+fc-rpc-core = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
 
-cumulus-client-consensus-relay-chain = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
-cumulus-client-service = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
-cumulus-client-network = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
-cumulus-primitives-core = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-client-consensus-relay-chain = { git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-client-service = { git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-client-network = { git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-primitives-core = { git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-primitives-parachain-inherent = { git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-test-relay-sproof-builder = { git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
 
 polkadot-primitives = { git = 'https://github.com/paritytech/polkadot', branch = 'master' }
 polkadot-service = { git = 'https://github.com/paritytech/polkadot', branch = 'master' }

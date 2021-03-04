@@ -93,6 +93,10 @@ pub struct RunCmd {
 	#[structopt(long)]
 	pub parachain_id: Option<u32>,
 
+	/// Run in dev mode without relay chain
+	#[structopt(long, name = "start-dev")]
+	pub start_dev: bool,
+
 	/// Options are "instant", "manual", or timer interval in milliseconds
 	#[structopt(long, default_value = "instant")]
 	pub sealing: Sealing,

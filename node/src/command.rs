@@ -35,7 +35,7 @@ fn load_spec(
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
-		"Parachain Collator Template".into()
+		"Polkafoundry Parachain Collator".into()
 	}
 
 	fn impl_version() -> String {
@@ -44,7 +44,7 @@ impl SubstrateCli for Cli {
 
 	fn description() -> String {
 		format!(
-			"Parachain Collator Template\n\nThe command-line arguments provided first will be \
+			"Polkafoundry Parachain Collator\n\nThe command-line arguments provided first will be \
 		passed to the parachain node, while the arguments provided after -- will be passed \
 		to the relaychain node.\n\n\
 		{} [parachain-args] -- [relaychain-args]",
@@ -57,7 +57,7 @@ impl SubstrateCli for Cli {
 	}
 
 	fn support_url() -> String {
-		"https://github.com/substrate-developer-hub/substrate-parachain-template/issues/new".into()
+		"https://github.com/polkafoundry/newpolka/issues/new".into()
 	}
 
 	fn copyright_start_year() -> i32 {
@@ -75,7 +75,7 @@ impl SubstrateCli for Cli {
 
 impl SubstrateCli for RelayChainCli {
 	fn impl_name() -> String {
-		"Parachain Collator Template".into()
+		"Polkafoundry Parachain Collator".into()
 	}
 
 	fn impl_version() -> String {
@@ -83,7 +83,7 @@ impl SubstrateCli for RelayChainCli {
 	}
 
 	fn description() -> String {
-		"Parachain Collator Template\n\nThe command-line arguments provided first will be \
+		"Polkafoundry Parachain Collator\n\nThe command-line arguments provided first will be \
 		passed to the parachain node, while the arguments provided after -- will be passed \
 		to the relaychain node.\n\n\
 		rococo-collator [parachain-args] -- [relaychain-args]"
@@ -95,7 +95,7 @@ impl SubstrateCli for RelayChainCli {
 	}
 
 	fn support_url() -> String {
-		"https://github.com/substrate-developer-hub/substrate-parachain-template/issues/new".into()
+		"https://github.com/polkafoundry/newpolka/issues/new".into()
 	}
 
 	fn copyright_start_year() -> i32 {
@@ -239,10 +239,17 @@ pub fn run() -> Result<()> {
 		}
 		None => {
 			let runner = cli.create_runner(&*cli.run)?;
+			let collator = cli.run.base.validator || cli.collator;
 
 			runner.run_node_until_exit(|config| async move {
-				// TODO
 				let key = sp_core::Pair::generate().0;
+				if cli.run.start_dev {
+					return crate::service::start_dev(
+						config,
+						cli.run.sealing,
+						collator,
+					);
+				}
 
 				let extension = chain_spec::Extensions::try_get(&*config.chain_spec);
 				let relay_chain_id = extension.map(|e| e.relay_chain.clone());
@@ -272,7 +279,6 @@ pub fn run() -> Result<()> {
 					task_executor,
 					None,
 				).map_err(|err| format!("Relay chain argument error: {}", err))?;
-				let collator = cli.run.base.validator || cli.collator;
 
 				info!("Parachain id: {:?}", id);
 				info!("Parachain Account: {}", parachain_account);
@@ -283,7 +289,7 @@ pub fn run() -> Result<()> {
 					.await
 					.map(|r| r.0)
 					.map_err(Into::into)
-			})
+			}).map_err(Into::into)
 		}
 	}
 }

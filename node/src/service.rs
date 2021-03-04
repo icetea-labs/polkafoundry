@@ -1,17 +1,14 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use std::{sync::{Arc, Mutex}, cell::RefCell, time::Duration, collections::{HashMap, BTreeMap}};
+use std::{sync::{Arc, Mutex}, cell::RefCell, collections::{HashMap, BTreeMap}};
 use fc_rpc_core::types::{FilterPool, PendingTransactions};
-use sc_client_api::{ExecutorProvider, RemoteBackend, BlockchainEvents};
+use sc_client_api::{BlockchainEvents};
 use fc_consensus::FrontierBlockImport;
 use polkafoundry_runtime::{self, opaque::Block, RuntimeApi, SLOT_DURATION};
 use sc_service::{Configuration, PartialComponents, Role, TFullBackend, TFullClient, TaskManager};
-use sp_inherents::{InherentDataProviders, ProvideInherentData, InherentIdentifier, InherentData};
+use sp_inherents::{ProvideInherentData, InherentIdentifier, InherentData};
 use sc_executor::native_executor_instance;
 pub use sc_executor::NativeExecutor;
-use sp_consensus_aura::sr25519::{AuthorityPair as AuraPair};
-use sc_finality_grandpa::SharedVoterState;
-use sp_timestamp::InherentError;
 use sc_telemetry::TelemetrySpan;
 use sp_runtime::traits::BlakeTwo256;
 use sc_consensus_manual_seal::{run_manual_seal, EngineCommand, ManualSealParams};
@@ -24,7 +21,12 @@ use cumulus_client_network::build_block_announce_validator;
 use cumulus_client_consensus_relay_chain::{
 	build_relay_chain_consensus, BuildRelayChainConsensusParams,
 };
-use sp_core::{Pair, H160, H256};
+use sp_core::{Pair, H256};
+use futures::{Stream, StreamExt};
+use sp_timestamp::InherentError;
+use cumulus_primitives_parachain_inherent::{ParachainInherentData, INHERENT_IDENTIFIER as PARACHAIN_INHERENT_IDENTIFIER};
+use cumulus_primitives_core::PersistedValidationData;
+use cumulus_test_relay_sproof_builder::RelayStateSproofBuilder;
 
 use crate::cli::Sealing;
 
@@ -37,7 +39,68 @@ native_executor_instance!(
 
 type FullClient = TFullClient<Block, RuntimeApi, Executor>;
 type FullBackend = TFullBackend<Block>;
-type FullSelectChain = sc_consensus::LongestChain<FullBackend, Block>;
+
+/// Provide a mock duration starting at 0 in millisecond for timestamp inherent.
+/// Each call will increment timestamp by slot_duration making Aura think time has passed.
+pub struct MockTimestampInherentDataProvider;
+
+pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"timstap0";
+
+thread_local!(static TIMESTAMP: RefCell<u64> = RefCell::new(0));
+
+
+impl ProvideInherentData for MockTimestampInherentDataProvider {
+	fn inherent_identifier(&self) -> &'static InherentIdentifier {
+		&INHERENT_IDENTIFIER
+	}
+
+	fn provide_inherent_data(
+		&self,
+		inherent_data: &mut InherentData,
+	) -> Result<(), sp_inherents::Error> {
+		TIMESTAMP.with(|x| {
+			*x.borrow_mut() += SLOT_DURATION;
+			inherent_data.put_data(INHERENT_IDENTIFIER, &*x.borrow())
+		})
+	}
+
+	fn error_to_string(&self, error: &[u8]) -> Option<String> {
+		InherentError::try_from(&INHERENT_IDENTIFIER, error).map(|e| format!("{:?}", e))
+	}
+}
+
+pub struct MockParachainInherentDataProvider;
+
+impl ProvideInherentData for MockParachainInherentDataProvider {
+	fn inherent_identifier(&self) -> &'static InherentIdentifier {
+		&PARACHAIN_INHERENT_IDENTIFIER
+	}
+
+	fn provide_inherent_data(
+		&self,
+		inherent_data: &mut InherentData,
+	) -> Result<(), sp_inherents::Error> {
+		let (relay_storage_root, proof) =
+			RelayStateSproofBuilder::default().into_state_root_and_proof();
+
+		let data = ParachainInherentData {
+			validation_data: PersistedValidationData {
+				parent_head: Default::default(),
+				relay_parent_number: Default::default(),
+				relay_parent_storage_root: relay_storage_root,
+				max_pov_size: 0
+			},
+			relay_chain_state: proof,
+			downward_messages: vec![],
+			horizontal_messages: Default::default()
+		};
+		inherent_data.put_data(PARACHAIN_INHERENT_IDENTIFIER, &data )
+	}
+
+	fn error_to_string(&self, error: &[u8]) -> Option<String> {
+		InherentError::try_from(&PARACHAIN_INHERENT_IDENTIFIER, error).map(|e| format!("{:?}", e))
+	}
+}
 
 /// Starts a `ServiceBuilder` for a full service.
 ///
@@ -115,7 +178,7 @@ async fn start_node_impl<RB>(
 	polkadot_config: Configuration,
 	id: polkadot_primitives::v0::Id,
 	validator: bool,
-	rpc_ext_builder: RB,
+	_rpc_ext_builder: RB,
 ) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, Executor>>)>
 	where
 		RB: Fn(
@@ -172,7 +235,6 @@ async fn start_node_impl<RB>(
 	let subscription_task_executor =
 		sc_rpc::SubscriptionTaskExecutor::new(task_manager.spawn_handle());
 
-	let rpc_client = client.clone();
 	let rpc_extensions_builder = {
 		let client = client.clone();
 		let pool = transaction_pool.clone();
@@ -215,7 +277,6 @@ async fn start_node_impl<RB>(
 	})?;
 	// Spawn Frontier EthFilterApi maintenance task.
 	if filter_pool.is_some() {
-		use futures::StreamExt;
 		// Each filter is allowed to stay in the pool for 100 blocks.
 		const FILTER_RETAIN_THRESHOLD: u64 = 100;
 		task_manager.spawn_essential_handle().spawn(
@@ -237,7 +298,6 @@ async fn start_node_impl<RB>(
 
 	// Spawn Frontier pending transactions maintenance task (as essential, otherwise we leak).
 	if pending_transactions.is_some() {
-		use futures::StreamExt;
 		use fp_consensus::{FRONTIER_ENGINE_ID, ConsensusLog};
 		use sp_runtime::generic::OpaqueDigestItemId;
 
@@ -348,4 +408,205 @@ pub async fn start_node(
 		|_| Default::default(),
 	)
 		.await
+}
+
+pub fn start_dev(
+	config: Configuration,
+	sealing: Sealing,
+	validator: bool
+) -> sc_service::error::Result<TaskManager> {
+	let sc_service::PartialComponents {
+		client,
+		backend,
+		mut task_manager,
+		import_queue,
+		keystore_container,
+		select_chain: _,
+		transaction_pool,
+		inherent_data_providers,
+		other: (block_import, pending_transactions, filter_pool),
+	} = new_partial(&config)?;
+
+	inherent_data_providers
+		.register_provider(MockTimestampInherentDataProvider)
+		.map_err(Into::into)
+		.map_err(sp_consensus::error::Error::InherentData)?;
+
+	inherent_data_providers
+		.register_provider(MockParachainInherentDataProvider)
+		.map_err(Into::into)
+		.map_err(sp_consensus::error::Error::InherentData)?;
+
+	let (network, network_status_sinks, system_rpc_tx, network_starter) =
+		sc_service::build_network(sc_service::BuildNetworkParams {
+			config: &config,
+			client: client.clone(),
+			transaction_pool: transaction_pool.clone(),
+			spawn_handle: task_manager.spawn_handle(),
+			import_queue,
+			on_demand: None,
+			block_announce_validator_builder: None,
+		})?;
+	let mut command_sink = None;
+
+	if config.offchain_worker.enabled {
+		sc_service::build_offchain_workers(
+			&config, backend.clone(), task_manager.spawn_handle(), client.clone(), network.clone(),
+		);
+	};
+	let prometheus_registry = config.prometheus_registry().cloned();
+
+	if validator {
+		let env = sc_basic_authorship::ProposerFactory::new(
+			task_manager.spawn_handle(),
+			client.clone(),
+			transaction_pool.clone(),
+			prometheus_registry.as_ref(),
+		);
+		let commands_stream: Box<dyn Stream<Item = EngineCommand<H256>> + Send + Sync + Unpin> =
+			match sealing {
+				Sealing::Instant => {
+					Box::new(
+						transaction_pool
+							.pool()
+							.validated_pool()
+							.import_notification_stream()
+							.map(|_| EngineCommand::SealNewBlock {
+								create_empty: false,
+								finalize: false,
+								parent_hash: None,
+								sender: None,
+							}),
+					)
+				}
+				Sealing::Manual => {
+					let (sink, stream) = futures::channel::mpsc::channel(1000);
+					// Keep a reference to the other end of the channel. It goes to the RPC.
+					command_sink = Some(sink);
+					Box::new(stream)
+				}
+			};
+
+		let select_chain = sc_consensus::LongestChain::new(backend.clone());
+
+		task_manager.spawn_essential_handle().spawn_blocking(
+			"authorship_task",
+			run_manual_seal(ManualSealParams {
+				block_import,
+				env,
+				client: client.clone(),
+				pool: transaction_pool.pool().clone(),
+				commands_stream,
+				select_chain,
+				inherent_data_providers,
+				consensus_data_provider: None,
+			}),
+		);
+	};
+	let subscription_task_executor =
+		sc_rpc::SubscriptionTaskExecutor::new(task_manager.spawn_handle());
+
+	let rpc_extensions_builder = {
+		let client = client.clone();
+		let pool = transaction_pool.clone();
+		let network = network.clone();
+		let pending = pending_transactions.clone();
+		let filter_pool = filter_pool.clone();
+		Box::new(move |deny_unsafe, _| {
+			let deps = crate::rpc::FullDeps {
+				client: client.clone(),
+				pool: pool.clone(),
+				deny_unsafe,
+				is_authority: validator,
+				network: network.clone(),
+				pending_transactions: pending.clone(),
+				filter_pool: filter_pool.clone(),
+				command_sink: command_sink.clone(),
+			};
+			crate::rpc::create_full(deps, subscription_task_executor.clone())
+		})
+	};
+
+	let telemetry_span = TelemetrySpan::new();
+	let _telemetry_span_entered = telemetry_span.enter();
+
+	sc_service::spawn_tasks(sc_service::SpawnTasksParams {
+		network: network.clone(),
+		client: client.clone(),
+		keystore: keystore_container.sync_keystore(),
+		task_manager: &mut task_manager,
+		transaction_pool: transaction_pool.clone(),
+		rpc_extensions_builder,
+		on_demand: None,
+		remote_blockchain: None,
+		backend, network_status_sinks, system_rpc_tx, config, telemetry_span: Some(telemetry_span.clone()),
+	})?;
+
+	// Spawn Frontier EthFilterApi maintenance task.
+	if filter_pool.is_some() {
+		// Each filter is allowed to stay in the pool for 100 blocks.
+		const FILTER_RETAIN_THRESHOLD: u64 = 100;
+		task_manager.spawn_essential_handle().spawn(
+			"frontier-filter-pool",
+			client.import_notification_stream().for_each(move |notification| {
+				if let Ok(locked) = &mut filter_pool.clone().unwrap().lock() {
+					let imported_number: u64 = notification.header.number as u64;
+					for (k, v) in locked.clone().iter() {
+						let lifespan_limit = v.at_block + FILTER_RETAIN_THRESHOLD;
+						if lifespan_limit <= imported_number {
+							locked.remove(&k);
+						}
+					}
+				}
+				futures::future::ready(())
+			})
+		);
+	}
+
+	// Spawn Frontier pending transactions maintenance task (as essential, otherwise we leak).
+	if pending_transactions.is_some() {
+		use fp_consensus::{FRONTIER_ENGINE_ID, ConsensusLog};
+		use sp_runtime::generic::OpaqueDigestItemId;
+
+		const TRANSACTION_RETAIN_THRESHOLD: u64 = 5;
+		task_manager.spawn_essential_handle().spawn(
+			"frontier-pending-transactions",
+			client.import_notification_stream().for_each(move |notification| {
+
+				if let Ok(locked) = &mut pending_transactions.clone().unwrap().lock() {
+					// As pending transactions have a finite lifespan anyway
+					// we can ignore MultiplePostRuntimeLogs error checks.
+					let mut frontier_log: Option<_> = None;
+					for log in notification.header.digest.logs {
+						let log = log.try_to::<ConsensusLog>(OpaqueDigestItemId::Consensus(&FRONTIER_ENGINE_ID));
+						if let Some(log) = log {
+							frontier_log = Some(log);
+						}
+					}
+
+					let imported_number: u64 = notification.header.number as u64;
+
+					if let Some(ConsensusLog::EndBlock {
+									block_hash: _, transaction_hashes,
+								}) = frontier_log {
+						// Retain all pending transactions that were not
+						// processed in the current block.
+						locked.retain(|&k, _| !transaction_hashes.contains(&k));
+					}
+					locked.retain(|_, v| {
+						// Drop all the transactions that exceeded the given lifespan.
+						let lifespan_limit = v.at_block + TRANSACTION_RETAIN_THRESHOLD;
+						lifespan_limit > imported_number
+					});
+				}
+				futures::future::ready(())
+			})
+		);
+	}
+
+	network_starter.start_network();
+
+	log::info!("Polkafoundry dev ready");
+
+	Ok(task_manager)
 }
