@@ -10,9 +10,9 @@ check:
 test:
 	SKIP_WASM_BUILD=1 cargo test --release --all
 
-.PHONY: run
+.PHONY: run-dev
 run:
-	 cargo run --release -- --dev --tmp --sealing=Manual
+	 cargo run --release -- --dev --tmp --start-dev --validator  --sealing=Manual
 
 .PHONY: build
 build:
@@ -20,5 +20,5 @@ build:
 
 .PHONY: spec
 spec:
-	./target/release/polkafoundry build-spec --disable-default-bootnode --chain local > tests/specs/polka-spec.json
+	./target/debug/polkafoundry build-spec --disable-default-bootnode --chain local > tests/specs/polka-spec.json
 
