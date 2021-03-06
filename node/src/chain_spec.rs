@@ -1,11 +1,14 @@
-use cumulus_primitives_core::ParaId;
-use polkafoundry_runtime::{GenesisConfig, AccountId, Signature, EVMConfig, EthereumConfig};
-use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
-use sc_service::ChainType;
-use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
-use std::collections::BTreeMap;
+
+use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
+use sc_service::ChainType;
+
+use cumulus_primitives_core::ParaId;
+use polkafoundry_runtime::{GenesisConfig, AccountId, Signature, EVMConfig, EthereumConfig};
+use serde::{Deserialize, Serialize};
 
 /// Specialized `ChainSpec` for the normal parachain runtime.
 pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig, Extensions>;

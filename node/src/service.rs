@@ -1,19 +1,20 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
 use std::{sync::{Arc, Mutex}, cell::RefCell, collections::{HashMap, BTreeMap}};
-use fc_rpc_core::types::{FilterPool, PendingTransactions};
-use sc_client_api::{BlockchainEvents};
-use fc_consensus::FrontierBlockImport;
-use polkafoundry_runtime::{self, opaque::Block, RuntimeApi, SLOT_DURATION};
-use sc_service::{Configuration, PartialComponents, Role, TFullBackend, TFullClient, TaskManager};
-use sp_inherents::{ProvideInherentData, InherentIdentifier, InherentData};
-use sc_executor::native_executor_instance;
-pub use sc_executor::NativeExecutor;
-use sc_telemetry::TelemetrySpan;
+
+use sp_core::{Pair, H256};
 use sp_runtime::traits::BlakeTwo256;
-use sc_consensus_manual_seal::{run_manual_seal, EngineCommand, ManualSealParams};
-use polkadot_primitives::v0::CollatorPair;
 use sp_trie::PrefixedMemoryDB;
+use sp_inherents::{ProvideInherentData, InherentIdentifier, InherentData};
+use sp_timestamp::InherentError;
+
+use sc_service::{Configuration, PartialComponents, Role, TFullBackend, TFullClient, TaskManager};
+use sc_executor::native_executor_instance;
+use sc_telemetry::TelemetrySpan;
+use sc_consensus_manual_seal::{run_manual_seal, EngineCommand, ManualSealParams};
+use sc_client_api::{BlockchainEvents};
+pub use sc_executor::NativeExecutor;
+
 use cumulus_client_service::{
 	prepare_node_config, start_collator, start_full_node, StartCollatorParams, StartFullNodeParams,
 };
@@ -21,12 +22,14 @@ use cumulus_client_network::build_block_announce_validator;
 use cumulus_client_consensus_relay_chain::{
 	build_relay_chain_consensus, BuildRelayChainConsensusParams,
 };
-use sp_core::{Pair, H256};
-use futures::{Stream, StreamExt};
-use sp_timestamp::InherentError;
 use cumulus_primitives_parachain_inherent::{ParachainInherentData, INHERENT_IDENTIFIER as PARACHAIN_INHERENT_IDENTIFIER};
 use cumulus_primitives_core::PersistedValidationData;
 use cumulus_test_relay_sproof_builder::RelayStateSproofBuilder;
+use futures::{Stream, StreamExt};
+use fc_rpc_core::types::{FilterPool, PendingTransactions};
+use fc_consensus::FrontierBlockImport;
+use polkafoundry_runtime::{self, opaque::Block, RuntimeApi, SLOT_DURATION};
+use polkadot_primitives::v0::CollatorPair;
 
 use crate::cli::Sealing;
 
