@@ -10,9 +10,9 @@ check:
 test:
 	SKIP_WASM_BUILD=1 cargo test --release --all
 
-.PHONY: run-dev
+.PHONY: run
 run:
-	 cargo run --release -- --dev --tmp --start-dev --validator  --sealing=Manual
+	 cargo run -- --dev --tmp --start-dev --validator  --sealing=Manual
 
 .PHONY: build
 build:

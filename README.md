@@ -129,7 +129,7 @@ We'll begin by deploying a parachain template with parachain id 200. These instr
 ### Generate Genesis State
 To register a parachain, the relay chain needs to know the parachain's genesis state. The collator node can export that state to a file for us. The following command will create a file containing the parachain's entire genesis state, hex-encoded.
 ```bash
-./target/release/polkafoundry export-genesis-state --parachain-id 200 > para-200-genesis
+./target/release/polkafoundry export-genesis-state --chain  <path to spec json> --parachain-id 200 > para-200-genesis
 ```
 
 ### Obtain Wasm Validation Function
@@ -142,7 +142,11 @@ The relay chain also needs the parachain-specific validation logic to validate p
 ### Start Polkafoundry Node
 We can now start the collator node with the following command. Notice that we need to supply the same relay chain spec we used when launching relay chain nodes.
 ```bash
-./target/release/polkafoundry \
+ ./target/release/polkafoundry \
+  --rpc-port 9933 \
+  --chain <path to spec json>  \
+  --rpc-cors all \
+  --rpc-methods unsafe \
   --collator \
   --tmp \
   --parachain-id 200 \
@@ -151,7 +155,12 @@ We can now start the collator node with the following command. Notice that we ne
   --alice \
   -- \
   --execution wasm \
-  --chain <relay chain spec json> \
+  --chain ../polkadot/rococo-custom.json \
+  --port 30343 \
+  --ws-port 9977
+
+  --execution wasm \
+  --chain ../polkadot/rococo-custom.json \
   --port 30343 \
   --ws-port 9977
 ```
