@@ -1,10 +1,10 @@
-# Substrate Node Template
+# Polkafoundry
 
-A fresh FRAME-based [Substrate](https://www.substrate.io/) node, ready for hacking :rocket:
+Ethereum compatible parachain based on [Substrate](https://www.substrate.io/) node, ready for hacking :rocket:
 
 ## Getting Started
 
-Follow these steps to get started with the Node Template :hammer_and_wrench:
+Follow these steps to get started with Polkafoundry :hammer_and_wrench:
 
 ### Rust Setup
 
@@ -33,7 +33,7 @@ Once the project has been built, the following command can be used to explore al
 subcommands:
 
 ```sh
-./target/release/node-template -h
+./target/release/polkafoundry -h
 ```
 
 ## Run
@@ -47,13 +47,13 @@ node.
 This command will start the single-node development chain with persistent state:
 
 ```bash
-./target/release/node-template --dev
+./target/release/polkafoundry --dev
 ```
 
 Purge the development chain's state:
 
 ```bash
-./target/release/node-template purge-chain --dev
+./target/release/polkafoundry purge-chain --dev
 ```
 
 Start the development chain with detailed logging:
@@ -67,96 +67,192 @@ RUST_LOG=debug RUST_BACKTRACE=1 ./target/release/node-template -lruntime=debug -
 If you want to see the multi-node consensus algorithm in action, refer to
 [our Start a Private Network tutorial](https://substrate.dev/docs/en/tutorials/start-a-private-network/).
 
-## Template Structure
+## Run Parachain
 
-A Substrate project such as this consists of a number of components that are spread across a few
-directories.
+### Starting the Relay Chain
+Before we can attach any cumulus-based parachains, we need to compile and launch the relay-chain.
 
-### Node
+## Compile
+```bash
+# Clone the Polkadot Repository
+git clone https://github.com/paritytech/polkadot.git
 
-A blockchain node is an application that allows users to participate in a blockchain network.
-Substrate-based blockchain nodes expose a number of capabilities:
+# Switch into the Polkadot directory
+cd polkadot
 
--   Networking: Substrate nodes use the [`libp2p`](https://libp2p.io/) networking stack to allow the
-    nodes in the network to communicate with one another.
--   Consensus: Blockchains must have a way to come to
-    [consensus](https://substrate.dev/docs/en/knowledgebase/advanced/consensus) on the state of the
-    network. Substrate makes it possible to supply custom consensus engines and also ships with
-    several consensus mechanisms that have been built on top of
-    [Web3 Foundation research](https://research.web3.foundation/en/latest/polkadot/NPoS/index.html).
--   RPC Server: A remote procedure call (RPC) server is used to interact with Substrate nodes.
+# Build the Relay Chain Node
+cargo build --release --features=real-overseer
 
-There are several files in the `node` directory - take special note of the following:
+# Print the help page to ensure the node build correctly
+./target/release/polkadot --help
 
--   [`chain_spec.rs`](./node/src/chain_spec.rs): A
-    [chain specification](https://substrate.dev/docs/en/knowledgebase/integrate/chain-spec) is a
-    source code file that defines a Substrate chain's initial (genesis) state. Chain specifications
-    are useful for development and testing, and critical when architecting the launch of a
-    production chain. Take note of the `development_config` and `testnet_genesis` functions, which
-    are used to define the genesis state for the local development chain configuration. These
-    functions identify some
-    [well-known accounts](https://substrate.dev/docs/en/knowledgebase/integrate/subkey#well-known-keys)
-    and use them to configure the blockchain's initial state.
--   [`service.rs`](./node/src/service.rs): This file defines the node implementation. Take note of
-    the libraries that this file imports and the names of the functions it invokes. In particular,
-    there are references to consensus-related topics, such as the
-    [longest chain rule](https://substrate.dev/docs/en/knowledgebase/advanced/consensus#longest-chain-rule),
-    the [Aura](https://substrate.dev/docs/en/knowledgebase/advanced/consensus#aura) block authoring
-    mechanism and the
-    [GRANDPA](https://substrate.dev/docs/en/knowledgebase/advanced/consensus#grandpa) finality
-    gadget.
+# Generate a Plain Chain Spec
+./target/release/polkadot build-spec --chain rococo-local --disable-default-bootnode > rococo-custom-plain.json
 
-After the node has been [built](#build), refer to the embedded documentation to learn more about the
-capabilities and configuration parameters that it exposes:
+# Convert to Raw Chain Spec
+./target/release/polkadot build-spec --chain rococo-custom-plain.json --raw --disable-default-bootnode > rococo-custom.json
 
-```shell
-./target/release/node-template --help
+Your final spec must start with the word rococo or the node will not know what runtime logic it includes.
+````
+
+### Start Alice's Node
+
+```bash
+./target/release/polkadot 
+  --chain <path to spec json> \
+  --tmp \
+  --ws-port 9944 \
+  --port 30333 \
+  --alice
+```
+The port and websocket port specified here are the defaults and thus those flags can be omitted. However I've chosen to leave them in to enforce the habit of checking their values. Because Alice is using the defaults, no other nodes on the relay chain or parachains can use these ports.
+
+When the node starts you will see several log messages. Take note of one that looks as follows. This lists Alice's Peer Id. We will need it when connecting other nodes to her.
+
+### Connect Apps UI
+To explore and interact with the network, you can use the Polkadot JS Apps UI. If you've started this node using the command above, you can access the node as https://polkadot.js.org/apps/#/?rpc=ws://localhost:9944
+
+### Start Bob's Node
+```bash
+./target/release/polkadot 
+  --chain <path to spec json> \
+  --tmp \
+  --ws-port 9955 \
+  --port 30334 \
+  --bob \
+  --bootnodes /ip4/<Alice IP>/tcp/30333/p2p/<Alice Peer ID>
 ```
 
-### Runtime
+## Launching a Parachain
+We'll begin by deploying a parachain template with parachain id 200. These instructions are written specifically for parachain id 200, however you can re-use these instructions with any parachain id by adjusting occurrences of the number 200 accordingly.
 
-In Substrate, the terms
-"[runtime](https://substrate.dev/docs/en/knowledgebase/getting-started/glossary#runtime)" and
-"[state transition function](https://substrate.dev/docs/en/knowledgebase/getting-started/glossary#stf-state-transition-function)"
-are analogous - they refer to the core logic of the blockchain that is responsible for validating
-blocks and executing the state changes they define. The Substrate project in this repository uses
-the [FRAME](https://substrate.dev/docs/en/knowledgebase/runtime/frame) framework to construct a
-blockchain runtime. FRAME allows runtime developers to declare domain-specific logic in modules
-called "pallets". At the heart of FRAME is a helpful
-[macro language](https://substrate.dev/docs/en/knowledgebase/runtime/macros) that makes it easy to
-create pallets and flexibly compose them to create blockchains that can address
-[a variety of needs](https://www.substrate.io/substrate-users/).
+### Generate Genesis State
+To register a parachain, the relay chain needs to know the parachain's genesis state. The collator node can export that state to a file for us. The following command will create a file containing the parachain's entire genesis state, hex-encoded.
+```bash
+./target/release/polkafoundry export-genesis-state --chain  <path to spec json> --parachain-id 200 > para-200-genesis
+```
 
-Review the [FRAME runtime implementation](./runtime/src/lib.rs) included in this template and note
-the following:
+### Obtain Wasm Validation Function
+The relay chain also needs the parachain-specific validation logic to validate parachain blocks. The collator node also has a command to produce this wasm blob.
 
--   This file configures several pallets to include in the runtime. Each pallet configuration is
-    defined by a code block that begins with `impl $PALLET_NAME::Config for Runtime`.
--   The pallets are composed into a single runtime by way of the
-    [`construct_runtime!`](https://crates.parity.io/frame_support/macro.construct_runtime.html)
-    macro, which is part of the core
-    [FRAME Support](https://substrate.dev/docs/en/knowledgebase/runtime/frame#support-library)
-    library.
+```bash
+./target/release/polkafoundry export-genesis-wasm > para-200-wasm
+```
 
-### Pallets
+### Start Polkafoundry Node
+We can now start the collator node with the following command. Notice that we need to supply the same relay chain spec we used when launching relay chain nodes.
+```bash
+ ./target/release/polkafoundry \
+  --rpc-port 9933 \
+  --chain <path to spec json>  \
+  --rpc-cors all \
+  --rpc-methods unsafe \
+  --collator \
+  --tmp \
+  --parachain-id 200 \
+  --port 40333 \
+  --ws-port 9844 \
+  --alice \
+  -- \
+  --execution wasm \
+  --chain ../polkadot/rococo-custom.json \
+  --port 30343 \
+  --ws-port 9977
 
-The runtime in this project is constructed using many FRAME pallets that ship with the
-[core Substrate repository](https://github.com/paritytech/substrate/tree/master/frame) and a
-template pallet that is [defined in the `pallets`](./pallets/template/src/lib.rs) directory.
+  --execution wasm \
+  --chain ../polkadot/rococo-custom.json \
+  --port 30343 \
+  --ws-port 9977
+```
 
-A FRAME pallet is compromised of a number of blockchain primitives:
+The first thing to notice about this command is that several arguments are passed before the lone --, and several more arguments are passed after it. A cumulus collator contains the actual collator node, and also an embedded relay chain node. The arguments before the -- are for the collator, and the arguments after the -- are for the embedded relay chain node.
 
--   Storage: FRAME defines a rich set of powerful
-    [storage abstractions](https://substrate.dev/docs/en/knowledgebase/runtime/storage) that makes
-    it easy to use Substrate's efficient key-value database to manage the evolving state of a
-    blockchain.
--   Dispatchables: FRAME pallets define special types of functions that can be invoked (dispatched)
-    from outside of the runtime in order to update its state.
--   Events: Substrate uses [events](https://substrate.dev/docs/en/knowledgebase/runtime/events) to
-    notify users of important changes in the runtime.
--   Errors: When a dispatchable fails, it returns an error.
--   Config: The `Config` configuration interface is used to define the types and parameters upon
-    which a FRAME pallet depends.
+We give the collator a base path and ports as we did for the relay chain node previously. We also specify the parachain id. Remember to change these collator-specific values if you are executing these instructions a second time for a second parachain. Then we give the embedded relay chain node the relay chain spec we are using. Finally, we give the embedded relay chain node some peer addresses.
+
+### Is It Working?
+
+At this point you should see your collator node running and peering with the relay-chain nodes. You should not see it authoring parachain blocks yet. Authoring will begin when the collator is actually registered on the relay chain (the next step).
+
+At this point your collator's logs should look something like this:
+
+```bash
+2021-01-14 15:47:03  Cumulus Test Parachain Collator
+2021-01-14 15:47:03  ✌️  version 0.1.0-4786231-x86_64-linux-gnu
+2021-01-14 15:47:03  ❤️  by Parity Technologies <admin@parity.io>, 2017-2021
+2021-01-14 15:47:03  📋 Chain specification: Local Testnet
+2021-01-14 15:47:03  🏷 Node name: Alice
+2021-01-14 15:47:03  👤 Role: AUTHORITY
+2021-01-14 15:47:03  💾 Database: RocksDb at /tmp/substrateIZ0HQm/chains/local_testnet/db
+2021-01-14 15:47:03  ⛓  Native runtime: cumulus-test-parachain-3 (cumulus-test-parachain-1.tx1.au1)
+2021-01-14 15:47:03  Parachain id: Id(200)
+2021-01-14 15:47:03  Parachain Account: 5Ec4AhPTL6nWnUnw58QzjJvFd3QATwHA3UJnvSD4GVSQ7Gop
+2021-01-14 15:47:03  Parachain genesis state: 0x000000000000000000000000000000000000000000000000000000000000000000b86f2a5f94d1029bf54b07867c3c2fa0339e69e31748cfd5921bbb2f176ada6f03170a2e7597b7b7e3d84c05391d139a62b157e78786d8c082f29dcf4c11131400
+2021-01-14 15:47:03  Is collating: yes
+2021-01-14 15:47:04  [Relaychain] 🔨 Initializing Genesis block/state (state: 0x1693…5e3f, header-hash: 0x2fc1…2ec3)
+2021-01-14 15:47:04  [Relaychain] 👴 Loading GRANDPA authority set from genesis on what appears to be first startup.
+2021-01-14 15:47:04  [Relaychain] ⏱  Loaded block-time = 6000 milliseconds from genesis on first-launch
+2021-01-14 15:47:04  [Relaychain] 👶 Creating empty BABE epoch changes on what appears to be first startup.
+2021-01-14 15:47:04  [Relaychain] 🏷 Local node identity is: 12D3KooWDTBqULpZPTTnRrEZtA53xG3Ade223mQfbLWstg7L3HA4
+2021-01-14 15:47:04  [Relaychain] 📦 Highest known block at #0
+2021-01-14 15:47:04  [Relaychain] 〽️ Prometheus server started at 127.0.0.1:9616
+2021-01-14 15:47:04  [Relaychain] Listening for new connections on 127.0.0.1:9977.
+2021-01-14 15:47:05  [Parachain] 🔨 Initializing Genesis block/state (state: 0xb86f…da6f, header-hash: 0x755b…42ca)
+2021-01-14 15:47:05  [Parachain] Using default protocol ID "sup" because none is configured in the chain specs
+2021-01-14 15:47:05  [Parachain] 🏷 Local node identity is: 12D3KooWEmhCGHnxfuYX9yWoWmnS1MSU7mkoZFnPSAKws2ZL3CCd
+2021-01-14 15:47:05  [Parachain] 📦 Highest known block at #0
+2021-01-14 15:47:05  [Parachain] Listening for new connections on 127.0.0.1:9855.
+2021-01-14 15:47:06  [Relaychain] 🔍 Discovered new external address for our node: /ip4/127.0.0.1/tcp/30343/p2p/12D3KooWDTBqULpZPTTnRrEZtA53xG3Ade223mQfbLWstg7L3HA4
+2021-01-14 15:47:06  [Relaychain] 🔍 Discovered new external address for our node: /ip4/192.168.178.77/tcp/30343/p2p/12D3KooWDTBqULpZPTTnRrEZtA53xG3Ade223mQfbLWstg7L3HA4
+2021-01-14 15:47:06  [Parachain] 🔍 Discovered new external address for our node: /ip4/192.168.178.77/tcp/30433/p2p/12D3KooWEmhCGHnxfuYX9yWoWmnS1MSU7mkoZFnPSAKws2ZL3CCd
+2021-01-14 15:47:08  [Relaychain] 👶 New epoch 29 launching at block 0x765e…c213 (block slot 268439271 >= start slot 268439271).
+2021-01-14 15:47:08  [Relaychain] 👶 Next epoch starts at slot 268439281
+2021-01-14 15:47:08  [Relaychain] ✨ Imported #291 (0x765e…c213)
+2021-01-14 15:47:09  [Relaychain] 💤 Idle (3 peers), best: #291 (0x765e…c213), finalized #289 (0xca88…7eb1), ⬇ 196.9kiB/s ⬆ 161.9kiB/s
+2021-01-14 15:47:10  [Parachain] 💤 Idle (0 peers), best: #0 (0x755b…42ca), finalized #0 (0x755b…42ca), ⬇ 809.4kiB/s ⬆ 773.7kiB/s
+2021-01-14 15:47:12  [Relaychain] ✨ Imported #292 (0x1cdf…7cf7)
+2021-01-14 15:47:12  [Relaychain] ✨ Imported #292 (0x26a5…7d91)
+2021-01-14 15:47:14  [Relaychain] 💤 Idle (3 peers), best: #292 (0x1cdf…7cf7), finalized #289 (0xca88…7eb1), ⬇ 256.8kiB/s ⬆ 270.0kiB/s
+2021-01-14 15:47:15  [Parachain] 💤 Idle (0 peers), best: #0 (0x755b…42ca), finalized #0 (0x755b…42ca), ⬇ 814.3kiB/s ⬆ 799.9kiB/s
+2021-01-14 15:47:18  [Relaychain] ✨ Imported #293 (0x93d5…c54c)
+2021-01-14 15:47:19  [Relaychain] 💤 Idle (3 peers), best: #293 (0x93d5…c54c), finalized #290 (0x1109…ea3d), ⬇ 203.6kiB/s ⬆ 200.5kiB/s
+2021-01-14 15:47:20  [Parachain] 💤 Idle (0 peers), best: #0 (0x755b…42ca), finalized #0 (0x755b…42ca), ⬇ 751.0kiB/s ⬆ 730.2kiB/s
+2021-01-14 15:47:24  [Relaychain] ✨ Imported #294 (0xbd35…8364)
+2021-01-14 15:47:24  [Relaychain] 💤 Idle (3 peers), best: #294 (0xbd35…8364), finalized #290 (0x1109…ea3d), ⬇ 175.6kiB/s ⬆ 181.4kiB/s
+2021-01-14 15:47:25  [Parachain] 💤 Idle (0 peers), best: #0 (0x755b…42ca), finalized #0 (0x755b…42ca), ⬇ 727.8kiB/s ⬆ 736.7kiB/s
+```
+
+## Parachain Registration
+We have our relay chain launched and our parachain collator ready to go. Now we have to register the parachain on the relay chain. In the live Polkadot network, this will be accomplished with parachain auctions. But today we will do it with Sudo.
+
+### Registration Transaction
+The transaction can be submitted from `Apps > Sudo > parasSudoWrapper > sudoScheduleParaInitialize`
+with the following parameters:
+
+- id: `200`
+- genesisHead: upload the file `para-200-genesis` (from the previous step)
+- validationCode: upload the file `para-200-wasm` (from the previous step)
+- parachain: Yes
+
+### Block Production
+
+The collator should start producing parachain blocks (aka collating) once the registration is
+successful. The collator should start producing log messages like the following:
+
+```
+2021-01-14 16:09:54  [Relaychain] ✨ Imported #519 (0x7c22…71b8)
+2021-01-14 16:09:54  [Relaychain] Starting collation for relay parent 0x7c22474df9f10b44aed7616c3ad9aef4d0db82e8421a81cbc3c10e63569971b8 on parent 0x4d77beb48b42979b070e0e81357f66629da194faa0f72be0bb70ee6828c220d0.
+2021-01-14 16:09:54  [Relaychain] 🙌 Starting consensus session on top of parent 0x4d77beb48b42979b070e0e81357f66629da194faa0f72be0bb70ee6828c220d0
+2021-01-14 16:09:54  [Relaychain] 🎁 Prepared block for proposing at 18 [hash: 0x8cb3aa750b83e1dfc120c81243e8d7fdb3f6926adfe79b977ec7d8f4a5f7bb7b; parent_hash: 0x4d77…20d0; extrinsics (3): [0x9d73…3794, 0xd860…3108, 0x6fdb…0112]]
+2021-01-14 16:09:54  [Relaychain] Produced proof-of-validity candidate 0x67b91f2a3e0cc82d0b18a2ec31212081853b24e5c8f7de98d39fabfd89f46bee from block 0x8cb3aa750b83e1dfc120c81243e8d7fdb3f6926adfe79b977ec7d8f4a5f7bb7b.
+2021-01-14 16:09:54  [Parachain] ✨ Imported #18 (0x8cb3…bb7b)
+2021-01-14 16:09:54  [Relaychain] 💤 Idle (4 peers), best: #519 (0x7c22…71b8), finalized #516 (0x982f…d9cf), ⬇ 239.4kiB/s ⬆ 239.6kiB/s
+2021-01-14 16:09:55  [Parachain] 💤 Idle (0 peers), best: #17 (0x4d77…20d0), finalized #15 (0x25ec…a10b), ⬇ 633.5kiB/s ⬆ 622.3kiB/s
+2021-01-14 16:09:59  [Relaychain] 💤 Idle (4 peers), best: #519 (0x7c22…71b8), finalized #517 (0x6852…ec17), ⬇ 216.3kiB/s ⬆ 216.6kiB/s
+2021-01-14 16:10:00  [Relaychain] ✨ Imported #520 (0x0ecb…4dba)
+2021-01-14 16:10:00  [Parachain] 💤 Idle (0 peers), best: #17 (0x4d77…20d0), finalized #16 (0xd7e0…ae67), ⬇ 503.7kiB/s ⬆ 494.3kiB/s
+2021-01-14 16:10:04  [Relaychain] 💤 Idle (4 peers), best: #520 (0x0ecb…4dba), finalized #518 (0x15df…f3fa), ⬇ 282.0kiB/s ⬆ 275.3kiB/s
+2021-01-14 16:10:05  [Parachain] 💤 Idle (0 peers), best: #17 (0x4d77…20d0), finalized #16 (0xd7e0…ae67), ⬇ 605.2kiB/s ⬆ 595.0kiB/s
+```
 
 ### Run in Docker
 

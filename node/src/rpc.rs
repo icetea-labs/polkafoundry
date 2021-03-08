@@ -2,34 +2,24 @@
 
 use std::{sync::Arc};
 
-use fc_rpc_core::types::{PendingTransactions, FilterPool};
-use sc_consensus_manual_seal::rpc::{ManualSeal, ManualSealApi};
-use polkafoundry_runtime::{Hash, AccountId, Index, opaque::Block, Balance};
 use sp_api::ProvideRuntimeApi;
 use sp_transaction_pool::TransactionPool;
 use sp_blockchain::{Error as BlockChainError, HeaderMetadata, HeaderBackend};
+use sp_runtime::traits::BlakeTwo256;
+use sp_block_builder::BlockBuilder;
+
 use sc_rpc_api::DenyUnsafe;
 use sc_client_api::{
 	backend::{StorageProvider, Backend, StateBackend, AuxStore},
 	client::BlockchainEvents
 };
 use sc_rpc::SubscriptionTaskExecutor;
-use sp_runtime::traits::BlakeTwo256;
-use sp_block_builder::BlockBuilder;
 use sc_network::NetworkService;
-use jsonrpc_pubsub::manager::SubscriptionManager;
+use sc_consensus_manual_seal::rpc::{ManualSeal, ManualSealApi};
 
-/// Light client extra dependencies.
-pub struct LightDeps<C, F, P> {
-	/// The client instance to use.
-	pub client: Arc<C>,
-	/// Transaction pool instance.
-	pub pool: Arc<P>,
-	/// Remote access to the blockchain (async).
-	pub remote_blockchain: Arc<dyn sc_client_api::light::RemoteBlockchain<Block>>,
-	/// Fetcher instance.
-	pub fetcher: Arc<F>,
-}
+use fc_rpc_core::types::{PendingTransactions, FilterPool};
+use jsonrpc_pubsub::manager::SubscriptionManager;
+use polkafoundry_runtime::{Hash, AccountId, Index, opaque::Block, Balance};
 
 /// Full client dependencies.
 pub struct FullDeps<C, P> {
@@ -41,8 +31,6 @@ pub struct FullDeps<C, P> {
 	pub deny_unsafe: DenyUnsafe,
 	/// The Node authority flag
 	pub is_authority: bool,
-	/// Whether to enable dev signer
-	pub enable_dev_signer: bool,
 	/// Network service
 	pub network: Arc<NetworkService<Block, Hash>>,
 	/// Ethereum pending transactions.
@@ -74,7 +62,7 @@ pub fn create_full<C, P, BE>(
 	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApi};
 	use fc_rpc::{
 		EthApi, EthApiServer, EthFilterApi, EthFilterApiServer, NetApi, NetApiServer,
-		EthPubSubApi, EthPubSubApiServer, Web3Api, Web3ApiServer, EthDevSigner, EthSigner,
+		EthPubSubApi, EthPubSubApiServer, Web3Api, Web3ApiServer,
 		HexEncodedIdProvider,
 	};
 
@@ -88,7 +76,6 @@ pub fn create_full<C, P, BE>(
 		pending_transactions,
 		filter_pool,
 		command_sink,
-		enable_dev_signer,
 	} = deps;
 
 	io.extend_with(
@@ -98,10 +85,8 @@ pub fn create_full<C, P, BE>(
 		TransactionPaymentApi::to_delegate(TransactionPayment::new(client.clone()))
 	);
 
-	let mut signers = Vec::new();
-	if enable_dev_signer {
-		signers.push(Box::new(EthDevSigner::new()) as Box<dyn EthSigner>);
-	}
+	let signers = Vec::new();
+
 	io.extend_with(
 		EthApiServer::to_delegate(EthApi::new(
 			client.clone(),
@@ -159,34 +144,6 @@ pub fn create_full<C, P, BE>(
 		}
 		_ => {}
 	}
-
-	io
-}
-
-/// Instantiate all Light RPC extensions.
-pub fn create_light<C, P, M, F>(
-	deps: LightDeps<C, F, P>,
-) -> jsonrpc_core::IoHandler<M> where
-	C: sp_blockchain::HeaderBackend<Block>,
-	C: Send + Sync + 'static,
-	F: sc_client_api::light::Fetcher<Block> + 'static,
-	P: TransactionPool + 'static,
-	M: jsonrpc_core::Metadata + Default,
-{
-	use substrate_frame_rpc_system::{LightSystem, SystemApi};
-
-	let LightDeps {
-		client,
-		pool,
-		remote_blockchain,
-		fetcher
-	} = deps;
-	let mut io = jsonrpc_core::IoHandler::default();
-	io.extend_with(
-		SystemApi::<Hash, AccountId, Index>::to_delegate(
-			LightSystem::new(client, remote_blockchain, fetcher, pool)
-		)
-	);
 
 	io
 }
