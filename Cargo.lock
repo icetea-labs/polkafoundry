@@ -1109,7 +1109,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-collator"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "cumulus-client-consensus-common",
  "cumulus-client-network",
@@ -1133,7 +1133,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-consensus-common"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "async-trait",
  "dyn-clone",
@@ -1158,7 +1158,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-consensus-relay-chain"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "async-trait",
  "cumulus-client-consensus-common",
@@ -1183,7 +1183,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-network"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "derive_more",
  "futures 0.3.13",
@@ -1207,7 +1207,7 @@ dependencies = [
 [[package]]
 name = "cumulus-client-service"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "cumulus-client-collator",
  "cumulus-client-consensus-common",
@@ -1231,12 +1231,11 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-parachain-system"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "cumulus-primitives-core",
  "cumulus-primitives-parachain-inherent",
  "environmental",
- "frame-executive",
  "frame-support",
  "frame-system",
  "hash-db",
@@ -1261,7 +1260,7 @@ dependencies = [
 [[package]]
 name = "cumulus-pallet-xcm-handler"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "cumulus-primitives-core",
  "frame-support",
@@ -1270,12 +1269,13 @@ dependencies = [
  "parity-scale-codec",
  "sp-std",
  "xcm",
+ "xcm-executor",
 ]
 
 [[package]]
 name = "cumulus-primitives-core"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "impl-trait-for-tuples 0.2.1",
  "parity-scale-codec",
@@ -1290,7 +1290,7 @@ dependencies = [
 [[package]]
 name = "cumulus-primitives-parachain-inherent"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "cumulus-primitives-core",
  "parity-scale-codec",
@@ -1308,7 +1308,7 @@ dependencies = [
 [[package]]
 name = "cumulus-test-relay-sproof-builder"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "cumulus-primitives-core",
  "parity-scale-codec",
@@ -5042,7 +5042,7 @@ dependencies = [
 [[package]]
 name = "parachain-info"
 version = "0.1.0"
-source = "git+https://github.com/polkafoundry/cumulus.git?branch=v0.1-polka#dafbe8c63270dc42227b9b3431375f58b15aa765"
+source = "git+https://github.com/paritytech/cumulus.git?branch=master#cb5a244f3d4e7966fe1fb6ccd32030dd715d0b40"
 dependencies = [
  "cumulus-primitives-core",
  "frame-support",
