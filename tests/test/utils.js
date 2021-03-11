@@ -1,7 +1,6 @@
 const Web3 = require('web3');
-const { RPC_PORT, SPECS_PATH, PORT, WS_PORT, BINARY_PATH, SPAWNING_TIME } = require('./constants');
+const { RPC_PORT, SPECS_PATH, PORT, WS_PORT, BINARY_PATH, SPAWNING_TIME, GENESIS_ACCOUNT, GENESIS_ACCOUNT_PRIVATE_KEY } = require('./constants');
 const { spawn } = require('child_process');
-
 
 const customRequest = async (web3, method, params) => {
     return new Promise((resolve, reject) => {
@@ -26,6 +25,37 @@ const customRequest = async (web3, method, params) => {
     });
 }
 
+const deployContract = async (web3, contractJson, args, gas, gasPrice) => {
+    return new Promise(async (resolve, reject) => {
+        const contract = await new web3.eth.Contract(contractJson.abi);
+        const deployJson = {
+            data: contractJson.bytecode,
+        }
+
+        if (args && args.length) {
+            deployJson.arguments = args;
+        }
+        const deployContract = await contract.deploy(deployJson)
+        const deployData = await deployContract.encodeABI();
+        const tx = await web3.eth.accounts.signTransaction({
+            from: GENESIS_ACCOUNT,
+            data: deployData,
+            gas,
+            gasPrice,
+        }, GENESIS_ACCOUNT_PRIVATE_KEY);
+
+        web3.eth.sendSignedTransaction(tx.rawTransaction, (error, result) => {
+            if (error) {
+                reject(
+                    `Failed to deploy contract: ${
+                        error.message || error.toString()
+                    }`
+                );
+            }
+            resolve(result);
+        });
+    })
+}
 // Create a block and finalize it.
 // It will include all previously executed transactions since the last finalized block.
 async function createAndFinalizeBlock(web3) {
@@ -139,5 +169,6 @@ module.exports = {
     customRequest,
     createAndFinalizeBlock,
     startPolkafoundryNode,
-    describeWithPolkafoundry
+    describeWithPolkafoundry,
+    deployContract,
 }

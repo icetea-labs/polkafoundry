@@ -62,10 +62,10 @@ pallet-ethereum = { default-features = false, git = 'https://github.com/polkafou
 
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'v0.1-polka' }
 
-cumulus-pallet-parachain-system = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
-cumulus-primitives-core = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
-cumulus-pallet-xcm-handler =  { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
-parachain-info = { default-features = false, git = 'https://github.com/polkafoundry/cumulus.git', branch = 'v0.1-polka' }
+cumulus-pallet-parachain-system = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'master' }
+cumulus-primitives-core = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'master' }
+cumulus-pallet-xcm-handler =  { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'master' }
+parachain-info = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'master' }
 
 polkadot-parachain = { default-features = false, git = 'https://github.com/paritytech/polkadot', branch = 'master' }
 xcm = { default-features = false, git = 'https://github.com/paritytech/polkadot', branch = 'master' }
