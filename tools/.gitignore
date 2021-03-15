@@ -1,3 +1,4 @@
 **/*.log
 /node_modules
-**/*.json
+**/rococo-local.json
+**/rococo-local-raw.json
