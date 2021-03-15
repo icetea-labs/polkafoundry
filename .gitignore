@@ -13,3 +13,4 @@
 .local
 
 .idea
+**/node_modules/
