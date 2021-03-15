@@ -18,4 +18,4 @@ EXPOSE 30333 9933 9944
 
 VOLUME ["/data"]
 
-#ENTRYPOINT ["/polkafoundry/polkafoundry"]
+ENTRYPOINT ["/polkafoundry/polkafoundry"]
