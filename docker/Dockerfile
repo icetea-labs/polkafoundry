@@ -1,4 +1,4 @@
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 LABEL description="Binary for Polkafoundry Collator"
 
 RUN useradd -m -u 1000 -U -s /bin/sh -d /polkafoundry polkafoundry && \
@@ -18,4 +18,4 @@ EXPOSE 30333 9933 9944
 
 VOLUME ["/data"]
 
-ENTRYPOINT ["/polkafoundry/polkafoundry"]
+#ENTRYPOINT ["/polkafoundry/polkafoundry"]
