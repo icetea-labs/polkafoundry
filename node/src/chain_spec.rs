@@ -50,7 +50,7 @@ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
 pub fn development_config(id: ParaId) -> ChainSpec {
 	ChainSpec::from_genesis(
 		// Name
-		"Development",
+		"Halongbay Testnet",
 		// ID
 		"dev",
 		ChainType::Local,
@@ -80,7 +80,7 @@ pub fn development_config(id: ParaId) -> ChainSpec {
 pub fn local_testnet_config(id: ParaId) -> ChainSpec {
 	ChainSpec::from_genesis(
 		// Name
-		"Local Testnet",
+		"Halongbay Testnet",
 		// ID
 		"local_testnet",
 		ChainType::Local,
