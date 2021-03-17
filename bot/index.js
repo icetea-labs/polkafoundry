@@ -13,32 +13,50 @@ const token = '1401222730:AAGv-XwfbfiSYZkV-5zVHBkznYbYlUaWJRc';
 const bot = new TelegramBot(token, { polling: true });
 
 let web3;
-
+let balance;
+let balance_genesis;
 async function callWeb3(address) {
   try {
+    // web3 = new Web3(`ws://localhost:9944`);
     web3 = new Web3(`ws://localhost:${WS_PORT}`);
   }
   catch (err) {
-    console.log(err);
+    return [null, err];
   }
 
-  const tx = await web3.eth.accounts.signTransaction(
-    {
-      from: GENESIS_ACCOUNT,
-      to: address,
-      value: '0x10',
-      gasPrice: '0x01',
-      gas: '0x100000',
-    },
-    GENESIS_ACCOUNT_PRIVATE_KEY
-  );
-  await customRequest(web3, 'eth_sendRawTransaction', [tx.rawTransaction]);
-  // await createAndFinalizeBlock(web3);
+  let tx;
+  try {
+    tx = await web3.eth.accounts.signTransaction(
+      {
+        from: GENESIS_ACCOUNT,
+        to: address,
+        value: web3.utils.toWei("1", "ether"),
+        gasPrice: '0x01',
+        gas: '0x100000',
+      },
+      GENESIS_ACCOUNT_PRIVATE_KEY
+    );
+    console.log('address: ', address);
+  } catch (err) {
+    return [null, err];
+  }
+
+  try {
+    await customRequest(web3, 'eth_sendRawTransaction', [tx.rawTransaction]);
+  } catch (err) {
+    return [null, err];
+  }
+
+  balance = await web3.eth.getBalance(address);
+  balance_genesis = await web3.eth.getBalance(GENESIS_ACCOUNT)
+  console.log('balance received account after transfer: ', balance);
+  console.log('balance GENESIS_ACCOUNT account: ', balance_genesis)
+  return [tx.rawTransaction, null];
 };
 
 bot.onText(/\/help/, (msg, match) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, "Support commands: faucet to_address");
+  bot.sendMessage(chatId, "Support commands:\n /faucet to_address");
 });
 
 
@@ -47,8 +65,11 @@ bot.onText(/\/faucet (.+)/, async (msg, match) => {
   const to_address = match[1];
 
   // call web3
-  ret = await callWeb3(to_address);
+  const [transaction, err] = await callWeb3(to_address);
 
   // send back chat
-  bot.sendMessage(chatId, "Call: " + to_address);
+  if (transaction != null)
+    bot.sendMessage(chatId, "Transaction successful\n" + transaction);
+  else
+    bot.sendMessage(chatId, "Transaction failed\n" + err);
 });
