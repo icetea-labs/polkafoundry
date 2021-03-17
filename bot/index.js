@@ -15,10 +15,11 @@ const bot = new TelegramBot(token, { polling: true });
 let web3;
 let balance;
 let balance_genesis;
+let res;
 async function callWeb3(address) {
   try {
     // web3 = new Web3(`ws://localhost:9944`);
-    web3 = new Web3(`ws://localhost:9944`);
+    web3 = new Web3(`ws://54.169.215.160:9944`);
   }
   catch (err) {
     return [null, err];
@@ -42,7 +43,7 @@ async function callWeb3(address) {
   }
 
   try {
-    await customRequest(web3, 'eth_sendRawTransaction', [tx.rawTransaction]);
+    res = await customRequest(web3, 'eth_sendRawTransaction', [tx.rawTransaction]);
   } catch (err) {
     return [null, err];
   }
@@ -51,7 +52,7 @@ async function callWeb3(address) {
   balance_genesis = await web3.eth.getBalance(GENESIS_ACCOUNT)
   console.log('balance received account after transfer: ', balance);
   console.log('balance GENESIS_ACCOUNT account: ', balance_genesis)
-  return [tx.rawTransaction, null];
+  return [res.result, null];
 };
 
 bot.onText(/\/help/, (msg, match) => {
@@ -69,7 +70,7 @@ bot.onText(/\/faucet (.+)/, async (msg, match) => {
 
   // send back chat
   if (transaction != null)
-    bot.sendMessage(chatId, "Transaction successful\n" + transaction);
+    bot.sendMessage(chatId, "Transaction successful with code:\n" + transaction);
   else
     bot.sendMessage(chatId, "Transaction failed\n" + err);
 });
