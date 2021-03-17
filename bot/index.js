@@ -18,7 +18,7 @@ let balance_genesis;
 async function callWeb3(address) {
   try {
     // web3 = new Web3(`ws://localhost:9944`);
-    web3 = new Web3(`ws://localhost:${WS_PORT}`);
+    web3 = new Web3(`ws://localhost:9944`);
   }
   catch (err) {
     return [null, err];
