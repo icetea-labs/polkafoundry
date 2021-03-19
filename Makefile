@@ -12,11 +12,15 @@ test:
 
 .PHONY: run
 run:
-	 cargo run -- --dev --tmp --start-dev --validator  --sealing=Manual
+	cargo run -- --dev --tmp --start-dev --validator  --sealing=Manual
 
 .PHONY: build
 build:
-	 cargo build --release
+	cargo build --release
+	cp ./target/release/polkafoundry ./binary
+.PHONY: copy
+copy:
+	cp ./target/release/polkafoundry ./binary
 
 .PHONY: spec
 spec:
