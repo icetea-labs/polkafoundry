@@ -5,14 +5,14 @@ services:
     ports:
       - "9933:9933"
       - "9944:9944"
-    image: parity/rococo:rococo-v1
+    image: parity/rococo:rococo-v1-0.8.29-3d03552a-0189c7ce
     volumes:
       - "polkadot-data-alice:/data"
-      - ./specs/halongbay-v1:/specs/halongbay-v1
+      - ../specs/halongbay-v1:/specs/halongbay-v1
     command:  --alice 
               --chain /specs/halongbay-v1/rococo-local.json
               --name node_alice
-              --rpc-cors=all 
+              --rpc-cors=all
               --unsafe-rpc-external 
               --unsafe-ws-external 
               --rpc-methods=Unsafe 
@@ -20,17 +20,17 @@ services:
     networks:
       testing_net:
         ipv4_address: 172.99.1.1
-# ###############################################################
+################################################################
   node_bob:
     container_name: rococo_bob
     ports:
       - "30330:30333"
       - "8844:9944"
       - "8833:9933"
-    image: parity/rococo:rococo-v1
+    image: parity/rococo:rococo-v1-0.8.29-3d03552a-0189c7ce
     volumes:
       - "polkadot-data-bob:/data"
-      - ./specs/halongbay-v1:/specs/halongbay-v1
+      - ../specs/halongbay-v1:/specs/halongbay-v1
     links:
       - "node_alice:alice"
     command:  --bob 
@@ -43,17 +43,17 @@ services:
     networks:
       testing_net:
         ipv4_address: 172.99.1.2
-# ###############################################################
+################################################################
   node_validator:
     container_name: rococo_validator
     ports:
       - "7744:9944"
       - "7733:9933"
       - "30331:30333"
-    image: parity/rococo:rococo-v1
+    image: parity/rococo:rococo-v1-0.8.29-3d03552a-0189c7ce
     volumes:
       - "polkadot-data-validator:/data"
-      - ./specs/halongbay-v1:/specs/halongbay-v1
+      - ../specs/halongbay-v1:/specs/halongbay-v1
     links:
       - "node_alice:alice"
       - "node_bob:bob"
@@ -74,10 +74,10 @@ services:
       - "5544:9944"
       - "5533:9933"
       - "20336:30333"
-    image: polkafoundry/halongbay-v1:latest
+    image: public.ecr.aws/o0b6j5s9/polkafoundry:halongbay-v1
     volumes:
       - "halongbay-collator-data:/data"
-      - ./specs/halongbay-v1:/specs/halongbay-v1
+      - ../specs/halongbay-v1:/specs/halongbay-v1
     # links:
     #   - "node_alice:alice"
     command: --collator 
@@ -98,10 +98,10 @@ services:
       - "4444:9944"
       - "4433:9933"
       - "20337:30333"
-    image: polkafoundry/halongbay-v1:latest
+    image: public.ecr.aws/o0b6j5s9/polkafoundry:halongbay-v1
     volumes:
       - "halongbay-fullnode-data:/data"
-      - ./specs/halongbay-v1:/specs/halongbay-v1
+      - ../specs/halongbay-v1:/specs/halongbay-v1
     # links:
     #   - "node_alice:alice"
     command: --parachain-id 14

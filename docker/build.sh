@@ -9,18 +9,15 @@ cd $PROJECT_ROOT
 
 # Find the current version from Cargo.toml
 # VERSION=`grep "^version" ./Cargo.toml | egrep -o "([0-9\.]+)"`
-GITUSER=polkafoundry
-GITREPO=halongbay-v1
+GITUSER=public.ecr.aws/o0b6j5s9/polkafoundry
+TAG=halongbay-v1
 
 # Build the image
-echo "Building ${GITUSER}/${GITREPO}:latest docker image, hang on!"
-time docker build -f ./docker/Dockerfile --build-arg RUSTC_WRAPPER= --build-arg PROFILE=release -t ${GITUSER}/${GITREPO}:latest --no-cache .
+echo "Building ${GITUSER}/${TAG}:latest docker image, hang on!"
+time docker build -f ./docker/Dockerfile --build-arg RUSTC_WRAPPER= --build-arg PROFILE=release -t ${GITUSER}:${TAG} --no-cache .
 
 # Show the list of available images for this repo
 echo "Image is ready"
-docker images | grep ${GITREPO}
-
-echo -e "\nIf you just built version ${VERSION}, you may want to update your tag:"
-echo " $ docker tag ${GITUSER}/${GITREPO}:$VERSION ${GITUSER}/${GITREPO}:${VERSION}"
+docker images | grep ${TAG}
 
 popd
