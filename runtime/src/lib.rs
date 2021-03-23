@@ -25,7 +25,8 @@ use fp_rpc::TransactionStatus;
 use frame_system::{EnsureRoot, limits::{BlockLength, BlockWeights}};
 
 use pallet_evm::{
-	Account as EVMAccount, FeeCalculator, EnsureAddressTruncated, HashedAddressMapping, Runner
+	Account as EVMAccount, FeeCalculator, Runner,
+	EnsureAddressSame, EnsureAddressNever, IdentityAddressMapping
 };
 use polkadot_parachain::primitives::Sibling;
 
@@ -63,7 +64,7 @@ pub use pallet_template;
 pub type BlockNumber = u32;
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
-pub type Signature = MultiSignature;
+pub type Signature = ethereum::Signature;
 
 /// Some way of identifying an account on the chain. We intentionally make it equivalent
 /// to the public key of our transaction signing scheme.
@@ -367,9 +368,9 @@ parameter_types! {
 impl pallet_evm::Config for Runtime {
 	type FeeCalculator = ();
 	type GasWeightMapping = ();
-	type CallOrigin = EnsureAddressTruncated;
-	type WithdrawOrigin = EnsureAddressTruncated;
-	type AddressMapping = HashedAddressMapping<BlakeTwo256>;
+	type CallOrigin = EnsureAddressSame;
+	type WithdrawOrigin = EnsureAddressNever<AccountId>;
+	type AddressMapping = IdentityAddressMapping;
 	type Currency = Balances;
 	type Event = Event;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;

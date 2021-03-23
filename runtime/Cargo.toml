@@ -72,6 +72,8 @@ xcm = { default-features = false, git = 'https://github.com/paritytech/polkadot'
 xcm-executor = { default-features = false, git = 'https://github.com/paritytech/polkadot', branch = 'master' }
 xcm-builder = { default-features = false, git = 'https://github.com/paritytech/polkadot', branch = 'master' }
 
+ethereum = { path = 'ethereum/', default-features = false }
+
 [features]
 default = ['std']
 runtime-benchmarks = [

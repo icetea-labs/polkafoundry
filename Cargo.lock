@@ -1604,6 +1604,20 @@ dependencies = [
 
 [[package]]
 name = "ethereum"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "parity-scale-codec",
+ "serde",
+ "sha3 0.9.1",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "ethereum"
 version = "0.7.1"
 source = "git+https://github.com/rust-blockchain/ethereum?branch=master#f11532e1054bd5c9d5a12b4d41ae07ccc3e0730d"
 dependencies = [
@@ -1645,7 +1659,7 @@ name = "evm"
 version = "0.24.0"
 source = "git+https://github.com/polkafoundry/evm?branch=funty-workaround#138c1fb7d2282dd1998c8507ec1945b88ce67d99"
 dependencies = [
- "ethereum",
+ "ethereum 0.7.1",
  "evm-core",
  "evm-gasometer",
  "evm-runtime",
@@ -1768,7 +1782,7 @@ name = "fc-rpc"
 version = "0.1.0"
 source = "git+https://github.com/polkafoundry/frontier.git?branch=v0.1-polka#91e59303b7d3445bf5bda2428d7b4ddee93897f6"
 dependencies = [
- "ethereum",
+ "ethereum 0.7.1",
  "ethereum-types",
  "fc-consensus",
  "fc-rpc-core",
@@ -1932,7 +1946,7 @@ name = "fp-rpc"
 version = "0.1.0"
 source = "git+https://github.com/polkafoundry/frontier.git?branch=v0.1-polka#91e59303b7d3445bf5bda2428d7b4ddee93897f6"
 dependencies = [
- "ethereum",
+ "ethereum 0.7.1",
  "ethereum-types",
  "fp-evm",
  "parity-scale-codec",
@@ -4548,7 +4562,7 @@ name = "pallet-ethereum"
 version = "0.1.0"
 source = "git+https://github.com/polkafoundry/frontier.git?branch=v0.1-polka#91e59303b7d3445bf5bda2428d7b4ddee93897f6"
 dependencies = [
- "ethereum",
+ "ethereum 0.7.1",
  "ethereum-types",
  "evm",
  "fp-consensus",
@@ -6514,6 +6528,7 @@ dependencies = [
  "cumulus-pallet-parachain-system",
  "cumulus-pallet-xcm-handler",
  "cumulus-primitives-core",
+ "ethereum 0.1.0",
  "fp-rpc",
  "frame-benchmarking",
  "frame-executive",
