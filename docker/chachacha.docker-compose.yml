@@ -3,17 +3,17 @@ services:
   chachacha_validator1:
     container_name: chachacha_validator1
     ports:
-      - "18833:9933"
-      - "18844:9944"
-      - "10334:30333"
+      - "18883:9933"
+      - "18884:9944"
+      - "10384:30333"
     image: centrifugeio/rococo:chachacha-v1
     volumes:
-      - "chachacha-validator1:/data"
+      - "pkf-chachacha-validator1:/data"
     command:
       polkadot
       --validator
       --chain rococo-chachacha
-      --name polkafoundry_chachacha1
+      --name pkf_chachacha1
       --rpc-cors=all
       --unsafe-rpc-external
       --unsafe-ws-external
@@ -26,17 +26,17 @@ services:
   chachacha_validator2:
     container_name: chachacha_validator2
     ports:
-      - "17843:9933"
-      - "17844:9944"
-      - "10335:30333"
+      - "17883:9933"
+      - "17884:9944"
+      - "10385:30333"
     image: centrifugeio/rococo:chachacha-v1
     volumes:
-      - "chachacha-validator2:/data"
+      - "pkf-chachacha-validator2:/data"
     command:
       polkadot
       --validator
       --chain rococo-chachacha
-      --name polkafoundry_chachacha2
+      --name pkf_chachacha2
       --rpc-cors=all
       --unsafe-rpc-external
       --unsafe-ws-external
@@ -49,10 +49,10 @@ services:
   chachacha_collator:
     container_name: pkf_chachacha_collator
     ports:
-      - "16644:9944"
-      - "16633:9933"
-      - "10336:30333"
-    image: halongbay
+      - "16684:9944"
+      - "16683:9933"
+      - "10386:30333"
+    image: public.ecr.aws/o0b6j5s9/polkafoundry:rococo
     volumes:
       - "pkf-chachacha-collator:/data"
       - ../specs/chachacha:/specs/chachacha
@@ -64,6 +64,7 @@ services:
       --unsafe-ws-external
       --rpc-methods=Unsafe
       --discover-local
+      --chain /specs/chachacha/halongbaySpec.json
       --
       --execution=wasm
       --chain /specs/chachacha/rococo-chachacha.json
@@ -73,8 +74,8 @@ services:
         ipv4_address: 172.99.1.3
 
 volumes:
-  chachacha-validator1:
-  chachacha-validator2:
+  pkf-chachacha-validator1:
+  pkf-chachacha-validator2:
   pkf-chachacha-collator:
 
 networks:
