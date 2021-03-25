@@ -10,7 +10,7 @@ RUN useradd -m -u 1000 -U -s /bin/sh -d /polkafoundry polkafoundry && \
 
 USER polkafoundry
 
-COPY --chown=polkafoundry target/release/polkafoundry /polkafoundry/polkafoundry
+COPY --chown=polkafoundry bin/polkafoundry /polkafoundry/polkafoundry
 COPY --chown=polkafoundry tests/specs/polka-spec.json /polkafoundry/spec.json
 
 RUN chmod uog+x /polkafoundry/polkafoundry
