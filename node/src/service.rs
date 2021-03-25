@@ -10,7 +10,7 @@ use sp_timestamp::InherentError;
 
 use sc_service::{Configuration, PartialComponents, Role, TFullBackend, TFullClient, TaskManager};
 use sc_executor::native_executor_instance;
-use sc_telemetry::TelemetrySpan;
+use sc_telemetry::{Telemetry, TelemetryWorker, TelemetryWorkerHandle};
 use sc_consensus_manual_seal::{run_manual_seal, EngineCommand, ManualSealParams};
 use sc_client_api::{BlockchainEvents};
 pub use sc_executor::NativeExecutor;
@@ -122,15 +122,37 @@ pub fn new_partial(
 			FrontierBlockImport<Block, Arc<FullClient>, FullClient>,
 			PendingTransactions,
 			Option<FilterPool>,
+			Option<Telemetry>,
+			Option<TelemetryWorkerHandle>,
 		),
 	>,
 	sc_service::Error,
 > {
 	let inherent_data_providers = sp_inherents::InherentDataProviders::new();
 
+	let telemetry = config.telemetry_endpoints.clone()
+		.filter(|x| !x.is_empty())
+		.map(|endpoints| -> Result<_, sc_telemetry::Error> {
+			let worker = TelemetryWorker::new(16)?;
+			let telemetry = worker.handle().new_telemetry(endpoints);
+			Ok((worker, telemetry))
+		})
+		.transpose()?;
+
 	let (client, backend, keystore_container, task_manager) =
-		sc_service::new_full_parts::<Block, RuntimeApi, Executor>(&config)?;
+		sc_service::new_full_parts::<Block, RuntimeApi, Executor>(&config, telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()), )?;
+
 	let client = Arc::new(client);
+
+	let telemetry_worker_handle = telemetry
+		.as_ref()
+		.map(|(worker, _)| worker.handle());
+
+	let telemetry = telemetry
+		.map(|(worker, telemetry)| {
+			task_manager.spawn_handle().spawn("telemetry", worker.run());
+			telemetry
+		});
 
 	let registry = config.prometheus_registry();
 
@@ -165,7 +187,7 @@ pub fn new_partial(
 		transaction_pool,
 		inherent_data_providers,
 		select_chain: (),
-		other: (frontier_block_import, pending_transactions, filter_pool),
+		other: (frontier_block_import, pending_transactions, filter_pool, telemetry, telemetry_worker_handle),
 	};
 
 	Ok(params)
@@ -195,20 +217,28 @@ async fn start_node_impl<RB>(
 	}
 
 	let parachain_config = prepare_node_config(parachain_config);
+	let params = new_partial(&parachain_config)?;
+	params
+		.inherent_data_providers
+		.register_provider(sp_timestamp::InherentDataProvider)
+		.unwrap();
+
+	let (
+		block_import,
+		pending_transactions,
+		filter_pool,
+		mut telemetry,
+		telemetry_worker_handle,
+	) = params.other;
 
 	let polkadot_full_node =
-		cumulus_client_service::build_polkadot_full_node(polkadot_config, collator_key.public()).map_err(
+		cumulus_client_service::build_polkadot_full_node(polkadot_config, collator_key.public(), telemetry_worker_handle).map_err(
 			|e| match e {
 				polkadot_service::Error::Sub(x) => x,
 				s => format!("{}", s).into(),
 			},
 		)?;
 
-	let params = new_partial(&parachain_config)?;
-	params
-		.inherent_data_providers
-		.register_provider(sp_timestamp::InherentDataProvider)
-		.unwrap();
 
 	let client = params.client.clone();
 	let backend = params.backend.clone();
@@ -223,7 +253,8 @@ async fn start_node_impl<RB>(
 	let transaction_pool = params.transaction_pool.clone();
 	let mut task_manager = params.task_manager;
 	let import_queue = params.import_queue;
-	let (block_import, pending_transactions, filter_pool) = params.other;
+
+
 	let (network, network_status_sinks, system_rpc_tx, start_network) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &parachain_config,
@@ -260,9 +291,6 @@ async fn start_node_impl<RB>(
 		})
 	};
 
-	let telemetry_span = TelemetrySpan::new();
-	let _telemetry_span_entered = telemetry_span.enter();
-
 	sc_service::spawn_tasks(sc_service::SpawnTasksParams {
 		on_demand: None,
 		remote_blockchain: None,
@@ -276,7 +304,7 @@ async fn start_node_impl<RB>(
 		network: network.clone(),
 		network_status_sinks,
 		system_rpc_tx,
-		telemetry_span: Some(telemetry_span.clone()),
+		telemetry: telemetry.as_mut(),
 	})?;
 	// Spawn Frontier EthFilterApi maintenance task.
 	if filter_pool.is_some() {
@@ -342,7 +370,7 @@ async fn start_node_impl<RB>(
 
 	let announce_block = {
 		let network = network.clone();
-		Arc::new(move |hash, data| network.announce_block(hash, Some(data)))
+		Arc::new(move |hash, data| network.announce_block(hash, data))
 	};
 
 	if validator {
@@ -351,6 +379,7 @@ async fn start_node_impl<RB>(
 			client.clone(),
 			transaction_pool,
 			prometheus_registry.as_ref(),
+			telemetry.as_ref().map(|x| x.handle()),
 		);
 		let spawner = task_manager.spawn_handle();
 
@@ -427,7 +456,13 @@ pub fn start_dev(
 		select_chain: _,
 		transaction_pool,
 		inherent_data_providers,
-		other: (block_import, pending_transactions, filter_pool),
+		other: (
+			block_import,
+			pending_transactions,
+			filter_pool,
+			telemetry,
+			_telemetry_worker_handle,
+		),
 	} = new_partial(&config)?;
 
 	inherent_data_providers
@@ -454,7 +489,7 @@ pub fn start_dev(
 
 	if config.offchain_worker.enabled {
 		sc_service::build_offchain_workers(
-			&config, backend.clone(), task_manager.spawn_handle(), client.clone(), network.clone(),
+			&config, task_manager.spawn_handle(), client.clone(), network.clone(),
 		);
 	};
 	let prometheus_registry = config.prometheus_registry().cloned();
@@ -465,6 +500,7 @@ pub fn start_dev(
 			client.clone(),
 			transaction_pool.clone(),
 			prometheus_registry.as_ref(),
+			telemetry.as_ref().map(|x| x.handle()),
 		);
 		let commands_stream: Box<dyn Stream<Item = EngineCommand<H256>> + Send + Sync + Unpin> =
 			match sealing {
@@ -530,9 +566,6 @@ pub fn start_dev(
 		})
 	};
 
-	let telemetry_span = TelemetrySpan::new();
-	let _telemetry_span_entered = telemetry_span.enter();
-
 	sc_service::spawn_tasks(sc_service::SpawnTasksParams {
 		network: network.clone(),
 		client: client.clone(),
@@ -542,7 +575,7 @@ pub fn start_dev(
 		rpc_extensions_builder,
 		on_demand: None,
 		remote_blockchain: None,
-		backend, network_status_sinks, system_rpc_tx, config, telemetry_span: Some(telemetry_span.clone()),
+		backend, network_status_sinks, system_rpc_tx, config, telemetry: None,
 	})?;
 
 	// Spawn Frontier EthFilterApi maintenance task.
