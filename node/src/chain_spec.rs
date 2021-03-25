@@ -121,24 +121,24 @@ fn testnet_genesis(
 	id: ParaId,
 ) -> polkafoundry_runtime::GenesisConfig {
 	polkafoundry_runtime::GenesisConfig {
-		frame_system: Some(polkafoundry_runtime::SystemConfig {
+		frame_system: polkafoundry_runtime::SystemConfig {
 			code: polkafoundry_runtime::WASM_BINARY
 				.expect("WASM binary was not build, please build it!")
 				.to_vec(),
 			changes_trie_config: Default::default(),
-		}),
-		pallet_balances: Some(polkafoundry_runtime::BalancesConfig {
+		},
+		pallet_balances: polkafoundry_runtime::BalancesConfig {
 			balances: endowed_accounts
 				.iter()
 				.cloned()
 				.map(|k| (k, 1 << 60))
 				.collect(),
-		}),
-		pallet_sudo: Some(polkafoundry_runtime::SudoConfig { key: root_key }),
-		parachain_info: Some(polkafoundry_runtime::ParachainInfoConfig { parachain_id: id }),
-		pallet_evm: Some(EVMConfig {
+		},
+		pallet_sudo: polkafoundry_runtime::SudoConfig { key: root_key },
+		parachain_info: polkafoundry_runtime::ParachainInfoConfig { parachain_id: id },
+		pallet_evm: EVMConfig {
 			accounts: BTreeMap::new(),
-		}),
-		pallet_ethereum: Some(EthereumConfig {}),
+		},
+		pallet_ethereum: EthereumConfig {},
 	}
 }
