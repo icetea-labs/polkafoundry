@@ -1,13 +1,11 @@
-use std::collections::BTreeMap;
-
-use sp_core::{sr25519, Pair, Public};
+use sp_core::{sr25519, Pair, Public, H160, U256};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
 use sc_service::ChainType;
 
 use cumulus_primitives_core::ParaId;
-use polkafoundry_runtime::{GenesisConfig, AccountId, Signature, EVMConfig, EthereumConfig};
+use polkafoundry_runtime::{GenesisConfig, AccountId, Signature, EVMConfig, EthereumConfig, PKF, Balance};
 use serde::{Deserialize, Serialize};
 
 /// Specialized `ChainSpec` for the normal parachain runtime.
@@ -120,6 +118,8 @@ fn testnet_genesis(
 	endowed_accounts: Vec<AccountId>,
 	id: ParaId,
 ) -> polkafoundry_runtime::GenesisConfig {
+	const ENDOWMENT: Balance = 1_000_000_000 * PKF;
+
 	polkafoundry_runtime::GenesisConfig {
 		frame_system: polkafoundry_runtime::SystemConfig {
 			code: polkafoundry_runtime::WASM_BINARY
@@ -131,13 +131,26 @@ fn testnet_genesis(
 			balances: endowed_accounts
 				.iter()
 				.cloned()
-				.map(|k| (k, 1 << 60))
+				.map(|k| (k, ENDOWMENT))
 				.collect(),
 		},
 		pallet_sudo: polkafoundry_runtime::SudoConfig { key: root_key },
 		parachain_info: polkafoundry_runtime::ParachainInfoConfig { parachain_id: id },
 		pallet_evm: EVMConfig {
-			accounts: BTreeMap::new(),
+			accounts: vec![(
+				H160::from(hex_literal::hex![
+                    "6Be02d1d3665660d22FF9624b7BE0551ee1Ac91b"
+                ]),
+				pallet_evm::GenesisAccount {
+					balance: U256::from(U256::max_value()),
+					nonce: Default::default(),
+					code: Default::default(),
+					storage: Default::default(),
+				},
+			)]
+				.iter()
+				.cloned()
+				.collect(),
 		},
 		pallet_ethereum: EthereumConfig {},
 	}

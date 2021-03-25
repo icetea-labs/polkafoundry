@@ -87,6 +87,7 @@ services:
       --rpc-methods=Unsafe
       --parachain-id 14
       --discover-local
+      --chain /polkafoundry/spec.json
       --
       --execution wasm
       --chain /specs/halongbay-v1/rococo-local.json
@@ -114,6 +115,7 @@ services:
       --unsafe-ws-external
       --rpc-methods=Unsafe
       --discover-local
+      --chain /polkafoundry/spec.json
       --
       --execution wasm
       --chain /specs/halongbay-v1/rococo-local.json

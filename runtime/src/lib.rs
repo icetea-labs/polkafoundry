@@ -248,6 +248,8 @@ parameter_types! {
 	pub const MaxLocks: u32 = 50;
 }
 
+pub const PKF: Balance = 1_000_000_000_000_000_000;
+
 impl pallet_balances::Config for Runtime {
 	type MaxLocks = MaxLocks;
 	/// The type for recording an account's balance.

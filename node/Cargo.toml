@@ -27,6 +27,8 @@ futures = { version = '0.3.4' }
 log = '0.4.8'
 codec = { package = 'parity-scale-codec', version = '2.0.0' }
 serde = { features = ['derive'], version = '1.0.119' }
+hex-literal = '0.3.1'
+hex = '0.4.3'
 
 # local dependencies
 polkafoundry-runtime = { path = '../runtime', version = '0.0.1' }
@@ -88,6 +90,8 @@ polkadot-service = { git = 'https://github.com/paritytech/polkadot', branch = 'r
 polkadot-cli = { git = 'https://github.com/paritytech/polkadot', branch = 'rococo-v1' }
 polkadot-test-service = { git = 'https://github.com/paritytech/polkadot', branch = 'rococo-v1' }
 polkadot-parachain = { git = 'https://github.com/paritytech/polkadot', branch = 'rococo-v1' }
+
+pallet-evm = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
 
 [features]
 default = []
