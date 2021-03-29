@@ -1,76 +1,82 @@
-
 // Telegram bot link: http://t.me/pkf_test_bot
 
+require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const Web3 = require('web3');
-const { RPC_PORT, WS_PORT, GENESIS_ACCOUNT, GENESIS_ACCOUNT_PRIVATE_KEY } = require('../tests/test/constants');
+const Redis = require("ioredis");
 
-const { createAndFinalizeBlock, customRequest } = require('../tests/test/utils');
-
-const token = '1401222730:AAGv-XwfbfiSYZkV-5zVHBkznYbYlUaWJRc';
+const TOKEN = process.env.TELEGRAM_TOKEN || '1401222730:AAGv-XwfbfiSYZkV-5zVHBkznYbYlUaWJRc';
+const GENESIS_ACCOUNT = process.env.GENESIS_ACCOUNT;
+const GENESIS_ACCOUNT_PRIVATE_KEY = process.env.GENESIS_ACCOUNT_PRIVATE_KEY;
 
 // create a bot that uses 'polling' to fetch new updates
-const bot = new TelegramBot(token, { polling: true });
+const bot = new TelegramBot(TOKEN, { polling: true });
 
-let web3;
-let balance;
-let balance_genesis;
-let res;
-async function callWeb3(address) {
-  try {
-    // web3 = new Web3(`ws://localhost:9944`);
-    web3 = new Web3(`ws://54.169.215.160:9944`);
-  }
-  catch (err) {
-    return [null, err];
-  }
+const redis = new Redis(process.env.REDIS_URI);
+const web3 = new Web3(process.env.SOCKET_URI);
 
-  let tx;
-  try {
-    tx = await web3.eth.accounts.signTransaction(
-      {
-        from: GENESIS_ACCOUNT,
-        to: address,
-        value: web3.utils.toWei("1", "ether"),
-        gasPrice: '0x01',
-        gas: '0x100000',
-      },
-      GENESIS_ACCOUNT_PRIVATE_KEY
-    );
-    console.log('address: ', address);
-  } catch (err) {
-    return [null, err];
-  }
-
-  try {
-    res = await customRequest(web3, 'eth_sendRawTransaction', [tx.rawTransaction]);
-  } catch (err) {
-    return [null, err];
-  }
-
-  balance = await web3.eth.getBalance(address);
-  balance_genesis = await web3.eth.getBalance(GENESIS_ACCOUNT)
-  console.log('balance received account after transfer: ', balance);
-  console.log('balance GENESIS_ACCOUNT account: ', balance_genesis)
-  return [res.result, null];
+const second2Time = sec => {
+  return new Date(sec * 1000).toISOString().substr(11, 8);
 };
 
-bot.onText(/\/help/, (msg, match) => {
+const customRequest = async (method, params) => {
+  return new Promise((resolve, reject) => {
+    web3.currentProvider.send({
+        jsonrpc: '2.0',
+        id: 1,
+        method,
+        params,
+      }, (error, result) => {
+        if (error) reject(`Failed to send custom request (${method} (${params.join(',')})): ${error.message || error.toString()}`);
+        else resolve(result);
+      });
+  });
+};
+
+const callWeb3 = async address => {
+  const tx = await web3.eth.accounts.signTransaction({
+      from: GENESIS_ACCOUNT,
+      to: address,
+      value: web3.utils.toWei("1", "ether"),
+      gasPrice: '0x01',
+      gas: '0x100000',
+    },
+    GENESIS_ACCOUNT_PRIVATE_KEY
+  );
+
+  const res = await customRequest('eth_sendRawTransaction', [tx.rawTransaction]);
+
+  const balance = await web3.eth.getBalance(address);
+  const balance_genesis = await web3.eth.getBalance(GENESIS_ACCOUNT);
+
+  console.log('balance received account after transfer: ', balance);
+  console.log('balance GENESIS_ACCOUNT account: ', balance_genesis);
+
+  return res.result;
+};
+
+bot.onText(/\/help/, msg => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, "Support commands:\n /faucet to_address");
 });
-
 
 bot.onText(/\/faucet (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const to_address = match[1];
 
-  // call web3
-  const [transaction, err] = await callWeb3(to_address);
+  if (!to_address) return bot.sendMessage(chatId, "Please enter wallet address");
 
-  // send back chat
-  if (transaction != null)
-    bot.sendMessage(chatId, "Transaction successful with code:\n" + transaction);
-  else
+  const cacheKey = `faucet_${to_address}`;
+
+  const ttl = await redis.ttl(cacheKey);
+  if(ttl > 0) return bot.sendMessage(chatId, `${to_address} has reached their daily quota. Only request once per day. Please wait after ${second2Time(ttl)}`);
+
+  // call web3
+  try {
+    const transaction = await callWeb3(to_address);
+    await redis.set(cacheKey, '1', 'EX', 86400); // 1 day
+    bot.sendMessage(chatId, `Transaction successful with code:\n${transaction}`);
+  } catch(err) {
     bot.sendMessage(chatId, "Transaction failed\n" + err);
+  }
 });
