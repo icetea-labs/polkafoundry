@@ -15,3 +15,35 @@ services:
         source: ./.local
         target: /root/.local
     command: bash -c "cargo build --release && ./target/release/node-template --dev --ws-external"
+
+  bot:
+    container_name: node-bot
+    build:
+      context: ./bot/.
+      dockerfile: Dockerfile
+    env_file: bot/.env.docker
+    working_dir: /app
+    volumes:
+      - ./bot:/app
+    depends_on:
+      - redis
+    networks:
+      botlink:
+        ipv4_address: 192.168.11.10
+
+  redis:
+    image: redis:6.2.1-alpine
+    container_name: redis
+    hostname: redis
+    tty: true
+    networks:
+      botlink:
+        ipv4_address: 192.168.11.11
+
+networks:
+  botlink:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.11.0/24
