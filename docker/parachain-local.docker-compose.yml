@@ -5,7 +5,7 @@ services:
     ports:
       - "9933:9933"
       - "9944:9944"
-    image: parity/rococo:rococo-v1-0.8.29-369dc361-849f2132
+    image: parity/rococo:rococo-v1-0.8.29-f3e2cbf4-720390c1
     volumes:
       - "polkadot-data-alice:/data"
       - ../specs/halongbay-v1:/specs/halongbay-v1
@@ -27,7 +27,7 @@ services:
       - "30330:30333"
       - "8844:9944"
       - "8833:9933"
-    image: parity/rococo:rococo-v1-0.8.29-369dc361-849f2132
+    image: parity/rococo:rococo-v1-0.8.29-f3e2cbf4-720390c1
     volumes:
       - "polkadot-data-bob:/data"
       - ../specs/halongbay-v1:/specs/halongbay-v1
@@ -50,7 +50,7 @@ services:
       - "7744:9944"
       - "7733:9933"
       - "30331:30333"
-    image: parity/rococo:rococo-v1-0.8.29-369dc361-849f2132
+    image: parity/rococo:rococo-v1-0.8.29-f3e2cbf4-720390c1
     volumes:
       - "polkadot-data-validator:/data"
       - ../specs/halongbay-v1:/specs/halongbay-v1
@@ -74,7 +74,7 @@ services:
       - "5544:9944"
       - "5533:9933"
       - "20336:30333"
-    image: halongbay
+    image: public.ecr.aws/o0b6j5s9/polkafoundry:rococo-latest
     volumes:
       - "halongbay-collator-data:/data"
       - ../specs/halongbay-v1:/specs/halongbay-v1
@@ -103,7 +103,7 @@ services:
       - "4444:9944"
       - "4433:9933"
       - "20337:30333"
-    image: halongbay
+    image: public.ecr.aws/o0b6j5s9/polkafoundry:rococo-latest
     volumes:
       - "halongbay-fullnode-data:/data"
       - ../specs/halongbay-v1:/specs/halongbay-v1
