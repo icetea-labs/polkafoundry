@@ -1,6 +1,6 @@
 {
   "name": "Halongbay Testnet",
-  "id": "hlb1",
+  "id": "halongbay_testnet",
   "chainType": "Live",
   "bootNodes": [],
   "telemetryEndpoints": null,
@@ -8,7 +8,7 @@
   "properties": {
     "tokenSymbol": "PKF"
   },
-  "relay_chain": "rococo",
+  "relay_chain": "rococo_v1",
   "para_id": 14,
   "consensusEngine": null,
   "lightSyncState": null,
