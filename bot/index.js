@@ -60,23 +60,29 @@ bot.onText(/\/help/, msg => {
   bot.sendMessage(chatId, "Support commands:\n /faucet to_address");
 });
 
+bot.onText(/^\/faucet$/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const username = msg.chat.username;
+
+  bot.sendMessage(chatId, `@${username} please enter wallet address. Syntax: /faucet to_address`);
+});
+
 bot.onText(/\/faucet (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const to_address = match[1];
-
-  if (!to_address) return bot.sendMessage(chatId, "Please enter wallet address");
+  const username = msg.chat.username;
 
   const cacheKey = `faucet_${to_address}`;
 
   const ttl = await redis.ttl(cacheKey);
-  if(ttl > 0) return bot.sendMessage(chatId, `${to_address} has reached their daily quota. Only request once per day. Please wait after ${second2Time(ttl)}`);
+  if(ttl > 0) return bot.sendMessage(chatId, `@${username} has reached their daily quota. Only request once per day. Please wait after ${second2Time(ttl)}`);
 
   // call web3
   try {
     const transaction = await callWeb3(to_address);
     await redis.set(cacheKey, '1', 'EX', 86400); // 1 day
-    bot.sendMessage(chatId, `Transaction successful with code:\n${transaction}`);
+    bot.sendMessage(chatId, `Sent @${username} 1 PKF. Extrinsic hash: ${transaction}`);
   } catch(err) {
-    bot.sendMessage(chatId, "Transaction failed\n" + err);
+    bot.sendMessage(chatId, `@${username} transaction failed\n` + err);
   }
 });
