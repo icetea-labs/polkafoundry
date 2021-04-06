@@ -8,13 +8,12 @@ COPY . /polkafoundry
 
 RUN nice -n 20 cargo build --$PROFILE
 
-# ===== SECOND STAGE ======
-
+# ===== Build image state ======
 FROM debian:bullseye-slim
 LABEL description="Binary for Polkafoundry Collator"
 
+WORKDIR /polkafoundry
 ARG PROFILE=release
-#COPY --from=builder /polkafoundry/target/$PROFILE/polkafoundry /usr/local/bin
 
 RUN useradd -m -u 1000 -U -s /bin/sh -d /polkafoundry polkafoundry && \
 	mkdir -p /polkafoundry/.local/share && \
@@ -25,8 +24,7 @@ RUN useradd -m -u 1000 -U -s /bin/sh -d /polkafoundry polkafoundry && \
 
 USER polkafoundry
 
-#COPY --chown=polkafoundry bin/polkafoundry /polkafoundry/polkafoundry
-COPY --from=builder /polkafoundry/target/$PROFILE/polkafoundry /polkafoundry/polkafoundry
+COPY --chown=polkafoundry --from=builder /polkafoundry/target/$PROFILE/polkafoundry /polkafoundry/polkafoundry
 
 RUN chmod a+x /polkafoundry/polkafoundry
 
