@@ -1,18 +1,17 @@
 #!/bin/bash
 
 # Run
-# ./docker/generator.sh => current commit
-# ./docker/generator.sh <tag>
+# ./script/generate-parachain-specs.sh => current commit
+# ./script/generate-parachain-specs.sh <tag>
 
 TAG=$(git rev-parse --short HEAD)
 
-if [ $1 ]
-then
+if [ $1 ]; then
   TAG=$1
 fi
 
 WORKDIR=$(pwd)/specs/halongbay-v1
-DOCKER_WORKDIR="/generator"
+DOCKER_WORKDIR="/data"
 
 chmod 777 $WORKDIR
 IMG_ID=$(docker run -it --rm -v $WORKDIR:/$DOCKER_WORKDIR -d public.ecr.aws/o0b6j5s9/polkafoundry:$TAG)

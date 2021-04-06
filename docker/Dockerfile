@@ -1,5 +1,5 @@
 FROM paritytech/ci-linux:production as builder
-LABEL description="This is the build stage for Polkafoundry. Here we create the binary."
+LABEL description="This is the build stage for PolkaFoundry. Here we create the binary."
 
 ARG PROFILE=release
 WORKDIR /polkafoundry
