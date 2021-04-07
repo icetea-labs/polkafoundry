@@ -37,7 +37,7 @@ const callWeb3 = async address => {
   const tx = await web3.eth.accounts.signTransaction({
       from: GENESIS_ACCOUNT,
       to: address,
-      value: web3.utils.toWei("10", "ether"),
+      value: web3.utils.toWei("2", "ether"),
       gasPrice: '0x01',
       gas: '0x100000',
     },
@@ -75,14 +75,14 @@ bot.onText(/\/faucet (.+)/, async (msg, match) => {
   const cacheKey = `faucet_${to_address}`;
 
   const ttl = await redis.ttl(cacheKey);
-  if(ttl > 0) return bot.sendMessage(chatId, `@${username} has reached their daily quota. Only request once per day. Please wait after ${second2Time(ttl)}`);
+  // if(ttl > 0) return bot.sendMessage(chatId, `@${username} has reached their daily quota. Only request once per day. Please wait after ${second2Time(ttl)}`);
 
   // call web3
   try {
     const transaction = await callWeb3(to_address);
     if (transaction) {
       await redis.set(cacheKey, '1', 'EX', 86400); // 1 day
-      bot.sendMessage(chatId, `Sent @${username} 10 ETH. Extrinsic hash: ${transaction}`);
+      bot.sendMessage(chatId, `Sent @${username} 2 ETH. Extrinsic hash: ${transaction}`);
     } else {
       bot.sendMessage(chatId, `@${username} transaction failed`);
     }
