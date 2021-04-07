@@ -5,7 +5,7 @@
 
 TAG=$(git rev-parse --short HEAD)
 
-docker build -f docker/Dockerfile . -t polkafoundry:$TAG
+docker build -f ../docker/Dockerfile . -t polkafoundry:$TAG
 CODE=$?
 
 if [ "$CODE" -eq "0" ]; then
