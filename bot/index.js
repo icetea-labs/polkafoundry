@@ -37,7 +37,7 @@ const callWeb3 = async address => {
   const tx = await web3.eth.accounts.signTransaction({
       from: GENESIS_ACCOUNT,
       to: address,
-      value: web3.utils.toWei("2", "ether"),
+      value: web3.utils.toWei("1", "ether"),
       gasPrice: '0x01',
       gas: '0x100000',
     },
@@ -82,7 +82,7 @@ bot.onText(/\/faucet (.+)/, async (msg, match) => {
     const transaction = await callWeb3(to_address);
     if (transaction) {
       await redis.set(cacheKey, '1', 'EX', 86400); // 1 day
-      bot.sendMessage(chatId, `Sent @${username} 2 ETH. Extrinsic hash: ${transaction}`);
+      bot.sendMessage(chatId, `Sent @${username} 1 ETH. Extrinsic hash: ${transaction}`);
     } else {
       bot.sendMessage(chatId, `@${username} transaction failed`);
     }
