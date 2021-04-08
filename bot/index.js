@@ -72,6 +72,8 @@ bot.onText(/\/faucet (.+)/, async (msg, match) => {
   const to_address = match[1];
   const username = msg.chat.username;
 
+  console.log("Received request: faucet ", to_address);
+
   const cacheKey = `faucet_${to_address}`;
 
   const ttl = await redis.ttl(cacheKey);
