@@ -6,7 +6,7 @@ WORKDIR /polkafoundry
 
 COPY . /polkafoundry
 
-RUN nice -n 20 cargo build --$PROFILE
+RUN cargo build --$PROFILE
 
 # ===== Build image state ======
 FROM debian:bullseye-slim
