@@ -5,7 +5,7 @@ services:
     ports:
       - "9933:9933"
       - "9944:9944"
-    image: parity/rococo:rococo-v1-0.8.29-f3e2cbf4-720390c1
+    image: parity/rococo:rococo-v1-0.8.30-c4a0772-ee8441b9
     volumes:
       - "polkadot-data-alice:/data"
       - ../specs/halongbay-v1:/specs/halongbay-v1
@@ -27,7 +27,7 @@ services:
       - "30330:30333"
       - "8844:9944"
       - "8833:9933"
-    image: parity/rococo:rococo-v1-0.8.29-f3e2cbf4-720390c1
+    image: parity/rococo:rococo-v1-0.8.30-c4a0772-ee8441b9
     volumes:
       - "polkadot-data-bob:/data"
       - ../specs/halongbay-v1:/specs/halongbay-v1
@@ -50,7 +50,7 @@ services:
       - "7744:9944"
       - "7733:9933"
       - "30331:30333"
-    image: parity/rococo:rococo-v1-0.8.29-f3e2cbf4-720390c1
+    image: parity/rococo:rococo-v1-0.8.30-c4a0772-ee8441b9
     volumes:
       - "polkadot-data-validator:/data"
       - ../specs/halongbay-v1:/specs/halongbay-v1
@@ -85,9 +85,9 @@ services:
       --rpc-cors all
       --unsafe-ws-external
       --rpc-methods=Unsafe
-      --parachain-id 14
+      --parachain-id 1111
       --discover-local
-      --chain /polkafoundry/spec.json
+      --chain /specs/halongbay-v1/halongbaySpec.json
       --
       --execution wasm
       --chain /specs/halongbay-v1/rococo-local.json
@@ -109,13 +109,13 @@ services:
       - ../specs/halongbay-v1:/specs/halongbay-v1
     # links:
     #   - "node_alice:alice"
-    command: --parachain-id 14
+    command: --parachain-id 1111
       --unsafe-rpc-external
       --rpc-cors all
       --unsafe-ws-external
       --rpc-methods=Unsafe
       --discover-local
-      --chain /polkafoundry/spec.json
+      --chain /specs/halongbay-v1/halongbaySpec.json
       --
       --execution wasm
       --chain /specs/halongbay-v1/rococo-local.json
