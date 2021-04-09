@@ -14,6 +14,8 @@ const bot = new TelegramBot(TOKEN, { polling: true });
 
 const redis = new Redis(process.env.REDIS_URI);
 const web3 = new Web3(process.env.SOCKET_URI);
+var msgStart = "Welcome to PolkaFoundry Faucet Bot.\nTry command to get 1 ETH:\n/faucet to_address";
+
 
 const second2Time = sec => {
   return new Date(sec * 1000).toISOString().substr(11, 8);
@@ -58,6 +60,11 @@ const callWeb3 = async address => {
 bot.onText(/\/help/, msg => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, "Support commands:\n /faucet to_address");
+});
+
+bot.onText(/\/start/, msg => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, msgStart);
 });
 
 bot.onText(/^\/faucet$/, async (msg, match) => {
