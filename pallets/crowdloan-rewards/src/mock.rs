@@ -27,7 +27,7 @@ impl frame_system::Config for Test {
 	type BlockNumber = u64;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type AccountId = u64;
+	type AccountId = AccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
 	type Event = Event;
@@ -89,7 +89,7 @@ pub struct ExtBuilder;
 
 impl ExtBuilder {
 	pub fn build(contributions: Vec<([u8; 32], u32)>) -> sp_io::TestExternalities {
-		let mut storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+		let storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 		let mut ext = sp_io::TestExternalities::from(storage);
 		ext.execute_with(|| {
 			Crowdloan::initialize_reward(

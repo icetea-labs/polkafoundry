@@ -113,6 +113,40 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(0)]
+		pub fn update_associate_account(
+			origin: OriginFor<T>,
+			associated_native_account: T::AccountId,
+			relay_account: T::RelayChainAccountId,
+			proof: MultiSignature,
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+			let payload = who.clone().encode();
+
+			ensure!(
+				proof.verify(payload.as_slice(), &relay_account.clone().into()),
+				Error::<T>::InvalidSignature
+			);
+			ensure!(
+				AssociatedAccount::<T>::get(&who).is_none(),
+				Error::<T>::AlreadyAssociated
+			);
+			let relay_associated_account = AssociatedAccount::<T>::get(&associated_native_account)
+				.ok_or(Error::<T>::NoAssociatedAccount)?;
+
+			ensure!(
+				relay_account == relay_associated_account,
+				Error::<T>::BadRelayAccount
+			);
+			AssociatedAccount::<T>::remove(associated_native_account);
+			AssociatedAccount::<T>::insert(&who, &relay_account);
+			Self::deposit_event(Event::UpdateAssociateAccount(
+				who,
+				relay_account,
+			));
+			Ok(Default::default())
+		}
+
+		#[pallet::weight(0)]
 		pub fn get_money(
 			origin: OriginFor<T>,
 		) -> DispatchResultWithPostInfo {
@@ -120,7 +154,7 @@ pub mod pallet {
 			let now = frame_system::Pallet::<T>::block_number();
 
 			let relay_account =
-				AssociatedAccount::<T>::get(&who).ok_or(Error::<T>::NoAssociatedClaim)?;
+				AssociatedAccount::<T>::get(&who).ok_or(Error::<T>::NoAssociatedAccount)?;
 
 			let mut info =
 				Contributors::<T>::get(&relay_account).ok_or(Error::<T>::NotContributedYet)?;
@@ -151,7 +185,6 @@ pub mod pallet {
 			} else {
 				reward_per_block.saturating_mul(reward_period_as_balance)
 			};
-
 			info.last_paid = now;
 			info.claimed_reward = info.claimed_reward.saturating_add(amount);
 			Contributors::<T>::insert(&relay_account, info);
@@ -200,9 +233,11 @@ pub mod pallet {
 		/// Already paid all reward
 		AlreadyPaid,
 		/// User not associated relay account with native account yet
-		NoAssociatedClaim,
+		NoAssociatedAccount,
 		/// User not contribute for the crowdloan
 		NotContributedYet,
+		/// When user try to find reward account not their own
+		BadRelayAccount,
 		/// Invalid conversion while calculating payable amount
 		WrongConversionU128ToBalance,
 	}
@@ -211,6 +246,8 @@ pub mod pallet {
 	#[pallet::generate_deposit(fn deposit_event)]
 	pub enum Event<T: Config> {
 		AssociatedAccount(T::AccountId, T::RelayChainAccountId),
+
+		UpdateAssociateAccount(T::AccountId, T::RelayChainAccountId),
 
 		RewardPaid(T::AccountId, BalanceOf<T>),
 	}
