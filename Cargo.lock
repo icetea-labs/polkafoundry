@@ -4783,6 +4783,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-crowdloan-rewards"
+version = "0.0.1"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "pallet-utility",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-democracy"
 version = "3.0.0"
 source = "git+https://github.com/paritytech/substrate.git?branch=rococo-v1#13a07b4b637b6e25397db7fcd62d8b93eeae76ac"
@@ -6888,6 +6904,7 @@ dependencies = [
  "hex-literal",
  "pallet-aura",
  "pallet-balances",
+ "pallet-crowdloan-rewards",
  "pallet-ethereum",
  "pallet-evm",
  "pallet-grandpa",

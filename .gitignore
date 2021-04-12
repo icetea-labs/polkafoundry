@@ -15,3 +15,8 @@
 .idea
 
 bin
+
+
+scripts/js/node_modules
+scripts/js/.env
+
