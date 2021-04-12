@@ -1,20 +1,21 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
+use frame_support::pallet;
 
 #[cfg(test)]
 pub(crate) mod mock;
 #[cfg(test)]
 mod tests;
 
-#[frame_support::pallet]
+#[pallet]
 pub mod pallet {
 	use frame_support::{dispatch::fmt::Debug, pallet_prelude::*, traits::Currency};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::{Saturating, Verify};
 	use sp_runtime::{MultiSignature, SaturatedConversion};
 	use sp_core::crypto::AccountId32;
-	use sp_std::convert::{From, TryInto};
+	use sp_std::{convert::{From, TryInto}, vec::Vec};
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config {

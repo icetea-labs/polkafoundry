@@ -6641,6 +6641,7 @@ dependencies = [
  "hex-literal",
  "pallet-aura",
  "pallet-balances",
+ "pallet-crowdloan-rewards",
  "pallet-ethereum",
  "pallet-evm",
  "pallet-grandpa",

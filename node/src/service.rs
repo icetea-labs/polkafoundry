@@ -2,7 +2,7 @@
 
 use std::{sync::{Arc, Mutex}, cell::RefCell, collections::{HashMap, BTreeMap}};
 
-use sp_core::{Pair, H256};
+use sp_core::{H256};
 use sp_runtime::traits::BlakeTwo256;
 use sp_trie::PrefixedMemoryDB;
 use sp_inherents::{ProvideInherentData, InherentIdentifier, InherentData};

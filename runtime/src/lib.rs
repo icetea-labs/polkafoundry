@@ -11,6 +11,7 @@ use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256, H160, H256};
 use sp_runtime::{
 	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys, MultiSignature,
 	transaction_validity::{TransactionValidity, TransactionSource},
+	AccountId32
 };
 use sp_runtime::traits::{
 	AccountIdLookup, BlakeTwo256, Block as BlockT, Verify, IdentifyAccount,
@@ -374,6 +375,12 @@ impl pallet_evm::Config for Runtime {
 	type ChainId = ChainId;
 }
 
+impl pallet_crowdloan_rewards::Config for Runtime {
+	type Event = Event;
+	type RewardCurrency = Balances;
+	type RelayChainAccountId = AccountId32;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -393,6 +400,7 @@ construct_runtime!(
 		// Include the custom logic from the template pallet in the runtime.
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
+		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
