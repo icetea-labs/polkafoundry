@@ -1,32 +1,30 @@
 [package]
-authors = ['Polkafoundry']
-description = 'FRAME pallet template for defining custom runtime logic.'
-edition = '2018'
-homepage = 'https://polkafoundry.com'
-license = 'Unlicense'
-name = 'pallet-template'
-repository = 'https://github.com/polkafoundry/newpolka/'
-version = '0.0.1'
+name = "pallet-crowdloan-rewards"
+version = "0.0.1"
+authors = ["Tung <thanhtung6824@gmail.com>"]
+edition = "2018"
 
-[package.metadata.docs.rs]
-targets = ['x86_64-unknown-linux-gnu']
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 # alias "parity-scale-code" to "codec"
 [dependencies.codec]
 default-features = false
 features = ['derive']
 package = 'parity-scale-codec'
-version = '=2.0.0'
+version = '2.0.0'
 
 [dependencies]
+serde = { version = "1.0.119" }
+
 frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
-
-[dev-dependencies]
-serde = { version = "1.0.119" }
 sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+
+pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
 
 [features]
 default = ['std']
@@ -34,4 +32,10 @@ std = [
     'codec/std',
     'frame-support/std',
     'frame-system/std',
+    'pallet-balances/std',
+    'pallet-utility/std',
+    'sp-core/std',
+    'sp-io/std',
+    'sp-runtime/std',
+    'sp-std/std'
 ]

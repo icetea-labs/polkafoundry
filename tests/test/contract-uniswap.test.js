@@ -12,7 +12,6 @@ describeWithPolkafoundry('Polkafoundry Uniswap Contract', 'polka-spec.json', (co
     let wethAddress;
     let uniswapFactoryAddress;
     let uniswapRouter02Address;
-    let uniswapPairAddress;
 
     before('Create ERC20 contract', async function () {
         this.timeout(15000);
@@ -37,15 +36,6 @@ describeWithPolkafoundry('Polkafoundry Uniswap Contract', 'polka-spec.json', (co
         await createAndFinalizeBlock(context.web3);
         const recipe = await context.web3.eth.getTransactionReceipt(tx);
         uniswapFactoryAddress = recipe.contractAddress;
-    })
-
-    before('Create UniswapPair contract', async function () {
-        this.timeout(15000);
-        const gasLimit = (await context.web3.eth.getBlock("latest")).gasLimit;
-        const tx = await deployContract(context.web3, UniswapV2Pair, [], gasLimit + 1000, '0x01')
-        await createAndFinalizeBlock(context.web3);
-        const recipe = await context.web3.eth.getTransactionReceipt(tx);
-        uniswapPairAddress = recipe.contractAddress;
     })
 
     before('Create UniswapRouter contract', async function () {

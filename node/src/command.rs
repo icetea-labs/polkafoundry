@@ -39,7 +39,7 @@ fn load_spec(
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
-		"Polkafoundry Parachain Collator".into()
+		"PolkaFoundry Parachain Collator".into()
 	}
 
 	fn impl_version() -> String {
@@ -48,7 +48,7 @@ impl SubstrateCli for Cli {
 
 	fn description() -> String {
 		format!(
-			"Polkafoundry Parachain Collator\n\nThe command-line arguments provided first will be \
+			"PolkaFoundry Parachain Collator\n\nThe command-line arguments provided first will be \
 		passed to the parachain node, while the arguments provided after -- will be passed \
 		to the relaychain node.\n\n\
 		{} [parachain-args] -- [relaychain-args]",
@@ -69,7 +69,7 @@ impl SubstrateCli for Cli {
 	}
 
 	fn load_spec(&self, id: &str) -> std::result::Result<Box<dyn sc_service::ChainSpec>, String> {
-		load_spec(id, self.run.parachain_id.unwrap_or(200).into())
+		load_spec(id, self.run.parachain_id.unwrap_or(1111).into())
 	}
 
 	fn native_runtime_version(_: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
@@ -79,7 +79,7 @@ impl SubstrateCli for Cli {
 
 impl SubstrateCli for RelayChainCli {
 	fn impl_name() -> String {
-		"Polkafoundry Parachain Collator".into()
+		"PolkaFoundry Parachain Collator".into()
 	}
 
 	fn impl_version() -> String {
@@ -87,7 +87,7 @@ impl SubstrateCli for RelayChainCli {
 	}
 
 	fn description() -> String {
-		"Polkafoundry Parachain Collator\n\nThe command-line arguments provided first will be \
+		"PolkaFoundry Parachain Collator\n\nThe command-line arguments provided first will be \
 		passed to the parachain node, while the arguments provided after -- will be passed \
 		to the relaychain node.\n\n\
 		rococo-collator [parachain-args] -- [relaychain-args]"
@@ -267,7 +267,7 @@ pub fn run() -> Result<()> {
 						.chain(cli.relaychain_args.iter()),
 				);
 
-				let id = ParaId::from(cli.run.parachain_id.or(para_id).unwrap_or(200));
+				let id = ParaId::from(cli.run.parachain_id.or(para_id).unwrap_or(1111));
 
 				let parachain_account =
 					AccountIdConversion::<polkadot_primitives::v0::AccountId>::into_account(&id);
@@ -281,7 +281,6 @@ pub fn run() -> Result<()> {
 					&polkadot_cli,
 					&polkadot_cli,
 					task_executor,
-					None,
 				).map_err(|err| format!("Relay chain argument error: {}", err))?;
 
 				info!("Parachain id: {:?}", id);
@@ -356,7 +355,7 @@ impl CliConfiguration<Self> for RelayChainCli {
 		self.base.base.prometheus_config(default_listen_port)
 	}
 
-	fn init<C: SubstrateCli>(&self) -> Result<sc_telemetry::TelemetryWorker> {
+	fn init<C: SubstrateCli>(&self) -> Result<()> {
 		unreachable!("PolkadotCli is never initialized; qed");
 	}
 

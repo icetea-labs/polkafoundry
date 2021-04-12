@@ -20,5 +20,9 @@ build:
 
 .PHONY: spec
 spec:
-	./target/debug/polkafoundry build-spec --disable-default-bootnode --chain local > tests/specs/polka-spec.json
+	./target/release/polkafoundry build-spec --disable-default-bootnode --chain local > tests/specs/polka-spec.json
+
+.PHONY: copy
+copy:
+	cp ./target/release/polkafoundry ./bin
 

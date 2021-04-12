@@ -18,7 +18,7 @@
  *
  */
 
-// const HDWalletProvider = require('@truffle/hdwallet-provider');
+const HDWalletProvider = require('@truffle/hdwallet-provider');
 // const infuraKey = "fj4jll3k.....";
 //
 // const fs = require('fs');
@@ -42,11 +42,12 @@ module.exports = {
     // tab if you use this network and you must also set the `host`, `port` and `network_id`
     // options below to some value.
     //
-    // development: {
-    //  host: "127.0.0.1",     // Localhost (default: none)
-    //  port: 8545,            // Standard Ethereum port (default: none)
-    //  network_id: "*",       // Any network (default: none)
-    // },
+    development: {
+      host: "127.0.0.1",     // Localhost (default: none)
+      port: 9933,            // Standard Ethereum port (default: none)
+      network_id: 13,       // Any network (default: none)
+      provider: () => new HDWalletProvider('0x99B3C12287537E38C90A9219D4CB074A89A16E9CDB20BF85728EBD97C343E342', `http://127.0.0.1:9933`)
+    },
     // Another network with more advanced options...
     // advanced: {
     // port: 8777,             // Custom port
