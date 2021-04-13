@@ -23,8 +23,8 @@ mod tests;
 #[pallet]
 pub mod pallet {
 	use frame_support::{
-		dispatch::fmt::Debug, pallet_prelude::*,
-		traits::{Currency, ExistenceRequirement::AllowDeath},
+		pallet_prelude::*,
+		traits::{Currency, ExistenceRequirement::AllowDeath, Imbalance, OnUnbalanced},
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::{ModuleId, traits::AccountIdConversion};
@@ -51,23 +51,8 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
 
-	#[pallet::event]
-	#[pallet::generate_deposit(fn deposit_event)]
-	pub enum Event<T: Config>
-	{
-		/// Donor has made a charitable donation to the charity
-		DonationReceived(T::AccountId, BalanceOf<T>, BalanceOf<T>),
-		/// An imbalance from elsewhere in the runtime has been absorbed by the Charity
-		ImbalanceAbsorbed(BalanceOf<T>, BalanceOf<T>),
-		/// Charity has allocated funds to a cause
-		FundsAllocated(T::AccountId, BalanceOf<T>, BalanceOf<T>),
-		/// For testing purposes, to impl From<()> for TestEvent to assign `()` to balances::Event
-		NullEvent(u32), // u32 could be aliases as an error code for mocking setup
-	}
-
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-
 		/// Donate some funds to the charity
 		/// WARNING: for test net the weight is 0.
 		#[pallet::weight(0)]
@@ -124,21 +109,52 @@ pub mod pallet {
 		}
 	}
 
+	#[pallet::event]
+	#[pallet::generate_deposit(fn deposit_event)]
+	pub enum Event<T: Config>
+	{
+		/// Donor has made a charitable donation to the charity
+		DonationReceived(T::AccountId, BalanceOf<T>, BalanceOf<T>),
+		/// An imbalance from elsewhere in the runtime has been absorbed by the Charity
+		ImbalanceAbsorbed(BalanceOf<T>, BalanceOf<T>),
+		/// Charity has allocated funds to a cause
+		FundsAllocated(T::AccountId, BalanceOf<T>, BalanceOf<T>),
+		/// For testing purposes, to impl From<()> for TestEvent to assign `()` to balances::Event
+		NullEvent(u32), // u32 could be aliases as an error code for mocking setup
+	}
 
-	// decl_storage! {
-	// 	trait Store for Module<T: Config> as SimpleTreasury {
-	// 	// No storage items of our own, but we still need decl_storage to initialize the pot
-	// }
-	//
-	// add_extra_genesis {
-	// 	build(|_config| {
-	// 		// Create the charity's pot of funds, and ensure it has the minimum required deposit
-	// 		let _ = T::Currency::make_free_balance_be(
-	// 			&<Module<T>>::account_id(),
-	// 			T::Currency::minimum_balance(),
-	// 		);
-	// 	});
-	// }}
+
+	#[pallet::genesis_config]
+	#[derive(Default)]
+	pub struct GenesisConfig {
+		// Currently this pallet has no field in genesis
+		// but we need to initialize the pot
+	}
+
+
+	#[pallet::genesis_build]
+	impl<T: Config> GenesisBuild<T> for GenesisConfig {
+		fn build(&self) {
+			let _ = T::Currency::make_free_balance_be(
+				&<Pallet<T>>::account_id(),
+				T::Currency::minimum_balance(),
+			);
+		}
+	}
+
+	// This implementation allows the charity to be the recipient of funds that are burned elsewhere in
+// the runtime. For eample, it could be transaction fees, consensus-related slashing, or burns that
+// align incentives in other pallets.
+	impl<T: Config> OnUnbalanced<NegativeImbalanceOf<T>> for Pallet<T> {
+		fn on_nonzero_unbalanced(amount: NegativeImbalanceOf<T>) {
+			let numeric_amount = amount.peek();
+
+			// Must resolve into existing but better to be safe.
+			let _ = T::Currency::resolve_creating(&Self::account_id(), amount);
+
+			Self::deposit_event(Event::ImbalanceAbsorbed(numeric_amount, Self::pot()));
+		}
+	}
 }
 
 
