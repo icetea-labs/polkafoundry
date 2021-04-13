@@ -67,6 +67,9 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+
+		/// Donate some funds to the charity
+		/// WARNING: for test net the weight is 0.
 		#[pallet::weight(0)]
 		fn donate(
 			origin: OriginFor<T>,
@@ -78,6 +81,33 @@ pub mod pallet {
 				.map_err(|_| DispatchError::Other("Can't make donation"))?;
 
 			Self::deposit_event(Event::DonationReceived(donor, amount, Self::pot()));
+			Ok(())
+		}
+
+		/// Allocate the Charity's funds
+		///
+		/// Take funds from the Charity's pot and send them somewhere. This call requires root origin,
+		/// which means it must come from a governance mechanism such as Substrate's Democracy pallet.
+		/// WARNING: for test net the weight is 0.
+		#[pallet::weight(0)]
+		fn allocate(
+			origin: OriginFor<T>,
+			dest: T::AccountId,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+
+			// Make the transfer requested
+			T::Currency::transfer(
+				&Self::account_id(),
+				&dest,
+				amount,
+				AllowDeath,
+			).map_err(|_| DispatchError::Other("Can't make allocation"))?;
+
+			//TODO what about errors here??
+
+			Self::deposit_event(Event::FundsAllocated(dest, amount, Self::pot()));
 			Ok(())
 		}
 	}
