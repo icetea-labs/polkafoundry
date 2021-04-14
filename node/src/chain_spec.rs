@@ -1,4 +1,6 @@
-use sp_core::{sr25519, Pair, Public, H160, U256};
+use std::collections::BTreeMap;
+
+use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
@@ -48,9 +50,9 @@ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
 pub fn development_config(id: ParaId) -> ChainSpec {
 	ChainSpec::from_genesis(
 		// Name
-		"Halongbay Testnet",
+		"PolkaFoundry PC1",
 		// ID
-		"dev",
+		"polkafoundry_testnet",
 		ChainType::Local,
 		move || {
 			testnet_genesis(
@@ -78,9 +80,9 @@ pub fn development_config(id: ParaId) -> ChainSpec {
 pub fn local_testnet_config(id: ParaId) -> ChainSpec {
 	ChainSpec::from_genesis(
 		// Name
-		"Halongbay Testnet",
+		"PolkaFoundry PC1",
 		// ID
-		"local_testnet",
+		"polkafoundry_testnet",
 		ChainType::Local,
 		move || {
 			testnet_genesis(
@@ -137,20 +139,7 @@ fn testnet_genesis(
 		pallet_sudo: polkafoundry_runtime::SudoConfig { key: root_key },
 		parachain_info: polkafoundry_runtime::ParachainInfoConfig { parachain_id: id },
 		pallet_evm: EVMConfig {
-			accounts: vec![(
-				H160::from(hex_literal::hex![
-                    "6Be02d1d3665660d22FF9624b7BE0551ee1Ac91b"
-                ]),
-				pallet_evm::GenesisAccount {
-					balance: U256::from(U256::max_value()),
-					nonce: Default::default(),
-					code: Default::default(),
-					storage: Default::default(),
-				},
-			)]
-				.iter()
-				.cloned()
-				.collect(),
+			accounts: BTreeMap::new(),
 		},
 		pallet_ethereum: EthereumConfig {},
 	}
