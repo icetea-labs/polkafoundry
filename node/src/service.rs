@@ -15,6 +15,7 @@ use sc_telemetry::{Telemetry, TelemetryWorker, TelemetryWorkerHandle};
 use sc_consensus_manual_seal::{run_manual_seal, EngineCommand, ManualSealParams};
 use sc_client_api::{BlockchainEvents};
 pub use sc_executor::NativeExecutor;
+use crate::cli;
 
 use cumulus_client_service::{
 	prepare_node_config, start_collator, start_full_node, StartCollatorParams, StartFullNodeParams,
@@ -264,6 +265,7 @@ async fn start_node_impl<RB, RuntimeApi, Executor>(
 	id: polkadot_primitives::v0::Id,
 	validator: bool,
 	_rpc_ext_builder: RB,
+	runtime: cli::ForceChain
 ) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, Executor>>)>
 	where
 		RB: Fn(
@@ -350,7 +352,7 @@ async fn start_node_impl<RB, RuntimeApi, Executor>(
 				command_sink: None,
 			};
 
-			crate::rpc::create_full(deps, subscription_task_executor.clone())
+			crate::rpc::create_full(deps, subscription_task_executor.clone(), Some(runtime.clone()))
 		})
 	};
 
@@ -493,6 +495,7 @@ pub async fn start_node<RuntimeApi, Executor>(
 	polkadot_config: Configuration,
 	id: polkadot_primitives::v0::Id,
 	validator: bool,
+	runtime: cli::ForceChain
 ) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, Executor>>)>
 	where
 		RuntimeApi: ConstructRuntimeApi<Block, FullClient<RuntimeApi, Executor>> + Send + Sync + 'static,
@@ -506,6 +509,7 @@ pub async fn start_node<RuntimeApi, Executor>(
 		id,
 		validator,
 		|_| Default::default(),
+		runtime
 	)
 		.await
 }
@@ -630,7 +634,7 @@ pub fn start_dev(
 				filter_pool: filter_pool.clone(),
 				command_sink: command_sink.clone(),
 			};
-			crate::rpc::create_full(deps, subscription_task_executor.clone())
+			crate::rpc::create_full(deps, subscription_task_executor.clone(), None)
 		})
 	};
 
