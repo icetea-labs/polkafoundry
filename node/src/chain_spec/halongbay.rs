@@ -15,7 +15,7 @@ pub fn halongbay_config() -> Result<HalongbayChainSpec, String> {
 }
 
 fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::GenesisConfig {
-	const ENDOWMENT: halongbay::Balance = 20_000_000 * halongbay::HLB;
+	const ENDOWMENT: halongbay::Balance = 200_000_000 * halongbay::HLB;
 	let endowed_accounts = vec![
 		// 5HNFRkCYoriHQwuJbt5YgSwegRTxmSQRe51UKEEBWnUZuHf5
 		hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(),

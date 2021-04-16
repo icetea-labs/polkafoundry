@@ -20,6 +20,7 @@ use sc_consensus_manual_seal::rpc::{ManualSeal, ManualSealApi};
 use fc_rpc_core::types::{PendingTransactions, FilterPool};
 use jsonrpc_pubsub::manager::SubscriptionManager;
 use polkafoundry_primitives::{Hash, AccountId, Index, Block, Balance};
+use crate::cli;
 
 /// Full client dependencies.
 pub struct FullDeps<C, P> {
@@ -44,7 +45,8 @@ pub struct FullDeps<C, P> {
 /// Instantiate all Full RPC extensions.
 pub fn create_full<C, P, BE>(
 	deps: FullDeps<C, P>,
-	subscription_task_executor: SubscriptionTaskExecutor
+	subscription_task_executor: SubscriptionTaskExecutor,
+	runtime: Option<cli::ForceChain>
 ) -> jsonrpc_core::IoHandler<sc_rpc::Metadata> where
 	BE: Backend<Block> + 'static,
 	BE::State: StateBackend<BlakeTwo256>,
@@ -87,18 +89,64 @@ pub fn create_full<C, P, BE>(
 
 	let signers = Vec::new();
 
-	io.extend_with(
-		EthApiServer::to_delegate(EthApi::new(
-			client.clone(),
-			pool.clone(),
-			halongbay_runtime::TransactionConverter,
-			network.clone(),
-			pending_transactions.clone(),
-			signers,
-			is_authority,
-		))
-	);
-
+	match runtime {
+		Some(cli::ForceChain::PolkaFoundry) => {
+			#[cfg(feature = "polkafoundry")]
+				{
+					io.extend_with(
+						EthApiServer::to_delegate(EthApi::new(
+							client.clone(),
+							pool.clone(),
+							polkafoundry_runtime::TransactionConverter,
+							network.clone(),
+							pending_transactions.clone(),
+							signers,
+							is_authority,
+						))
+					);
+				}
+			#[cfg(not(feature = "polkafoundry"))]
+			panic!("PolkaFoundry runtime is not available. Please compile the node with `--features polkafoundry` to enable it.");
+		}
+		Some(cli::ForceChain::PolkaSmith) => {
+			println!("smith ne");
+			#[cfg(feature = "polkasmith")]
+				{
+					io.extend_with(
+						EthApiServer::to_delegate(EthApi::new(
+							client.clone(),
+							pool.clone(),
+							polkasmith_runtime::TransactionConverter,
+							network.clone(),
+							pending_transactions.clone(),
+							signers,
+							is_authority,
+						))
+					);
+				}
+			#[cfg(not(feature = "polkasmith"))]
+			panic!("PolkaSmith runtime is not available. Please compile the node with `--features polkasmith` to enable it.");
+		},
+		_ => {
+			println!("halongbay ne");
+			#[cfg(feature = "halongbay")]
+				{
+					io.extend_with(
+						EthApiServer::to_delegate(EthApi::new(
+							client.clone(),
+							pool.clone(),
+							halongbay_runtime::TransactionConverter,
+							network.clone(),
+							pending_transactions.clone(),
+							signers,
+							is_authority,
+						))
+					);	
+				}
+			#[cfg(not(feature = "halongbay"))]
+			panic!("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.");
+		}
+	}
 	if let Some(filter_pool) = filter_pool {
 		io.extend_with(
 			EthFilterApiServer::to_delegate(EthFilterApi::new(
