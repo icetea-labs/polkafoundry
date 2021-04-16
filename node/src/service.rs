@@ -8,6 +8,7 @@ use sp_trie::PrefixedMemoryDB;
 use sp_inherents::{ProvideInherentData, InherentIdentifier, InherentData};
 use sp_timestamp::InherentError;
 
+pub use sc_executor::NativeExecutionDispatch;
 use sc_service::{Configuration, PartialComponents, Role, TFullBackend, TFullClient, TaskManager};
 use sc_executor::native_executor_instance;
 use sc_telemetry::{Telemetry, TelemetryWorker, TelemetryWorkerHandle};
@@ -28,20 +29,74 @@ use cumulus_test_relay_sproof_builder::RelayStateSproofBuilder;
 use futures::{Stream, StreamExt};
 use fc_rpc_core::types::{FilterPool, PendingTransactions};
 use fc_consensus::FrontierBlockImport;
-use polkafoundry_runtime::{self, opaque::Block, RuntimeApi, SLOT_DURATION};
+use polkafoundry_primitives::{Block};
+use halongbay_runtime::{SLOT_DURATION};
 use polkadot_primitives::v0::CollatorPair;
 
 use crate::cli::Sealing;
 
+use crate::client::*;
+use sc_chain_spec::ChainSpec;
+use sp_api::ConstructRuntimeApi;
+
+#[cfg(feature = "polkafoundry")]
+pub use polkafoundry_runtime;
+
+#[cfg(feature = "polkasmith")]
+pub use polkasmith_runtime;
+
+#[cfg(feature = "halongbay")]
+pub use halongbay_runtime;
+
 // Our native executor instance.
+#[cfg(feature = "polkafoundry")]
 native_executor_instance!(
-	pub Executor,
+	pub PolkaFoundryExecutor,
 	polkafoundry_runtime::api::dispatch,
 	polkafoundry_runtime::native_version,
 );
 
-type FullClient = TFullClient<Block, RuntimeApi, Executor>;
-type FullBackend = TFullBackend<Block>;
+#[cfg(feature = "polkasmith")]
+native_executor_instance!(
+	pub PolkaSmithExecutor,
+	polkasmith_runtime::api::dispatch,
+	polkasmith_runtime::native_version,
+);
+
+#[cfg(feature = "halongbay")]
+native_executor_instance!(
+	pub HalongbayExecutor,
+	halongbay_runtime::api::dispatch,
+	halongbay_runtime::native_version,
+);
+
+
+pub trait IdentifyVariant {
+	/// Returns if this is a configuration for the `PolkaFoundry` network.
+	fn is_polkafoundry(&self) -> bool;
+
+	/// Returns if this is a configuration for the `PolkaSmith` network.
+	fn is_polkasmith(&self) -> bool;
+
+	/// Returns if this is a configuration for the `Halongbay` network.
+	fn is_halongbay(&self) -> bool;
+}
+
+impl IdentifyVariant for Box<dyn ChainSpec> {
+	fn is_polkafoundry(&self) -> bool {
+		self.id().starts_with("polkafoundry]") || self.id().starts_with("pkf")
+	}
+	fn is_polkasmith(&self) -> bool {
+		self.id().starts_with("polkasmith") || self.id().starts_with("pks")
+	}
+	fn is_halongbay(&self) -> bool {
+		self.id().starts_with("halongbay") || self.id().starts_with("hlb")
+	}
+}
+
+
+pub type FullClient<RuntimeApi, Executor> = TFullClient<Block, RuntimeApi, Executor>;
+pub type FullBackend = TFullBackend<Block>;
 
 /// Provide a mock duration starting at 0 in millisecond for timestamp inherent.
 /// Each call will increment timestamp by slot_duration making Aura think time has passed.
@@ -109,17 +164,17 @@ impl ProvideInherentData for MockParachainInherentDataProvider {
 ///
 /// Use this macro if you don't actually need the full service, but just the builder in order to
 /// be able to perform chain operations.
-pub fn new_partial(
+pub fn new_partial<RuntimeApi, Executor>(
 	config: &Configuration,
 ) -> Result<
 	PartialComponents<
-		FullClient,
+		FullClient<RuntimeApi, Executor>,
 		FullBackend,
 		(),
 		sp_consensus::import_queue::BasicQueue<Block, PrefixedMemoryDB<BlakeTwo256>>,
-		sc_transaction_pool::FullPool<Block, FullClient>,
+		sc_transaction_pool::FullPool<Block, FullClient<RuntimeApi, Executor>>,
 		(
-			FrontierBlockImport<Block, Arc<FullClient>, FullClient>,
+			FrontierBlockImport<Block, Arc<FullClient<RuntimeApi, Executor>>, FullClient<RuntimeApi, Executor>>,
 			PendingTransactions,
 			Option<FilterPool>,
 			Option<Telemetry>,
@@ -127,7 +182,12 @@ pub fn new_partial(
 		),
 	>,
 	sc_service::Error,
-> {
+>
+	where
+		RuntimeApi: ConstructRuntimeApi<Block, FullClient<RuntimeApi, Executor>> + Send + Sync + 'static,
+		RuntimeApi::RuntimeApi: RuntimeApiCollection<StateBackend = sc_client_api::StateBackendFor<FullBackend, Block>>,
+		Executor: NativeExecutionDispatch + 'static,
+{
 	let inherent_data_providers = sp_inherents::InherentDataProviders::new();
 
 	let telemetry = config.telemetry_endpoints.clone()
@@ -197,7 +257,7 @@ pub fn new_partial(
 ///
 /// This is the actual implementation that is abstract over the executor and the runtime api.
 #[sc_tracing::logging::prefix_logs_with("Parachain")]
-async fn start_node_impl<RB>(
+async fn start_node_impl<RB, RuntimeApi, Executor>(
 	parachain_config: Configuration,
 	collator_key: CollatorPair,
 	polkadot_config: Configuration,
@@ -211,13 +271,16 @@ async fn start_node_impl<RB>(
 		) -> jsonrpc_core::IoHandler<sc_rpc::Metadata>
 		+ Send
 		+ 'static,
+		RuntimeApi: ConstructRuntimeApi<Block, FullClient<RuntimeApi, Executor>> + Send + Sync + 'static,
+		RuntimeApi::RuntimeApi: RuntimeApiCollection<StateBackend = sc_client_api::StateBackendFor<FullBackend, Block>>,
+		Executor: NativeExecutionDispatch + 'static,
 {
 	if matches!(parachain_config.role, Role::Light) {
 		return Err("Light client not supported!".into());
 	}
 
 	let parachain_config = prepare_node_config(parachain_config);
-	let params = new_partial(&parachain_config)?;
+	let params = new_partial::<RuntimeApi, Executor>(&parachain_config)?;
 	params
 		.inherent_data_providers
 		.register_provider(sp_timestamp::InherentDataProvider)
@@ -424,13 +487,18 @@ async fn start_node_impl<RB>(
 }
 
 /// Start a normal parachain node.
-pub async fn start_node(
+pub async fn start_node<RuntimeApi, Executor>(
 	parachain_config: Configuration,
 	collator_key: CollatorPair,
 	polkadot_config: Configuration,
 	id: polkadot_primitives::v0::Id,
 	validator: bool,
-) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, Executor>>)> {
+) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, Executor>>)>
+	where
+		RuntimeApi: ConstructRuntimeApi<Block, FullClient<RuntimeApi, Executor>> + Send + Sync + 'static,
+		RuntimeApi::RuntimeApi: RuntimeApiCollection<StateBackend = sc_client_api::StateBackendFor<FullBackend, Block>>,
+		Executor: NativeExecutionDispatch + 'static,
+{
 	start_node_impl(
 		parachain_config,
 		collator_key,
@@ -463,7 +531,7 @@ pub fn start_dev(
 			telemetry,
 			_telemetry_worker_handle,
 		),
-	} = new_partial(&config)?;
+	} = new_partial::<halongbay_runtime::RuntimeApi, HalongbayExecutor>(&config)?;
 
 	inherent_data_providers
 		.register_provider(MockTimestampInherentDataProvider)
@@ -646,3 +714,63 @@ pub fn start_dev(
 
 	Ok(task_manager)
 }
+
+/// Builds a new object suitable for chain operations.
+pub fn new_chain_ops(
+	mut config: &mut Configuration,
+) -> Result<
+	(
+		Arc<Client>,
+		Arc<FullBackend>,
+		sp_consensus::import_queue::BasicQueue<Block, PrefixedMemoryDB<BlakeTwo256>>,
+		TaskManager,
+	),
+	sc_service::error::Error
+>
+{
+	config.keystore = sc_service::config::KeystoreConfig::InMemory;
+	if config.chain_spec.is_polkafoundry() {
+		#[cfg(feature = "polkafoundry")]
+			{
+				let PartialComponents {
+					client,
+					backend,
+					import_queue,
+					task_manager,
+					..
+				} = new_partial::<polkafoundry_runtime::RuntimeApi, PolkaFoundryExecutor>(config)?;
+				Ok((Arc::new(Client::PolkaFoundry(client)), backend, import_queue, task_manager))
+			}
+		#[cfg(not(feature = "polkafoundry"))]
+			Err("Polkafoundry runtime is not available. Please compile the node with `--features polkafoundry` to enable it.".into())
+	} else if config.chain_spec.is_polkasmith() {
+		#[cfg(feature = "polkasmith")]
+			{
+				let PartialComponents {
+					client,
+					backend,
+					import_queue,
+					task_manager,
+					..
+				} = new_partial::<polkasmith_runtime::RuntimeApi, PolkaSmithExecutor>(config)?;
+				Ok((Arc::new(Client::PolkaSmith(client)), backend, import_queue, task_manager))
+			}
+		#[cfg(not(feature = "polkasmith"))]
+			Err("PolkaSmith runtime is not available. Please compile the node with `--features polkasmith` to enable it.".into())
+	} else {
+		#[cfg(feature = "halongbay")]
+			{
+				let PartialComponents {
+					client,
+					backend,
+					import_queue,
+					task_manager,
+					..
+				} = new_partial::<halongbay_runtime::RuntimeApi, HalongbayExecutor>(config)?;
+				Ok((Arc::new(Client::Halongbay(client)), backend, import_queue, task_manager))
+			}
+		#[cfg(not(feature = "halongbay"))]
+			Err("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.".into())
+	}
+}
+
