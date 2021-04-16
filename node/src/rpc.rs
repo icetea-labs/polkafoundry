@@ -19,7 +19,7 @@ use sc_consensus_manual_seal::rpc::{ManualSeal, ManualSealApi};
 
 use fc_rpc_core::types::{PendingTransactions, FilterPool};
 use jsonrpc_pubsub::manager::SubscriptionManager;
-use polkafoundry_runtime::{Hash, AccountId, Index, opaque::Block, Balance};
+use polkafoundry_primitives::{Hash, AccountId, Index, Block, Balance};
 
 /// Full client dependencies.
 pub struct FullDeps<C, P> {
@@ -91,7 +91,7 @@ pub fn create_full<C, P, BE>(
 		EthApiServer::to_delegate(EthApi::new(
 			client.clone(),
 			pool.clone(),
-			polkafoundry_runtime::TransactionConverter,
+			halongbay_runtime::TransactionConverter,
 			network.clone(),
 			pending_transactions.clone(),
 			signers,

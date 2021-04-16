@@ -85,6 +85,15 @@ pub struct ExportGenesisWasmCommand {
 	pub chain: Option<String>,
 }
 
+arg_enum! {
+   #[derive(Debug, PartialEq)]
+   pub enum ForceChain {
+		PolkaFoundry,
+		PolkaSmith,
+		Halongbay
+	}
+}
+
 #[derive(Debug, StructOpt)]
 pub struct RunCmd {
 	#[structopt(flatten)]
@@ -97,6 +106,10 @@ pub struct RunCmd {
 	/// Run in dev mode without relay chain
 	#[structopt(long, name = "start-dev")]
 	pub start_dev: bool,
+
+	/// Force the runtime running
+	#[structopt(long, name = "force-chain", possible_values = &ForceChain::variants(), case_insensitive = true)]
+	pub force_chain: ForceChain,
 
 	/// Options are "instant", "manual", or timer interval in milliseconds
 	#[structopt(long, default_value = "instant")]

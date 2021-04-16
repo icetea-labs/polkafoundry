@@ -9,37 +9,31 @@ use sc_cli::{
 };
 use sc_service::{
 	config::{BasePath, PrometheusConfig},
-	PartialComponents,
 };
 
 use codec::Encode;
 use cumulus_client_service::genesis::generate_genesis_block;
 use cumulus_primitives_core::ParaId;
 use log::info;
-use polkafoundry_runtime::Block;
+use polkafoundry_primitives::Block;
 use polkadot_parachain::primitives::AccountIdConversion;
 
-use crate::{
-	chain_spec,
-	cli::{Cli, RelayChainCli, Subcommand},
-};
+use crate::{cli::{Cli, RelayChainCli, Subcommand}, chain_spec};
+use crate::service;
+use crate::service::IdentifyVariant;
 
-fn load_spec(
-	id: &str,
-	para_id: ParaId,
-) -> std::result::Result<Box<dyn sc_service::ChainSpec>, String> {
-	Ok(match id {
-		"dev" => Box::new(chain_spec::development_config(para_id)),
-		"" | "local" => Box::new(chain_spec::local_testnet_config(para_id)),
-		path => Box::new(chain_spec::ChainSpec::from_json_file(
-			std::path::PathBuf::from(path),
-		)?),
-	})
+fn chain_name() -> String {
+	#[cfg(feature = "polkafoundry")]
+		return "PolkaFoundry".into();
+	#[cfg(feature = "polkasmith")]
+		return "PolkaSmith".into();
+	#[cfg(feature = "halongbay")]
+		return "Halongbay".into();
 }
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
-		"PolkaFoundry Parachain Collator".into()
+		format!("{} Parachain Collator", chain_name())
 	}
 
 	fn impl_version() -> String {
@@ -48,10 +42,11 @@ impl SubstrateCli for Cli {
 
 	fn description() -> String {
 		format!(
-			"PolkaFoundry Parachain Collator\n\nThe command-line arguments provided first will be \
+			"{} Parachain Collator\n\nThe command-line arguments provided first will be \
 		passed to the parachain node, while the arguments provided after -- will be passed \
 		to the relaychain node.\n\n\
 		{} [parachain-args] -- [relaychain-args]",
+			chain_name(),
 			Self::executable_name()
 		)
 	}
@@ -65,21 +60,84 @@ impl SubstrateCli for Cli {
 	}
 
 	fn copyright_start_year() -> i32 {
-		2017
+		2019
 	}
 
 	fn load_spec(&self, id: &str) -> std::result::Result<Box<dyn sc_service::ChainSpec>, String> {
-		load_spec(id, self.run.parachain_id.unwrap_or(1111).into())
+		Ok(match id {
+			#[cfg(feature = "polkafoundry")]
+			"polkafoundry" => Box::new(chain_spec::polkafoundry::polkafoundry_config()?),
+			#[cfg(feature = "polkafoundry")]
+			"polkafoundry-dev" => Box::new(chain_spec::polkafoundry::polkafoundry_staging_testnet_config()?),
+			#[cfg(feature = "polkasmith")]
+			"polkasmith" => Box::new(chain_spec::polkasmith::polkasmith_config()?),
+			#[cfg(feature = "polkasmith")]
+			"polkasmith-dev" => Box::new(chain_spec::polkasmith::polkasmith_staging_testnet_config()?),
+			#[cfg(feature = "halongbay")]
+			"halongbay" => Box::new(chain_spec::halongbay::halongbay_config()?),
+			#[cfg(feature = "halongbay")]
+			"" => Box::new(chain_spec::halongbay::halongbay_staging_testnet_config()?),
+			path => {
+				let path = std::path::PathBuf::from(path);
+				let starts_with = |prefix: &str| {
+					path.file_name()
+						.map(|f| f.to_str().map(|s| s.starts_with(&prefix)))
+						.flatten()
+						.unwrap_or(false)
+				};
+				if starts_with("polkafoundry") {
+					#[cfg(feature = "polkafoundry")]
+						{
+							Box::new(chain_spec::polkafoundry::PolkaFoundryChainSpec::from_json_file(path)?)
+						}
+
+					#[cfg(not(feature = "polkafoundry"))]
+						return Err("PolkaFoundry runtime is not available. Please compile the node with `--features polkafoundry` to enable it.".into());
+				} else if starts_with("polkasmith") {
+					#[cfg(feature = "polkasmith")]
+						{
+							Box::new(chain_spec::polkasmith::PolkaSmithChainSpec::from_json_file(path)?)
+						}
+					#[cfg(not(feature = "polkasmith"))]
+						return Err("PolkaSmith runtime is not available. Please compile the node with `--features polkasmith` to enable it.".into());
+				} else {
+					#[cfg(feature = "halongbay")]
+						{
+							Box::new(chain_spec::halongbay::HalongbayChainSpec::from_json_file(path)?)
+						}
+					#[cfg(not(feature = "halongbay"))]
+						return Err("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.".into());
+				}
+			},
+		})
 	}
 
-	fn native_runtime_version(_: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
-		&polkafoundry_runtime::VERSION
+	fn native_runtime_version(chain_spec: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
+		if chain_spec.is_polkafoundry() {
+			#[cfg(feature = "polkafoundry")]
+				return &polkafoundry_runtime::VERSION;
+			#[cfg(not(feature = "polkafoundry"))]
+			panic!("PolkaFoundry runtime is not available. Please compile the node with `--features polkafoundry` to enable it.");
+		} else if chain_spec.is_polkasmith() {
+			#[cfg(feature = "polkasmith")]
+				return &polkasmith_runtime::VERSION;
+			#[cfg(not(feature = "polkasmith"))]
+			panic!("PolkaSmith runtime is not available. Please compile the node with `--features polkasmith` to enable it.");
+		} else {
+			#[cfg(feature = "halongbay")]
+				return &halongbay_runtime::VERSION;
+			#[cfg(not(feature = "halongbay"))]
+			panic!("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.");
+		}
 	}
 }
 
 impl SubstrateCli for RelayChainCli {
 	fn impl_name() -> String {
-		"PolkaFoundry Parachain Collator".into()
+		format!(
+			"{} Parachain Collator",
+			chain_name()
+		)
 	}
 
 	fn impl_version() -> String {
@@ -87,11 +145,14 @@ impl SubstrateCli for RelayChainCli {
 	}
 
 	fn description() -> String {
-		"PolkaFoundry Parachain Collator\n\nThe command-line arguments provided first will be \
-		passed to the parachain node, while the arguments provided after -- will be passed \
-		to the relaychain node.\n\n\
-		rococo-collator [parachain-args] -- [relaychain-args]"
-			.into()
+		format!(
+			"{} Parachain Collator\n\nThe command-line arguments provided first will be \
+			passed to the parachain node, while the arguments provided after -- will be passed \
+			to the relaychain node.\n\n\
+			rococo-collator [parachain-args] -- [relaychain-args]"
+			,
+			chain_name()
+		)
 	}
 
 	fn author() -> String {
@@ -103,12 +164,11 @@ impl SubstrateCli for RelayChainCli {
 	}
 
 	fn copyright_start_year() -> i32 {
-		2017
+		2019
 	}
 
 	fn load_spec(&self, id: &str) -> std::result::Result<Box<dyn sc_service::ChainSpec>, String> {
-		polkadot_cli::Cli::from_iter([RelayChainCli::executable_name().to_string()].iter())
-			.load_spec(id)
+		polkadot_cli::Cli::from_iter([RelayChainCli::executable_name()].iter()).load_spec(id)
 	}
 
 	fn native_runtime_version(chain_spec: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
@@ -136,47 +196,29 @@ pub fn run() -> Result<()> {
 		}
 		Some(Subcommand::CheckBlock(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				let PartialComponents {
-					client,
-					task_manager,
-					import_queue,
-					..
-				} = crate::service::new_partial(&config)?;
+			runner.async_run(|mut config| {
+				let (client, _, import_queue, task_manager) = service::new_chain_ops(&mut config)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
 		}
 		Some(Subcommand::ExportBlocks(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				let PartialComponents {
-					client,
-					task_manager,
-					..
-				} = crate::service::new_partial(&config)?;
+			runner.async_run(|mut config| {
+				let (client, _, _, task_manager) = service::new_chain_ops(&mut config)?;
 				Ok((cmd.run(client, config.database), task_manager))
 			})
 		}
 		Some(Subcommand::ExportState(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				let PartialComponents {
-					client,
-					task_manager,
-					..
-				} = crate::service::new_partial(&config)?;
+			runner.async_run(|mut config| {
+				let (client, _, _, task_manager) = service::new_chain_ops(&mut config)?;
 				Ok((cmd.run(client, config.chain_spec), task_manager))
 			})
 		}
 		Some(Subcommand::ImportBlocks(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				let PartialComponents {
-					client,
-					task_manager,
-					import_queue,
-					..
-				} = crate::service::new_partial(&config)?;
+			runner.async_run(|mut config| {
+				let (client, _, import_queue, task_manager) = service::new_chain_ops(&mut config)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
 		}
@@ -186,13 +228,8 @@ pub fn run() -> Result<()> {
 		}
 		Some(Subcommand::Revert(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
-			runner.async_run(|config| {
-				let PartialComponents {
-					client,
-					task_manager,
-					backend,
-					..
-				} = crate::service::new_partial(&config)?;
+			runner.async_run(|mut config| {
+				let (client, backend, _, task_manager) = service::new_chain_ops(&mut config)?;
 				Ok((cmd.run(client, backend), task_manager))
 			})
 		}
@@ -201,10 +238,7 @@ pub fn run() -> Result<()> {
 			builder.with_profiling(sc_tracing::TracingReceiver::Log, "");
 			let _ = builder.init();
 
-			let block: Block = generate_genesis_block(&load_spec(
-				&params.chain.clone().unwrap_or_default(),
-				params.parachain_id.into(),
-			)?)?;
+			let block: Block = generate_genesis_block(&cli.load_spec(&params.chain.clone().unwrap_or_default())?)?;
 			let raw_header = block.header().encode();
 			let output_buf = if params.raw {
 				raw_header
@@ -243,16 +277,22 @@ pub fn run() -> Result<()> {
 		}
 		None => {
 			let runner = cli.create_runner(&*cli.run)?;
+
 			let collator = cli.run.base.validator || cli.collator;
 
 			runner.run_node_until_exit(|config| async move {
 				let key = sp_core::Pair::generate().0;
 				if cli.run.start_dev {
-					return crate::service::start_dev(
-						config,
-						cli.run.sealing,
-						collator,
-					);
+					#[cfg(feature = "halongbay")]
+						{
+							return service::start_dev(
+								config,
+								cli.run.sealing,
+								collator
+							);
+						}
+					#[cfg(not(feature = "halongbay"))]
+						return Err("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.".into());
 				}
 
 				let extension = chain_spec::Extensions::try_get(&*config.chain_spec);
@@ -273,7 +313,7 @@ pub fn run() -> Result<()> {
 					AccountIdConversion::<polkadot_primitives::v0::AccountId>::into_account(&id);
 
 				let block: Block =
-					generate_genesis_block(&config.chain_spec).map_err(|e| format!("{:?}", e))?;
+					generate_genesis_block(&config.chain_spec).map_err(|e| format!("Error generate genesis block {:?}", e))?;
 				let genesis_state = format!("0x{:?}", HexDisplay::from(&block.header().encode()));
 
 				let task_executor = config.task_executor.clone();
@@ -287,11 +327,62 @@ pub fn run() -> Result<()> {
 				info!("Parachain Account: {}", parachain_account);
 				info!("Parachain genesis state: {}", genesis_state);
 				info!("Is collating: {}", if collator { "yes" } else { "no" });
+				info!("Runtime {:?}", cli.run.force_chain);
 
-				crate::service::start_node(config, key, polkadot_config, id, collator)
-					.await
-					.map(|r| r.0)
-					.map_err(Into::into)
+				match cli.run.force_chain {
+					crate::cli::ForceChain::PolkaFoundry => {
+						#[cfg(feature = "polkafoundry")]
+							{
+								return service::start_node::<service::polkafoundry_runtime::RuntimeApi, service::PolkaFoundryExecutor>(
+									config,
+									key,
+									polkadot_config,
+									id,
+									collator,
+								)
+									.await
+									.map(|r| r.0)
+									.map_err(Into::into);
+							}
+						#[cfg(not(feature = "polkafoundry"))]
+						panic!("PolkaFoundry runtime is not available. Please compile the node with `--features polkafoundry` to enable it.");
+					}
+					crate::cli::ForceChain::PolkaSmith => {
+						#[cfg(feature = "polkasmith")]
+							{
+								return service::start_node::<service::polkasmith_runtime::RuntimeApi, service::PolkaSmithExecutor>(
+									config,
+									key,
+									polkadot_config,
+									id,
+									collator,
+								)
+									.await
+									.map(|r| r.0)
+									.map_err(Into::into);
+
+							}
+						#[cfg(not(feature = "polkasmith"))]
+						panic!("PolkaSmith runtime is not available. Please compile the node with `--features polkasmith` to enable it.");
+					}
+					crate::cli::ForceChain::Halongbay => {
+						#[cfg(feature = "halongbay")]
+							{
+								return service::start_node::<service::halongbay_runtime::RuntimeApi, service::HalongbayExecutor>(
+									config,
+									key,
+									polkadot_config,
+									id,
+									collator,
+								)
+									.await
+									.map(|r| r.0)
+									.map_err(Into::into)
+							}
+						#[cfg(not(feature = "halongbay"))]
+						panic!("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.");
+					}
+				};
 			}).map_err(Into::into)
 		}
 	}
