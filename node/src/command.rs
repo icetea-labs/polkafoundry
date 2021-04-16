@@ -339,6 +339,7 @@ pub fn run() -> Result<()> {
 									polkadot_config,
 									id,
 									collator,
+									cli.run.force_chain
 								)
 									.await
 									.map(|r| r.0)
@@ -356,6 +357,7 @@ pub fn run() -> Result<()> {
 									polkadot_config,
 									id,
 									collator,
+									cli.run.force_chain
 								)
 									.await
 									.map(|r| r.0)
@@ -374,6 +376,7 @@ pub fn run() -> Result<()> {
 									polkadot_config,
 									id,
 									collator,
+									cli.run.force_chain
 								)
 									.await
 									.map(|r| r.0)

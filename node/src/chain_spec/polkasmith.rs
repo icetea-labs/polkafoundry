@@ -13,7 +13,7 @@ pub fn polkasmith_config() -> Result<PolkaSmithChainSpec, String> {
 }
 
 fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::GenesisConfig {
-	const ENDOWMENT: polkasmith::Balance = 20_000_000 * polkasmith::PKS;
+	const ENDOWMENT: polkasmith::Balance = 200_000_000 * polkasmith::PKS;
 	let endowed_accounts = vec![
 		// 5HNFRkCYoriHQwuJbt5YgSwegRTxmSQRe51UKEEBWnUZuHf5
 		hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(),
