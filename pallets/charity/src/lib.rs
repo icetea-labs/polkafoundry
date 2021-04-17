@@ -56,7 +56,7 @@ pub mod pallet {
 		/// Donate some funds to the charity
 		/// WARNING: for test net the weight is 0.
 		#[pallet::weight(0)]
-		fn donate(
+		pub fn donate(
 			origin: OriginFor<T>,
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
@@ -75,7 +75,7 @@ pub mod pallet {
 		/// which means it must come from a governance mechanism such as Substrate's Democracy pallet.
 		/// WARNING: for test net the weight is 0.
 		#[pallet::weight(0)]
-		fn allocate(
+		pub fn allocate(
 			origin: OriginFor<T>,
 			dest: T::AccountId,
 			amount: BalanceOf<T>,
@@ -104,7 +104,7 @@ pub mod pallet {
 		}
 
 		/// The Charity's balance
-		fn pot() -> BalanceOf<T> {
+		pub fn pot() -> BalanceOf<T> {
 			T::Currency::free_balance(&Self::account_id())
 		}
 	}
@@ -142,9 +142,9 @@ pub mod pallet {
 		}
 	}
 
-	// This implementation allows the charity to be the recipient of funds that are burned elsewhere in
-// the runtime. For eample, it could be transaction fees, consensus-related slashing, or burns that
-// align incentives in other pallets.
+	/// This implementation allows the charity to be the recipient of funds that are burned elsewhere in
+	/// the runtime. For example, it could be transaction fees, consensus-related slashing, or burns that
+	/// align incentives in other pallets.
 	impl<T: Config> OnUnbalanced<NegativeImbalanceOf<T>> for Pallet<T> {
 		fn on_nonzero_unbalanced(amount: NegativeImbalanceOf<T>) {
 			let numeric_amount = amount.peek();
