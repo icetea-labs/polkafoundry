@@ -378,7 +378,7 @@ impl pallet_ethereum::Config for Runtime {
 }
 
 parameter_types! {
-	pub const ChainId: u64 = 11;
+	pub const ChainId: u64 = 12;
 }
 
 impl pallet_evm::Config for Runtime {

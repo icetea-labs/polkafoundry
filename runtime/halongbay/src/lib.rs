@@ -371,11 +371,12 @@ parameter_types! {
 
 impl pallet_ethereum::Config for Runtime {
 	type Event = Event;
-	// This means we will never record a block author in the Ethereum-formatted blocks
-	type FindAuthor = ();
+	type FindAuthor = AuthorInherent;
 	type StateRoot = pallet_ethereum::IntermediateStateRoot;
 	type BlockGasLimit = BlockGasLimit;
 }
+
+impl author_inherent::Config for Runtime {}
 
 parameter_types! {
 	pub const ChainId: u64 = 11;
@@ -419,6 +420,7 @@ construct_runtime!(
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
+        AuthorInherent: author_inherent::{Pallet, Call, Storage, Inherent},
 
 		// XCM helpers.
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>},

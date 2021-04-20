@@ -2,7 +2,7 @@
 
 use std::{sync::{Arc, Mutex}, cell::RefCell, collections::{HashMap, BTreeMap}};
 
-use sp_core::{H256};
+use sp_core::{H256, Pair, Public};
 use sp_runtime::traits::BlakeTwo256;
 use sp_trie::PrefixedMemoryDB;
 use sp_inherents::{ProvideInherentData, InherentIdentifier, InherentData};
@@ -286,6 +286,12 @@ async fn start_node_impl<RB, RuntimeApi, Executor>(
 	params
 		.inherent_data_providers
 		.register_provider(sp_timestamp::InherentDataProvider)
+		.unwrap();
+
+	let account = Vec::from(collator_key.public().as_slice());
+	params
+		.inherent_data_providers
+		.register_provider(author_inherent::InherentDataProvider(account))
 		.unwrap();
 
 	let (
@@ -685,7 +691,7 @@ pub fn start_dev(
 					// As pending transactions have a finite lifespan anyway
 					// we can ignore MultiplePostRuntimeLogs error checks.
 					let mut frontier_log: Option<_> = None;
-					for log in notification.header.digest.logs {
+					for log in notification.header.digest.logs.iter().rev() {
 						let log = log.try_to::<ConsensusLog>(OpaqueDigestItemId::Consensus(&FRONTIER_ENGINE_ID));
 						if let Some(log) = log {
 							frontier_log = Some(log);

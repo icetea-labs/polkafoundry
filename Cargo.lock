@@ -404,6 +404,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "author-inherent"
+version = "0.6.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "serde",
+ "sp-authorship",
+ "sp-core",
+ "sp-inherents",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2709,6 +2725,7 @@ dependencies = [
 name = "halongbay-runtime"
 version = "0.0.1"
 dependencies = [
+ "author-inherent",
  "cumulus-pallet-parachain-system",
  "cumulus-pallet-xcm",
  "cumulus-pallet-xcmp-queue",
@@ -6959,6 +6976,7 @@ dependencies = [
 name = "polkafoundry"
 version = "0.0.1"
 dependencies = [
+ "author-inherent",
  "clap",
  "cumulus-client-consensus-relay-chain",
  "cumulus-client-network",
