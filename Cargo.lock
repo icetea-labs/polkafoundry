@@ -7113,6 +7113,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "polkafoundry-staking"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "pallet-utility",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "polkasmith-runtime"
 version = "0.0.1"
 dependencies = [
