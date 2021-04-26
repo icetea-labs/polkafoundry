@@ -107,7 +107,7 @@ pub struct ExtBuilder;
 impl ExtBuilder {
 	pub fn build(
 		balances: Vec<(AccountId, Balance)>,
-		stakers: Vec<(AccountId)>
+		stakers: Vec<(AccountId, Balance)>
 	) -> sp_io::TestExternalities {
 		let mut storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 		pallet_balances::GenesisConfig::<Test> { balances }
@@ -130,11 +130,21 @@ impl ExtBuilder {
 pub(crate) fn mock_test() -> sp_io::TestExternalities {
 	ExtBuilder::build(
 		vec![
+			// collator
 			(1, 1000),
 			(2, 500),
-			(3, 800)
+			(3, 800),
+			(100, 5000),
+			(200, 2000),
+				// nominator
+			(10, 1000),
+			(20, 500),
+			(30, 800),
 		],
-		vec![100]
+		vec![
+			(100, 500),
+			(200, 500),
+		]
 	)
 }
 

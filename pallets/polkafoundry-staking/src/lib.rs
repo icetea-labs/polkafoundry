@@ -9,7 +9,7 @@ mod tests;
 
 #[pallet]
 pub mod pallet {
-	use frame_support::{pallet_prelude::*, traits::{Currency, LockIdentifier, ReservableCurrency}};
+	use frame_support::{pallet_prelude::*, traits::{Currency, LockIdentifier, ReservableCurrency, CurrencyToVote}};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::{Saturating, Verify};
 	use sp_runtime::{MultiSignature, SaturatedConversion};
@@ -17,6 +17,9 @@ pub mod pallet {
 	use sp_std::{convert::{From, TryInto}, vec::Vec};
 	use frame_support::sp_runtime::traits::{Bounded, AtLeast32BitUnsigned};
 	use std::fmt::Debug;
+	use std::cell::RefCell;
+	use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
+
 
 	/// Counter for the number of round that have passed
 	pub type RoundIndex = u32;
@@ -36,7 +39,7 @@ pub mod pallet {
 		/// Number of block per round
 		type BlocksPerRound: Get<u32>;
 		/// Number of collators that nominators can be nominated for
-		type MaxCollatorsPerNominator: Get<u32>;
+		const MAX_COLLATORS_PER_NOMINATOR: u32;
 		/// Number of round that staked funds must remain bonded for
 		type BondDuration: Get<RoundIndex>;
 		/// Minimum stake required to be reserved to be a collator
@@ -45,6 +48,19 @@ pub mod pallet {
 		type MinNominatorStake: Get<BalanceOf<Self>>;
 		/// Number of round per payout
 		type VestingAfter: Get<RoundIndex>;
+		/// Something that provides the election functionality.
+		type ElectionProvider: frame_election_provider_support::ElectionProvider<
+			Self::AccountId,
+			Self::BlockNumber,
+			// we only accept an election provider that has staking as data provider.
+			DataProvider = Module<Self>,
+		>;
+		/// Convert a balance into a number used for election calculation. This must fit into a `u64`
+		/// but is allowed to be sensibly lossy. The `u64` is used to communicate with the
+		/// [`sp_npos_elections`] crate which accepts u64 numbers and does operations in 128.
+		/// Consequently, the backward convert is used convert the u128s from sp-elections back to a
+		/// [`BalanceOf`].
+		type CurrencyToVote: CurrencyToVote<BalanceOf<Self>>;
 	}
 
 	#[pallet::pallet]
@@ -55,9 +71,8 @@ pub mod pallet {
 		fn on_finalize(now: T::BlockNumber) {
 			let mut current_round = CurrentRound::<T>::get();
 			let round_index = current_round.index;
-
 			if current_round.should_goto_next_round(now) {
-				current_round = current_round.update(now, T::BlocksPerRound::get());
+				current_round.update(now, T::BlocksPerRound::get());
 				CurrentRound::<T>::put(current_round);
 				Self::update_ledger(round_index);
 				Self::update_candidate_pool(round_index);
@@ -83,8 +98,8 @@ pub mod pallet {
 	}
 
 	#[derive(Default, Clone, Encode, Decode, RuntimeDebug)]
-	pub struct Bond<AccountId, Balance> {
-		pub owner: AccountId,
+	pub struct Bond<AccountId, Balance>  {
+		pub candidate: AccountId,
 		pub amount: Balance,
 	}
 
@@ -97,6 +112,8 @@ pub mod pallet {
 		/// The total amount of the stash's balance that will be at stake in any forthcoming
 		/// rounds.
 		pub active: Balance,
+		/// The total amount of the nomination by nominator
+		pub nomination: Balance,
 		/// Any balance that is becoming free, which may eventually be transferred out
 		/// of the stash (assuming it doesn't get slashed first).
 		pub unlocking: Vec<UnlockChunk<Balance>>,
@@ -109,12 +126,13 @@ pub mod pallet {
 	}
 
 	impl <Balance> StakingLedger<Balance>
-	where Balance: Copy + Debug + Saturating + AtLeast32BitUnsigned
+	where Balance: Copy + Debug + Saturating + AtLeast32BitUnsigned + std::ops::AddAssign
 	{
 		pub fn new (total: Balance, active: Balance) -> Self {
 			StakingLedger {
 				total,
 				active,
+				nomination: 0u32.into(),
 				unlocking: vec![],
 				unbonding: vec![],
 				claimed_rewards: vec![]
@@ -132,6 +150,7 @@ pub mod pallet {
 			Self {
 				total,
 				active: self.active,
+				nomination: self.nomination,
 				unlocking,
 				unbonding: self.unbonding,
 				claimed_rewards: self.claimed_rewards
@@ -151,6 +170,7 @@ pub mod pallet {
 				Some(Self {
 					total: self.total,
 					active,
+					nomination: self.nomination,
 					unlocking: self.unlocking,
 					unbonding,
 					claimed_rewards: self.claimed_rewards
@@ -166,7 +186,7 @@ pub mod pallet {
 				.filter(|chunk| if chunk.round > current_round {
 					true
 				} else {
-					active = active.saturating_add(chunk.value);
+					active += chunk.value;
 					false
 				})
 				.collect();
@@ -174,12 +194,12 @@ pub mod pallet {
 			Self {
 				total: self.total,
 				active,
+				nomination: 0u32.into(),
 				unlocking,
 				unbonding: self.unbonding,
 				claimed_rewards: self.claimed_rewards
 			}
 		}
-
 	}
 
 	/// Chilling, onboarding, leaving candidates
@@ -231,6 +251,16 @@ pub mod pallet {
 		Leaving(RoundIndex)
 	}
 
+	#[derive(Clone, Copy, Encode, Decode, RuntimeDebug)]
+	pub enum StakerStatus {
+		/// Declared desire in validating or already participating in it.
+		Validator,
+		/// Nominating for a group of other stakers.
+		Nominator,
+		/// Leaving in round
+		Leaving(RoundIndex)
+	}
+
 	impl Default for CandidateStatus {
 		fn default() -> Self {
 			CandidateStatus::Onboarding
@@ -238,17 +268,54 @@ pub mod pallet {
 	}
 
 	#[derive(Default, Clone, Encode, Decode, RuntimeDebug)]
-	pub struct Nominators<AccountId, Balance> {
+	pub struct StakingNominators<AccountId, Balance> {
 		pub nominations: Vec<Bond<AccountId, Balance>>,
-		pub bond: Balance
+		/// The total amount of the account's balance that we are currently accounting for.
+		/// It's just `active` plus all the `unlocking` balances then minus all the unbonding balances.
+		pub total: Balance,
+		/// The total amount of the stash's balance that will be at stake in any forthcoming
+		/// rounds.
+		pub active: Balance,
+		/// List of eras for which the stakers behind a validator have claimed rewards. Only updated
+		/// for validators.
+		pub claimed_rewards: Vec<RoundIndex>,
 	}
 
-	/// A nominator pool, a set of onboarding, leaving nominators
-	#[derive(Default, Clone, Encode, Decode, RuntimeDebug)]
-	pub struct NominatorPool<AccountId, Balance> {
-		pub active_at: RoundIndex,
-		pub nominations: Vec<Bond<AccountId, Balance>>,
-		pub status: NominatorStatus
+	impl <AccountId, Balance> StakingNominators<AccountId, Balance>
+		where
+			AccountId: Clone + PartialEq,
+			Balance: Copy + Debug + Saturating + AtLeast32BitUnsigned {
+		pub fn new (nominations: Vec<Bond<AccountId, Balance>>, amount: Balance) -> Self {
+			StakingNominators {
+				nominations,
+				total: amount,
+				active: amount,
+				claimed_rewards: vec![]
+			}
+		}
+
+		pub fn add_nomination(&mut self, nomination: Bond<AccountId, Balance>) -> bool {
+			let is_bonded = self.nominations.iter().any(|bonded| bonded.candidate == nomination.candidate);
+			return if is_bonded {
+				false
+			} else {
+				self.total += nomination.amount;
+				self.nominations.push(nomination.clone());
+				true
+			}
+		}
+
+		pub fn nominate_extra(&mut self, extra: Bond<AccountId, Balance>) -> Option<Balance> {
+			for nominate in &mut self.nominations {
+				if nominate.candidate == extra.candidate {
+					self.total += extra.amount;
+					nominate.amount += extra.amount;
+
+					return Some(extra.amount);
+				}
+			}
+			None
+		}
 	}
 
 	#[derive(Clone, Encode, Decode, RuntimeDebug)]
@@ -265,34 +332,6 @@ pub mod pallet {
 		fn default() -> Self {
 			NominatorStatus::Onboarding
 		}
-	}
-
-	impl<A, B> NominatorPool<A, B> {
-		pub fn new(next_round: RoundIndex, nominations: Vec<Bond<A, B>>) -> Self {
-			NominatorPool {
-				active_at: next_round,
-				nominations,
-				status: NominatorStatus::default()
-			}
-		}
-
-		// pub fn bond_extra(&mut self, candidate: A, amount: B) -> Self::nominations {
-		// 	for nominate in &mut self.nominations {
-		// 		if nominate.owner == &candidate {
-		// 			nominate.amount.saturated_into::<u128>().saturating_add(*amount)
-		// 		}
-		// 	}
-		// 	&self.nominations
-		// }
-		//
-		// pub fn bond_less(&mut self, candidate: A, amount: B) -> Self::nominations {
-		// 	for nominate in &mut self.nominations {
-		// 		if nominate.owner == &candidate {
-		// 			nominate.amount.saturated_into::<u128>().saturating_sub(*amount)
-		// 		}
-		// 	}
-		// 	&self.nominations
-		// }
 	}
 
 
@@ -326,21 +365,22 @@ pub mod pallet {
 		}
 
 		/// New round
-		pub fn update(&mut self, now: BlockNumber, length: u32) -> Self {
-			let mut index = self.index;
-			let mut start_in = self.start_in;
-			index += 1u32;
-			start_in = now;
-
-			Self {
-				index,
-				start_in,
-				length
-			}
+		pub fn update(&mut self, now: BlockNumber, length: u32) {
+			self.index += 1u32;
+			self.start_in = now;
+			self.length = length;
 		}
 
 		pub fn should_goto_next_round (&self, now: BlockNumber) -> bool {
 			now - self.start_in >= self.length.into()
+		}
+
+		pub fn next_election_prediction (&self, default_length: u32) -> BlockNumber {
+			return if self.index % 2 == 0 {
+				self.start_in + self.length.into()
+			} else {
+				self.start_in + self.length.into() + default_length.into()
+			}
 		}
 	}
 
@@ -360,7 +400,7 @@ pub mod pallet {
 
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
-		pub stakers: Vec<(T::AccountId)>,
+		pub stakers: Vec<(T::AccountId, BalanceOf<T>)>,
 	}
 
 	#[cfg(feature = "std")]
@@ -376,6 +416,17 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
 		fn build(&self) {
+			for &(ref staker, balance) in &self.stakers {
+				assert!(
+					T::Currency::free_balance(&staker) >= balance,
+					"Account does not have enough balance to bond."
+				);
+				Pallet::<T>::bond(
+					T::Origin::from(Some(staker.clone()).into()),
+					balance.clone(),
+				);
+			}
+
 			// Start Round 1 at Block 0
 			let round: RoundInfo<T::BlockNumber> =
 				RoundInfo::new(1u32, 0u32.into(), T::BlocksPerRound::get());
@@ -506,12 +557,95 @@ pub mod pallet {
 
 			Ok(Default::default())
 		}
+
+		#[pallet::weight(0)]
+		pub fn nominate(
+			origin: OriginFor<T>,
+			candidate: T::AccountId,
+			amount: BalanceOf<T>
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+
+			let mut ledger = Ledger::<T>::get(&candidate).ok_or(Error::<T>::CandidateNotExist)?;
+
+			ensure!(
+				amount >= T::MinNominatorStake::get(),
+				Error::<T>::NominateBelowMin
+			);
+
+			if let Some(mut nominator) = Nominators::<T>::get(&who) {
+				ensure!(
+					nominator.add_nomination(Bond {
+						candidate: candidate.clone(),
+						amount,
+					}),
+					Error::<T>::AlreadyNominatedCollator
+				);
+				ledger.nomination += amount;
+
+				Nominators::<T>::insert(&who, nominator)
+			} else {
+				let nominator = StakingNominators::new(vec![Bond {
+					candidate: candidate.clone(), amount
+				}], amount);
+				ledger.nomination += amount;
+
+				Nominators::<T>::insert(&who, nominator)
+			}
+
+			Ledger::<T>::insert(&candidate, ledger);
+			T::Currency::reserve(&who, amount);
+			Self::deposit_event(Event::Nominate(candidate, amount));
+
+			Ok(Default::default())
+		}
+
+		#[pallet::weight(0)]
+		pub fn nominate_extra(
+			origin: OriginFor<T>,
+			candidate: T::AccountId,
+			extra: BalanceOf<T>
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+
+			let mut nominator = Nominators::<T>::get(&who).ok_or(Error::<T>::NominationNotExist)?;
+
+			let mut ledger = Ledger::<T>::get(&candidate).ok_or(Error::<T>::CandidateNotExist)?;
+
+			nominator.nominate_extra(Bond {
+				candidate: candidate.clone(),
+				amount: extra
+			}).ok_or(Error::<T>::CandidateNotExist)?;
+
+			ledger.nomination += extra;
+
+			Ledger::<T>::insert(&candidate, ledger);
+			Nominators::<T>::insert(&who, nominator);
+			T::Currency::reserve(&who, extra);
+
+			Self::deposit_event(Event::NominateExtra(
+				candidate,
+				extra,
+			));
+
+			Ok(Default::default())
+		}
 	}
 
 	impl <T: Config> Pallet<T> {
 		fn update_ledger(current_round: RoundIndex) {
 			for (acc, mut staker) in  Ledger::<T>::iter() {
 				staker = staker.consolidate_active(current_round.clone());
+				let unbonding = staker.clone().unbonding.into_iter()
+					.filter(|chunk| if chunk.round >= current_round  {
+						staker.total -= chunk.value;
+						T::Currency::unreserve(&acc, chunk.value);
+						false
+					} else {
+						true
+					})
+					.collect();
+				staker.unbonding = unbonding;
 				Ledger::<T>::insert(acc, staker)
 			}
 		}
@@ -526,6 +660,115 @@ pub mod pallet {
 					CandidateQueue::<T>::remove(&acc)
 				}
 			}
+		}
+		/// The total balance that can be slashed from a stash account as of right now.
+		pub fn slashable_balance_of(stash: &T::AccountId, status: StakerStatus) -> BalanceOf<T> {
+			// Weight note: consider making the stake accessible through stash.
+			match status {
+				StakerStatus::Validator => Self::ledger(stash).map(|l| l.active.saturating_add(l.nomination)).unwrap_or_default(),
+				StakerStatus::Nominator => Self::nominator(stash).map(|l| l.total).unwrap_or_default(),
+				_ => Default::default(),
+			}
+		}
+
+		/// Internal impl of [`Self::slashable_balance_of`] that returns [`VoteWeight`].
+		pub fn slashable_balance_of_vote_weight(
+			stash: &T::AccountId,
+			issuance: BalanceOf<T>,
+			status: StakerStatus
+		) -> VoteWeight {
+			T::CurrencyToVote::to_vote(Self::slashable_balance_of(stash, status), issuance)
+		}
+
+		/// Returns a closure around `slashable_balance_of_vote_weight` that can be passed around.
+		///
+		/// This prevents call sites from repeatedly requesting `total_issuance` from backend. But it is
+		/// important to be only used while the total issuance is not changing.
+		pub fn slashable_balance_of_fn(status: StakerStatus) -> Box<dyn Fn(&T::AccountId) -> VoteWeight> {
+			// NOTE: changing this to unboxed `impl Fn(..)` return type and the module will still
+			// compile, while some types in mock fail to resolve.
+			let issuance = T::Currency::total_issuance();
+			Box::new(move |who: &T::AccountId| -> VoteWeight {
+				Self::slashable_balance_of_vote_weight(who, issuance, status)
+			})
+		}
+
+		/// Get all of the voters that are eligible for the npos election.
+		///
+		/// This will use all on-chain nominators, and all the validators will inject a self vote.
+		///
+		/// ### Slashing
+		///
+		/// All nominations that have been submitted before the last non-zero slash of the validator are
+		/// auto-chilled.
+		///
+		/// Note that this is VERY expensive. Use with care.
+		fn get_npos_voters() -> Vec<(T::AccountId, VoteWeight, Vec<T::AccountId>)> {
+			let weight_of_validator = Self::slashable_balance_of_fn(StakerStatus::Validator);
+			let weight_of_nominator = Self::slashable_balance_of_fn(StakerStatus::Nominator);
+			let mut all_voters = Vec::new();
+
+			for (validator, _) in <Ledger<T>>::iter() {
+				// append self vote
+				let self_vote = (validator.clone(), weight_of_validator(&validator), vec![validator.clone()]);
+				all_voters.push(self_vote);
+			}
+
+			for (nominator, nominations) in Nominators::<T>::iter() {
+				let StakingNominators { nominations, .. } = nominations;
+				let mut targets = vec![];
+				for bond in nominations {
+					targets.push(bond.candidate.clone())
+				}
+
+				let vote_weight = weight_of_nominator(&nominator);
+				all_voters.push((nominator, vote_weight, targets))
+			}
+
+			all_voters
+		}
+
+		pub fn get_npos_targets() -> Vec<T::AccountId> {
+			<Ledger<T>>::iter().map(|(v, _)| v).collect::<Vec<_>>()
+		}
+	}
+
+	impl<T: Config> frame_election_provider_support::ElectionDataProvider<T::AccountId, T::BlockNumber>
+	for Pallet<T>
+	{
+		const MAXIMUM_VOTES_PER_VOTER: u32 = T::MAX_COLLATORS_PER_NOMINATOR;
+
+		fn targets(maybe_max_len: Option<usize>) -> data_provider::Result<(Vec<T::AccountId>, Weight)> {
+			let target_count = <Ledger<T>>::iter().count();
+
+			if maybe_max_len.map_or(false, |max_len| target_count > max_len) {
+				return Err("Target snapshot too big");
+			}
+
+			let weight = <T as frame_system::Config>::DbWeight::get().reads(target_count as u64);
+			Ok((Self::get_npos_targets(), weight))
+		}
+
+		fn voters(maybe_max_len: Option<usize>) -> data_provider::Result<(Vec<(T::AccountId, VoteWeight, Vec<T::AccountId>)>, Weight)> {
+			let nominator_count = Nominators::<T>::iter().count();
+			let validator_count = Ledger::<T>::iter().count();
+			let voter_count = nominator_count.saturating_add(validator_count);
+
+			if maybe_max_len.map_or(false, |max_len| voter_count > max_len) {
+				return Err("Voter snapshot too big");
+			}
+			let weight = <T as frame_system::Config>::DbWeight::get().reads(voter_count as u64);
+
+			Ok((Self::get_npos_voters(), weight))
+		}
+
+		fn desired_targets() -> data_provider::Result<(u32, Weight)> {
+			Ok((10u32, <T as frame_system::Config>::DbWeight::get().reads(1)))
+		}
+
+		fn next_election_prediction(_: T::BlockNumber) -> T::BlockNumber {
+			let current_round = Self::current_round();
+			current_round.next_election_prediction(T::BlocksPerRound::get())
 		}
 	}
 
@@ -545,6 +788,11 @@ pub mod pallet {
 	StorageMap<_, Twox64Concat, T::AccountId, CandidatePool<BalanceOf<T>>>;
 
 	#[pallet::storage]
+	#[pallet::getter(fn nominator)]
+	pub type Nominators<T: Config> =
+	StorageMap<_, Twox64Concat, T::AccountId, StakingNominators<T::AccountId, BalanceOf<T>>>;
+
+	#[pallet::storage]
 	#[pallet::getter(fn storage_version)]
 	pub type StorageVersion<T: Config> =
 	StorageValue<_, Releases, ValueQuery>;
@@ -562,6 +810,16 @@ pub mod pallet {
 		Underflow,
 		/// Bond less than minimum value
 		BondBelowMin,
+		/// Bond less than minimum value
+		NominateBelowMin,
+		/// Nominate not exist candidate
+		CandidateNotExist,
+		/// Too many nomination candidates supplied
+		TooManyCandidates,
+		/// Nomination not exist
+		NominationNotExist,
+		/// Already nominated collator
+		AlreadyNominatedCollator,
 	}
 
 	#[pallet::event]
@@ -570,5 +828,7 @@ pub mod pallet {
 		BondInQueue(T::AccountId, BalanceOf<T>),
 		BondExtra(T::AccountId, BalanceOf<T>),
 		BondLess(T::AccountId, BalanceOf<T>),
+		Nominate(T::AccountId, BalanceOf<T>),
+		NominateExtra(T::AccountId, BalanceOf<T>)
 	}
 }

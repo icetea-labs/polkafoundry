@@ -7116,6 +7116,7 @@ dependencies = [
 name = "polkafoundry-staking"
 version = "0.1.0"
 dependencies = [
+ "frame-election-provider-support",
  "frame-support",
  "frame-system",
  "log",

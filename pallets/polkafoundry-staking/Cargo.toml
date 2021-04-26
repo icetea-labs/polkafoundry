@@ -23,6 +23,7 @@ sp-core = { default-features = false, git = 'https://github.com/paritytech/subst
 sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+frame-election-provider-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 
 pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
 pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
@@ -33,10 +34,11 @@ std = [
     'codec/std',
     'frame-support/std',
     'frame-system/std',
+    'frame-election-provider-support/std',
     'pallet-balances/std',
     'pallet-utility/std',
     'sp-core/std',
     'sp-io/std',
     'sp-runtime/std',
-    'sp-std/std'
+    'sp-std/std',
 ]
