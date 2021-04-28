@@ -1,6 +1,6 @@
 [package]
 name = "polkafoundry-staking"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Tung <tung.nguyen@icetea.io>"]
 edition = "2018"
 
@@ -24,9 +24,11 @@ sp-io = { default-features = false, git = 'https://github.com/paritytech/substra
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 frame-election-provider-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+pallet-election-provider-multi-phase = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 
 pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
 pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+sp-npos-elections = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 
 [features]
 default = ['std']
@@ -41,4 +43,6 @@ std = [
     'sp-io/std',
     'sp-runtime/std',
     'sp-std/std',
+    'sp-npos-elections/std',
+    'pallet-election-provider-multi-phase/std',
 ]

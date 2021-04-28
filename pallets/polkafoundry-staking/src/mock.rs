@@ -5,11 +5,14 @@ use frame_support::{
 };
 use sp_io;
 use sp_runtime::{
+	Perbill,
+	PerU16,
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 };
 use sp_std::convert::{From, TryInto};
 use sp_core::H256;
+use frame_election_provider_support::onchain;
 
 pub type AccountId = u64;
 pub type Balance = u128;
@@ -69,21 +72,33 @@ impl pallet_utility::Config for Test {
 parameter_types! {
 	pub const BlocksPerRound: u32 = 10;
 	pub const MaxCollatorsPerNominator: u32 = 5;
+	pub const MaxNominationsPerCollator: u32 = 2;
 	pub const BondDuration: u32 = 2;
 	pub const MinCollatorStake: u32 = 500;
 	pub const MinNominatorStake: u32 = 100;
 	pub const VestingAfter: u32 = 2;
 }
 
+impl onchain::Config for Test {
+	type AccountId = u64;
+	type BlockNumber = u64;
+	type BlockWeights = BlockWeights;
+	type Accuracy = Perbill;
+	type DataProvider = Staking;
+}
+
 impl Config for Test {
+	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
 	type Event = Event;
 	type Currency = Balances;
 	type BlocksPerRound = BlocksPerRound;
-	type MaxCollatorsPerNominator = MaxCollatorsPerNominator;
+	type MaxNominationsPerCollator = MaxNominationsPerCollator;
 	type BondDuration = BondDuration;
 	type MinCollatorStake = MinCollatorStake;
 	type MinNominatorStake = MinNominatorStake;
 	type VestingAfter = VestingAfter;
+	type ElectionProvider = onchain::OnChainSequentialPhragmen<Self>;
+	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
 }
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
