@@ -6,6 +6,7 @@ use frame_support::pallet;
 pub(crate) mod mock;
 #[cfg(test)]
 mod tests;
+mod taylor_series;
 
 #[pallet]
 pub mod pallet {
@@ -895,6 +896,28 @@ pub mod pallet {
 	}
 
 	impl <T: Config> Pallet<T> {
+		fn enact_election(current_round: RoundIndex) -> Option<Vec<T::AccountId>> {
+			T::ElectionProvider::elect()
+				.map_err(|e| {
+					log!(warn, "election provider failed due to {:?}", e)
+				})
+				.and_then(|(res, weight)| {
+					<frame_system::Pallet<T>>::register_extra_weight_unchecked(
+						weight,
+						frame_support::weights::DispatchClass::Mandatory,
+					);
+					Self::process_election(res, current_round)
+				})
+				.ok()
+		}
+
+		pub fn process_election(
+			flat_supports: frame_election_provider_support::Supports<T::AccountId>,
+			current_era: EraIndex,
+		) -> Result<Vec<T::AccountId>, ()> {
+
+		}
+
 		fn update_collators(current_round: RoundIndex) {
 			for (acc, mut collator) in  Collators::<T>::iter() {
 				// active onboarding collator
