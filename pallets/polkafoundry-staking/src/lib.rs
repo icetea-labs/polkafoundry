@@ -7,6 +7,7 @@ pub(crate) mod mock;
 #[cfg(test)]
 mod tests;
 mod taylor_series;
+mod inflation;
 
 #[pallet]
 pub mod pallet {

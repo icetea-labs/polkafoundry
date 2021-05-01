@@ -7125,6 +7125,7 @@ dependencies = [
  "pallet-utility",
  "parity-scale-codec",
  "serde",
+ "sp-arithmetic",
  "sp-core",
  "sp-io",
  "sp-npos-elections",
