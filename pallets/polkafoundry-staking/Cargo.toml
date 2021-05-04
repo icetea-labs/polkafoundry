@@ -17,6 +17,7 @@ version = '2.0.0'
 serde = { version = "1.0.119" }
 log = '0.4.8'
 
+author-inherent = { path = '../author-inherent', default-features = false }
 frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
@@ -34,6 +35,7 @@ sp-npos-elections = { default-features = false, git = 'https://github.com/parity
 [features]
 default = ['std']
 std = [
+    'author-inherent/std',
     'codec/std',
     'frame-support/std',
     'frame-system/std',

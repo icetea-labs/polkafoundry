@@ -9,12 +9,25 @@ mod tests;
 mod taylor_series;
 mod inflation;
 
+pub(crate) const LOG_TARGET: &'static str = "runtime::staking";
+
+// syntactic sugar for logging.
+#[macro_export]
+macro_rules! log {
+	($level:tt, $patter:expr $(, $values:expr)* $(,)?) => {
+		log::$level!(
+			target: crate::LOG_TARGET,
+			concat!("[{:?}] 💸 ", $patter), <frame_system::Pallet<T>>::block_number() $(, $values)*
+		)
+	};
+}
+
 #[pallet]
 pub mod pallet {
-	use frame_support::{pallet_prelude::*, traits::{Currency, LockIdentifier, ReservableCurrency, CurrencyToVote}};
+	use frame_support::{pallet_prelude::*, traits::{Currency, LockIdentifier, ReservableCurrency, CurrencyToVote, Imbalance}};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::{Saturating, Verify};
-	use sp_runtime::{MultiSignature, SaturatedConversion};
+	use sp_runtime::traits::{Saturating, Verify, Zero};
+	use sp_runtime::{MultiSignature, SaturatedConversion, Perbill};
 	use sp_core::crypto::AccountId32;
 	use sp_std::{convert::{From, TryInto}, vec::Vec};
 	use frame_support::sp_runtime::traits::{Bounded, AtLeast32BitUnsigned};
@@ -22,7 +35,8 @@ pub mod pallet {
 	use std::cell::RefCell;
 	use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
 	use std::cmp::Ordering;
-
+	use crate::inflation::compute_total_payout;
+	use std::ops::Mul;
 
 	/// Counter for the number of round that have passed
 	pub type RoundIndex = u32;
@@ -52,7 +66,7 @@ pub mod pallet {
 		/// Minimum stake required to be reserved to be a nominator
 		type MinNominatorStake: Get<BalanceOf<Self>>;
 		/// Number of round per payout
-		type VestingAfter: Get<RoundIndex>;
+		type PayoutDuration: Get<RoundIndex>;
 		/// Something that provides the election functionality.
 		type ElectionProvider: frame_election_provider_support::ElectionProvider<
 			Self::AccountId,
@@ -78,11 +92,21 @@ pub mod pallet {
 			if current_round.should_goto_next_round(now) {
 				current_round.update(now, T::BlocksPerRound::get());
 				let round_index = current_round.index;
+				// start a new round
 				CurrentRound::<T>::put(current_round);
-
+				// pay for stakers
+				Self::payout_stakers(round_index);
+				// onboard, unlock bond, unbond collators
 				Self::update_collators(round_index);
+				// unbond all nominators
 				Self::update_nominators(round_index);
+				// execute all delayed collator exits
 				Self::execute_exit_queue(round_index);
+				// select winner candidates in this round
+				Self::enact_election(round_index);
+				// update total stake of next round
+				TotalStakedAt::<T>::insert(round_index, TotalStaked::<T>::get());
+				TotalIssuanceAt::<T>::insert(round_index, T::Currency::total_issuance());
 			}
 		}
 	}
@@ -534,12 +558,8 @@ pub mod pallet {
 			now - self.start_in >= self.length.into()
 		}
 
-		pub fn next_election_prediction (&self, default_length: u32) -> BlockNumber {
-			return if self.index % 2 == 0 {
-				self.start_in + self.length.into()
-			} else {
-				self.start_in + self.length.into() + default_length.into()
-			}
+		pub fn next_election_prediction (&self) -> BlockNumber {
+			self.start_in + self.length.into()
 		}
 	}
 
@@ -556,6 +576,27 @@ pub mod pallet {
 			Releases::V1_0_0
 		}
 	}
+
+	/// The amount of exposure (to slashing) than an individual nominator has.
+	#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Encode, Decode, RuntimeDebug)]
+	pub struct IndividualExposure<AccountId, Balance> {
+		/// The stash account of the nominator in question.
+		pub who: AccountId,
+		/// Amount of funds exposed.
+		pub value: Balance,
+	}
+
+	/// A snapshot of the stake backing a single validator in the system.
+	#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Encode, Decode, Default, RuntimeDebug)]
+	pub struct Exposure<AccountId, Balance> {
+		/// The total balance backing this validator.
+		pub total: Balance,
+		/// The validator's own stash that is exposed.
+		pub own: Balance,
+		/// The portions of nominators stashes that are exposed.
+		pub others: Vec<IndividualExposure<AccountId, Balance>>,
+	}
+
 
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
@@ -574,21 +615,25 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
 		fn build(&self) {
+			let mut total_staked: BalanceOf<T> = Zero::zero();
 			for &(ref staker, balance) in &self.stakers {
 				assert!(
 					T::Currency::free_balance(&staker) >= balance,
 					"Account does not have enough balance to bond."
 				);
+				total_staked += balance.clone();
 				Pallet::<T>::bond(
 					T::Origin::from(Some(staker.clone()).into()),
 					balance.clone(),
 				);
 			}
+			TotalStaked::<T>::put(total_staked);
 
 			// Start Round 1 at Block 0
 			let round: RoundInfo<T::BlockNumber> =
 				RoundInfo::new(1u32, 0u32.into(), T::BlocksPerRound::get());
 			CurrentRound::<T>::put(round);
+			TotalStakedAt::<T>::insert(1u32, TotalStaked::<T>::get());
 		}
 	}
 
@@ -614,6 +659,8 @@ pub mod pallet {
 			let staker = StakingCollators::new(amount, current_round.next_round_index());
 
 			Collators::<T>::insert(&who, staker);
+			let current_staked = TotalStaked::<T>::get();
+			TotalStaked::<T>::put(current_staked + amount);
 
 			T::Currency::reserve(
 				&who,
@@ -663,6 +710,8 @@ pub mod pallet {
 
 			collator.bond_extra(extra, current_round.next_round_index());
 			Collators::<T>::insert(&who, collator);
+			let current_staked = TotalStaked::<T>::get();
+			TotalStaked::<T>::put(current_staked + extra);
 
 			T::Currency::reserve(
 				&who,
@@ -782,6 +831,11 @@ pub mod pallet {
 
 			Collators::<T>::insert(&candidate, collator);
 			T::Currency::reserve(&who, amount);
+
+			let current_round = CurrentRound::<T>::get();
+			let current_staked = TotalStaked::<T>::get();
+			TotalStaked::<T>::put(current_staked + amount);
+
 			Self::deposit_event(Event::Nominate(candidate, amount));
 
 			Ok(Default::default())
@@ -813,6 +867,10 @@ pub mod pallet {
 			Collators::<T>::insert(&candidate, collator);
 			Nominators::<T>::insert(&who, nominator);
 			T::Currency::reserve(&who, extra);
+
+			let current_round = CurrentRound::<T>::get();
+			let current_staked = TotalStaked::<T>::get();
+			TotalStaked::<T>::put(current_staked + extra);
 
 			Self::deposit_event(Event::NominateExtra(
 				candidate,
@@ -897,12 +955,75 @@ pub mod pallet {
 	}
 
 	impl <T: Config> Pallet<T> {
-		fn enact_election(current_round: RoundIndex) -> Option<Vec<T::AccountId>> {
+		fn payout_stakers(current_round: RoundIndex) {
+			let mint = |amount: BalanceOf<T>, to: T::AccountId| {
+				if amount > T::Currency::minimum_balance() {
+					if let Ok(imb) = T::Currency::deposit_into_existing(&to, amount) {
+						Self::deposit_event(Event::Rewarded(to.clone(), imb.peek()));
+					}
+				}
+			};
+			let duration = T::PayoutDuration::get();
+			if current_round > duration {
+				let payout_round = current_round - duration;
+				let total_stake = TotalStakedAt::<T>::get(payout_round);
+				let total_issuance = TotalIssuanceAt::<T>::get(payout_round);
+
+				let payout = compute_total_payout(
+					total_stake,
+					total_issuance,
+					2_5u32,
+					20u32,
+					50u32,
+					0_05u32,
+					(T::BlocksPerRound::get() * 6000) as u64);
+
+				let commission_rate = Perbill::from_rational(
+					50u32,
+					100
+				);
+				let stake_rate = Perbill::from_rational(
+					50u32,
+					100
+				);
+				let total_points = TotalPoints::<T>::get(current_round);
+				for (acc, point) in CollatorPoints::<T>::drain_prefix(current_round) {
+					let exposure = RoundStakerClipped::<T>::get(&current_round, &acc);
+					let collator_exposure_part = stake_rate * Perbill::from_rational(
+						exposure.own,
+						exposure.total,
+					);
+					let collator_commission_part = commission_rate * Perbill::from_rational(
+						point,
+						total_points
+					);
+					mint(
+						collator_exposure_part.mul(payout) + collator_commission_part.mul(payout),
+						acc.clone()
+					);
+
+					for nominator in exposure.others.iter() {
+						let nominator_exposure_part = Perbill::from_rational(
+							nominator.value,
+							exposure.total,
+						);
+						mint(
+							nominator_exposure_part.mul(payout),
+							nominator.who.clone()
+						);
+					}
+				}
+
+			}
+		}
+
+		pub fn enact_election(current_round: RoundIndex) -> Option<Vec<T::AccountId>> {
 			T::ElectionProvider::elect()
 				.map_err(|e| {
 					log!(warn, "election provider failed due to {:?}", e)
 				})
 				.and_then(|(res, weight)| {
+					println!("res ne {:?}", res);
 					<frame_system::Pallet<T>>::register_extra_weight_unchecked(
 						weight,
 						frame_support::weights::DispatchClass::Mandatory,
@@ -914,9 +1035,54 @@ pub mod pallet {
 
 		pub fn process_election(
 			flat_supports: frame_election_provider_support::Supports<T::AccountId>,
-			current_era: EraIndex,
+			current_round: RoundIndex,
 		) -> Result<Vec<T::AccountId>, ()> {
+			let exposures = Self::collect_exposures(flat_supports);
+			let elected_stashes = exposures.iter().cloned().map(|(x, _)| x).collect::<Vec<_>>();
 
+			exposures.into_iter().for_each(|(stash, exposure)| {
+				RoundStakerClipped::<T>::insert(current_round, stash.clone(), exposure.clone());
+
+				Self::deposit_event(Event::CollatorChoosen(current_round, stash, exposure.total));
+			});
+
+			Ok(elected_stashes)
+		}
+
+		/// Consume a set of [`Supports`] from [`sp_npos_elections`] and collect them into a
+		/// [`Exposure`].
+		fn collect_exposures(
+			supports: Supports<T::AccountId>,
+		) -> Vec<(T::AccountId, Exposure<T::AccountId, BalanceOf<T>>)> {
+			let total_issuance = T::Currency::total_issuance();
+			let to_currency = |e: frame_election_provider_support::ExtendedBalance| {
+				T::CurrencyToVote::to_currency(e, total_issuance)
+			};
+
+			supports
+				.into_iter()
+				.map(|(validator, support)| {
+					// build `struct exposure` from `support`
+					let mut others = Vec::with_capacity(support.voters.len());
+					let mut own: BalanceOf<T> = Zero::zero();
+					let mut total: BalanceOf<T> = Zero::zero();
+					support
+						.voters
+						.into_iter()
+						.map(|(nominator, weight)| (nominator, to_currency(weight)))
+						.for_each(|(nominator, stake)| {
+							if nominator == validator {
+								own = own.saturating_add(stake);
+							} else {
+								others.push(IndividualExposure { who: nominator, value: stake });
+							}
+							total = total.saturating_add(stake);
+						});
+
+					let exposure = Exposure { own, others, total };
+					(validator, exposure)
+				})
+				.collect::<Vec<(T::AccountId, Exposure<_, _>)>>()
 		}
 
 		fn update_collators(current_round: RoundIndex) {
@@ -940,8 +1106,11 @@ pub mod pallet {
 				let before_total = nominations.total;
 				// executed unbonding after delay BondDuration
 				nominations = nominations.consolidate_unbonded(current_round.clone());
+				let current_staked = TotalStaked::<T>::get();
+				let unbonded = before_total - nominations.total;
+				TotalStaked::<T>::put(current_staked - unbonded);
 
-				T::Currency::unreserve(&acc, before_total - nominations.total);
+				T::Currency::unreserve(&acc, unbonded);
 
 				Nominators::<T>::insert(&acc, nominations)
 			}
@@ -949,12 +1118,16 @@ pub mod pallet {
 
 		fn execute_exit_queue(current_round: RoundIndex) {
 			for (acc, mut exit) in ExitQueue::<T>::iter() {
+				let current_staked = TotalStaked::<T>::get();
+
 				if exit.when > current_round {
 					let unbonding = exit.unbonding.into_iter()
 						.filter(|chunk| if chunk.round > current_round {
 							true
 						} else {
 							T::Currency::unreserve(&acc, chunk.value);
+							TotalStaked::<T>::put(current_staked - chunk.value);
+
 							false
 						}).collect();
 
@@ -962,8 +1135,11 @@ pub mod pallet {
 					ExitQueue::<T>::insert(&acc, exit);
 				} else {
 					T::Currency::unreserve(&acc, exit.remaining);
+					TotalStaked::<T>::put(current_staked - exit.remaining);
+
 					for unbond in exit.unbonding {
 						T::Currency::unreserve(&acc, unbond.value);
+						TotalStaked::<T>::put(current_staked - unbond.value);
 					}
 					ExitQueue::<T>::remove(&acc);
 				}
@@ -1040,6 +1216,10 @@ pub mod pallet {
 		pub fn get_npos_targets() -> Vec<T::AccountId> {
 			<Collators<T>>::iter().map(|(v, _)| v).collect::<Vec<_>>()
 		}
+
+		pub fn can_author(account: &T::AccountId) -> bool {
+			Collators::<T>::get(&account).is_some()
+		}
 	}
 
 	impl<T: Config> frame_election_provider_support::ElectionDataProvider<T::AccountId, T::BlockNumber>
@@ -1077,7 +1257,7 @@ pub mod pallet {
 
 		fn next_election_prediction(_: T::BlockNumber) -> T::BlockNumber {
 			let current_round = Self::current_round();
-			current_round.next_election_prediction(T::BlocksPerRound::get())
+			current_round.next_election_prediction()
 		}
 	}
 
@@ -1097,15 +1277,57 @@ pub mod pallet {
 	StorageMap<_, Twox64Concat, T::AccountId, Leaving<BalanceOf<T>>>;
 
 	#[pallet::storage]
+	#[pallet::getter(fn total_staked)]
+	pub type TotalStaked<T: Config> =
+	StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn total_staked_at)]
+	pub type TotalStakedAt<T: Config> =
+	StorageMap<_, Twox64Concat, RoundIndex, BalanceOf<T>, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn total_issuance_at)]
+	pub type TotalIssuanceAt<T: Config> =
+	StorageMap<_, Twox64Concat, RoundIndex, BalanceOf<T>, ValueQuery>;
+
+	#[pallet::storage]
 	#[pallet::getter(fn nominators)]
 	pub type Nominators<T: Config> =
 	StorageMap<_, Twox64Concat, T::AccountId, StakingNominators<T::AccountId, BalanceOf<T>>>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn round_staker_clipped)]
+	pub type RoundStakerClipped<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		RoundIndex,
+		Twox64Concat,
+		T::AccountId,
+		Exposure<T::AccountId, BalanceOf<T>>,
+		ValueQuery,
+	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn storage_version)]
 	pub type StorageVersion<T: Config> =
 	StorageValue<_, Releases, ValueQuery>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn total_points)]
+	pub type TotalPoints<T: Config> = StorageMap<_, Twox64Concat, RoundIndex, RewardPoint, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn awarded_pts)]
+	pub type CollatorPoints<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		RoundIndex,
+		Twox64Concat,
+		T::AccountId,
+		RewardPoint,
+		ValueQuery,
+	>;
 
 	#[pallet::error]
 	pub enum Error<T> {
@@ -1149,5 +1371,25 @@ pub mod pallet {
 		CandidateOnboard(T::AccountId),
 		CandidateLeaving(T::AccountId, RoundIndex),
 		NominatorLeaveCollator(T::AccountId, T::AccountId),
+		CollatorChoosen(RoundIndex, T::AccountId, BalanceOf<T>),
+		Rewarded(T::AccountId, BalanceOf<T>),
 	}
+
+	/// Add reward points to block authors:
+	/// * 20 points to the block producer for producing a block in the chain
+	impl<T: Config> author_inherent::EventHandler<T::AccountId> for Pallet<T> {
+		fn note_author(author: T::AccountId) {
+			let now = <CurrentRound<T>>::get().index;
+			let score_plus_20 = <CollatorPoints<T>>::get(now, &author) + 20;
+			<CollatorPoints<T>>::insert(now, author, score_plus_20);
+			<TotalPoints<T>>::mutate(now, |x| *x += 20);
+		}
+	}
+
+	impl<T: Config> author_inherent::CanAuthor<T::AccountId> for Pallet<T> {
+		fn can_author(account: &T::AccountId) -> bool {
+			Self::can_author(account)
+		}
+	}
+
 }

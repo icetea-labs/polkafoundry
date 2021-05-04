@@ -2,25 +2,29 @@ use sp_runtime::{Perbill, traits::AtLeast32BitUnsigned, curve::PiecewiseLinear};
 use crate::taylor_series::compute_inflation;
 use sp_arithmetic::PerThing;
 use sp_arithmetic::traits::Saturating;
+use std::ops::Mul;
 
-pub fn compute_total_payout<P>(
-	i_0: P,
-	i_ideal: P,
-	x: P,
-	x_ideal: P,
-	d: P,
+pub fn compute_total_payout<N>(
+	npos_token_staked: N,
+	total_tokens: N,
+	i_0: u32,
+	i_ideal: u32,
+	x_ideal: u32,
+	d: u32,
 	round_duration: u64
-) -> (P, P)
-	where P: PerThing
+) -> N
+	where N: AtLeast32BitUnsigned + Clone
 {
 	// Milliseconds per year for the Julian year (365.25 days).
 	const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
+	let i_0 = Perbill::from_rational(i_0, 100);
+	let i_ideal = Perbill::from_rational(i_ideal, 100);
+	let x = Perbill::from_rational(npos_token_staked, total_tokens.clone());
+	let x_ideal = Perbill::from_rational(x_ideal, 100);
+	let d = Perbill::from_rational(d, 100);
 
-	let portion = P::from_rational(round_duration as u128, MILLISECONDS_PER_YEAR as u128);
-	let payout = portion * compute_i_npos(i_0, i_ideal, x, x_ideal, d);
-
-	let maximum = portion * payout;
-	(payout, maximum)
+	let portion = Perbill::from_rational(round_duration,MILLISECONDS_PER_YEAR);
+	(portion * compute_i_npos(i_0, i_ideal, x, x_ideal, d)).mul(total_tokens)
 }
 
 pub fn compute_i_npos<P: PerThing> (

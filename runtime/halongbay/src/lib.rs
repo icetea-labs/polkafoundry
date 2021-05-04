@@ -376,7 +376,9 @@ impl pallet_ethereum::Config for Runtime {
 	type BlockGasLimit = BlockGasLimit;
 }
 
-impl author_inherent::Config for Runtime {}
+impl author_inherent::Config for Runtime {
+	type EventHandler = Staking;
+}
 
 parameter_types! {
 	pub const ChainId: u64 = 11;

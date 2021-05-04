@@ -57,6 +57,8 @@ impl<T> CanAuthor<T> for () {
 }
 
 pub trait Config: System {
+	/// Other pallets that want to be informed about block authorship
+	type EventHandler: EventHandler<Self::AccountId>;
 }
 
 decl_error! {

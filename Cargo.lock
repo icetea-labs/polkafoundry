@@ -2756,6 +2756,7 @@ dependencies = [
  "parity-scale-codec",
  "polkadot-parachain",
  "polkafoundry-primitives",
+ "polkafoundry-staking",
  "precompiles",
  "serde",
  "sp-api",
@@ -7116,6 +7117,7 @@ dependencies = [
 name = "polkafoundry-staking"
 version = "0.0.1"
 dependencies = [
+ "author-inherent",
  "frame-election-provider-support",
  "frame-support",
  "frame-system",

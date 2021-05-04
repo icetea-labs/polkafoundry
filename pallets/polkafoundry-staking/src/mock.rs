@@ -1,4 +1,4 @@
-use crate::{self as stake, Config};
+use crate::{self as stake, Config, CollatorPoints, TotalPoints};
 use frame_support::{
 	construct_runtime, parameter_types,
 	traits::{GenesisBuild, OnFinalize, OnInitialize},
@@ -76,7 +76,7 @@ parameter_types! {
 	pub const BondDuration: u32 = 2;
 	pub const MinCollatorStake: u32 = 500;
 	pub const MinNominatorStake: u32 = 100;
-	pub const VestingAfter: u32 = 2;
+	pub const PayoutDuration: u32 = 2;
 }
 
 impl onchain::Config for Test {
@@ -96,7 +96,7 @@ impl Config for Test {
 	type BondDuration = BondDuration;
 	type MinCollatorStake = MinCollatorStake;
 	type MinNominatorStake = MinNominatorStake;
-	type VestingAfter = VestingAfter;
+	type PayoutDuration = PayoutDuration;
 	type ElectionProvider = onchain::OnChainSequentialPhragmen<Self>;
 	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
 }
@@ -187,4 +187,9 @@ pub(crate) fn run_to_block(n: u64) {
 		Balances::on_initialize(System::block_number());
 		Staking::on_initialize(System::block_number());
 	}
+}
+
+pub(crate) fn set_author(round: u32, acc: u64, pts: u32) {
+	<TotalPoints<Test>>::mutate(round, |p| *p += pts);
+	<CollatorPoints<Test>>::mutate(round, acc, |p| *p += pts);
 }
