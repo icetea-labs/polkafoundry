@@ -14,8 +14,8 @@ package = 'parity-scale-codec'
 version = '2.0.0'
 
 [dependencies]
-serde = { version = "1.0.119" }
-log = '0.4.8'
+serde = { version = "1.0.119", optional = true }
+log = { version = "0.4.14", default-features = false }
 
 author-inherent = { path = '../author-inherent', default-features = false }
 frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
@@ -26,11 +26,9 @@ sp-arithmetic = { default-features = false, git = 'https://github.com/paritytech
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 frame-election-provider-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
-pallet-election-provider-multi-phase = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 
 pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
 pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
-sp-npos-elections = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 
 [features]
 default = ['std']
@@ -42,11 +40,11 @@ std = [
     'frame-election-provider-support/std',
     'pallet-balances/std',
     'pallet-utility/std',
+    'log/std',
     'sp-core/std',
     'sp-io/std',
     'sp-runtime/std',
     'sp-std/std',
-    'sp-npos-elections/std',
     'sp-arithmetic/std',
-    'pallet-election-provider-multi-phase/std',
+    'serde'
 ]

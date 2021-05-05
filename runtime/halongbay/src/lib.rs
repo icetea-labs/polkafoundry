@@ -10,7 +10,7 @@ use sp_std::prelude::*;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256, H160, H256};
 use sp_runtime::{
 	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys,
-	transaction_validity::{TransactionValidity, TransactionSource},
+	transaction_validity::{TransactionValidity, TransactionSource, TransactionPriority},
 	AccountId32
 };
 use sp_runtime::traits::{
@@ -60,6 +60,13 @@ pub use polkafoundry_primitives::{
 	DigestItem, Index, Hash, Moment, Nonce, Signature,
 };
 
+use runtime_common::{
+	BlockHashCount, BlockWeights, BlockLength,
+	OffchainSolutionWeightLimit, OffchainSolutionLengthLimit,
+};
+
+// Weights used in the runtime.
+mod weights;
 mod constants;
 pub use constants::{weights::*, time::*};
 
@@ -86,39 +93,9 @@ impl_opaque_keys! {
 	pub struct SessionKeys {}
 }
 
-/// We assume that ~10% of the block weight is consumed by `on_initalize` handlers.
-/// This is used to limit the maximal weight of a single extrinsic.
-const AVERAGE_ON_INITIALIZE_RATIO: Perbill = Perbill::from_percent(10);
-/// We allow `Normal` extrinsics to fill up the block up to 75%, the rest can be used
-/// by  Operational  extrinsics.
-const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
-/// We allow for 2 seconds of compute with a 6 second average block time.
-const MAXIMUM_BLOCK_WEIGHT: Weight = 2 * WEIGHT_PER_SECOND;
-
 parameter_types! {
-	pub const BlockHashCount: BlockNumber = 250;
 	pub const Version: RuntimeVersion = VERSION;
-	pub RuntimeBlockLength: BlockLength =
-		BlockLength::max_with_normal_ratio(5 * 1024 * 1024, NORMAL_DISPATCH_RATIO);
-	pub RuntimeBlockWeights: BlockWeights = BlockWeights::builder()
-		.base_block(BlockExecutionWeight::get())
-		.for_class(DispatchClass::all(), |weights| {
-			weights.base_extrinsic = ExtrinsicBaseWeight::get();
-		})
-		.for_class(DispatchClass::Normal, |weights| {
-			weights.max_total = Some(NORMAL_DISPATCH_RATIO * MAXIMUM_BLOCK_WEIGHT);
-		})
-		.for_class(DispatchClass::Operational, |weights| {
-			weights.max_total = Some(MAXIMUM_BLOCK_WEIGHT);
-			// Operational transactions have some extra reserved space, so that they
-			// are included even if block reached `MAXIMUM_BLOCK_WEIGHT`.
-			weights.reserved = Some(
-				MAXIMUM_BLOCK_WEIGHT - NORMAL_DISPATCH_RATIO * MAXIMUM_BLOCK_WEIGHT
-			);
-		})
-		.avg_block_initialization(AVERAGE_ON_INITIALIZE_RATIO)
-		.build_or_panic();
-	pub const SS58Prefix: u8 = 42;
+	pub const SS58Prefix: u8 = SS58PREFIX;
 }
 
 // Configure FRAME pallets to include in runtime.
@@ -127,9 +104,9 @@ impl frame_system::Config for Runtime {
 	/// The basic call filter to use in dispatchable.
 	type BaseCallFilter = ();
 	/// Block & extrinsics weights: base values and limits.
-	type BlockWeights = RuntimeBlockWeights;
+	type BlockWeights = BlockWeights;
 	/// The maximum length of a block (in bytes).
-	type BlockLength = RuntimeBlockLength;
+	type BlockLength = BlockLength;
 	/// The identifier used to distinguish between accounts.
 	type AccountId = AccountId;
 	/// The aggregated dispatch type that is available for extrinsics.
@@ -381,7 +358,7 @@ impl author_inherent::Config for Runtime {
 }
 
 parameter_types! {
-	pub const ChainId: u64 = 11;
+	pub const ChainId: u64 = CHAIN_ID;
 }
 
 impl pallet_evm::Config for Runtime {
@@ -403,6 +380,81 @@ impl pallet_crowdloan_rewards::Config for Runtime {
 	type RelayChainAccountId = AccountId32;
 }
 
+parameter_types! {
+	// no signed phase for now, just unsigned.
+	pub const SignedPhase: u32 = 0;
+	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_SLOTS / 4 as u32;
+
+	// fallback: run election on-chain.
+	pub const Fallback: pallet_election_provider_multi_phase::FallbackStrategy =
+		pallet_election_provider_multi_phase::FallbackStrategy::OnChain;
+	pub SolutionImprovementThreshold: Perbill = Perbill::from_rational(5u32, 10_000);
+
+	// miner configs
+	pub const MinerMaxIterations: u32 = 10;
+	pub NposSolutionPriority: TransactionPriority =
+		Perbill::from_percent(90) * TransactionPriority::max_value();
+}
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime where
+	Call: From<C>,
+{
+	type OverarchingCall = Call;
+	type Extrinsic = UncheckedExtrinsic;
+}
+
+sp_npos_elections::generate_solution_type!(
+	#[compact]
+	pub struct NposCompactSolution5::<
+		VoterIndex = u32,
+		TargetIndex = u16,
+		Accuracy = sp_runtime::PerU16,
+	>(5)
+);
+
+impl pallet_election_provider_multi_phase::Config for Runtime {
+	type Event = Event;
+	type Currency = Balances;
+	type SignedPhase = SignedPhase;
+	type UnsignedPhase = UnsignedPhase;
+	type SolutionImprovementThreshold = SolutionImprovementThreshold;
+	type MinerMaxIterations = MinerMaxIterations;
+	type MinerMaxWeight = OffchainSolutionWeightLimit;
+	type MinerMaxLength = OffchainSolutionLengthLimit;
+	type MinerTxPriority = NposSolutionPriority;
+	type DataProvider = Staking;
+	type OnChainAccuracy = Perbill;
+	type CompactSolution = NposCompactSolution5;
+	type Fallback = Fallback;
+	type BenchmarkingConfig = ();
+	type WeightInfo = weights::pallet_election_provider_multi_phase::WeightInfo<Runtime>;
+}
+
+parameter_types! {
+	pub const BlocksPerRound: u32 = 600;
+	pub const MaxCollatorsPerNominator: u32 = 5;
+	pub const MaxNominationsPerCollator: u32 = 2;
+	pub const BondDuration: u32 = 2;
+	pub const MinCollatorStake: u32 = 500;
+	pub const MinNominatorStake: u32 = 100;
+	pub const PayoutDuration: u32 = 2;
+	pub const DesiredTarget: u32 = 2;
+}
+
+impl polkafoundry_staking::Config for Runtime {
+	const MAX_COLLATORS_PER_NOMINATOR: u32 = <NposCompactSolution5 as sp_npos_elections::CompactSolution>::LIMIT as u32;
+	type Event = Event;
+	type Currency = Balances;
+	type BlocksPerRound = BlocksPerRound;
+	type MaxNominationsPerCollator = MaxNominationsPerCollator;
+	type BondDuration = BondDuration;
+	type MinCollatorStake = MinCollatorStake;
+	type MinNominatorStake = MinNominatorStake;
+	type PayoutDuration = PayoutDuration;
+	type ElectionProvider = ElectionProviderMultiPhase;
+	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
+	type DesiredTarget = DesiredTarget;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -419,9 +471,11 @@ construct_runtime!(
 		ParachainInfo: parachain_info::{Pallet, Storage, Config},
 		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the template pallet in the runtime.
+		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>, ValidateUnsigned},
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
+		Staking: polkafoundry_staking::{Pallet, Call, Storage, Event<T>, Config<T>},
         AuthorInherent: author_inherent::{Pallet, Call, Storage, Inherent},
 
 		// XCM helpers.

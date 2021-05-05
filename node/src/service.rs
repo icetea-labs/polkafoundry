@@ -2,7 +2,7 @@
 
 use std::{sync::{Arc, Mutex}, cell::RefCell, collections::{HashMap, BTreeMap}};
 
-use sp_core::{H256, Pair, Public};
+use sp_core::{H256};
 use sp_runtime::traits::BlakeTwo256;
 use sp_trie::PrefixedMemoryDB;
 use sp_inherents::{ProvideInherentData, InherentIdentifier, InherentData};
@@ -48,6 +48,8 @@ pub use polkasmith_runtime;
 
 #[cfg(feature = "halongbay")]
 pub use halongbay_runtime;
+use sp_runtime::AccountId32;
+use codec::Encode;
 
 // Our native executor instance.
 #[cfg(feature = "polkafoundry")]
@@ -261,6 +263,7 @@ pub fn new_partial<RuntimeApi, Executor>(
 async fn start_node_impl<RB, RuntimeApi, Executor>(
 	parachain_config: Configuration,
 	collator_key: CollatorPair,
+	author_id: Option<AccountId32>,
 	polkadot_config: Configuration,
 	id: polkadot_primitives::v0::Id,
 	validator: bool,
@@ -288,11 +291,12 @@ async fn start_node_impl<RB, RuntimeApi, Executor>(
 		.register_provider(sp_timestamp::InherentDataProvider)
 		.unwrap();
 
-	let account = Vec::from(collator_key.public().as_slice());
-	params
-		.inherent_data_providers
-		.register_provider(author_inherent::InherentDataProvider(account))
-		.unwrap();
+	if let Some(author) = author_id {
+		params
+			.inherent_data_providers
+			.register_provider(author_inherent::InherentDataProvider(author.encode()))
+			.unwrap();
+	}
 
 	let (
 		block_import,
@@ -498,6 +502,7 @@ async fn start_node_impl<RB, RuntimeApi, Executor>(
 pub async fn start_node<RuntimeApi, Executor>(
 	parachain_config: Configuration,
 	collator_key: CollatorPair,
+	author_id: Option<AccountId32>,
 	polkadot_config: Configuration,
 	id: polkadot_primitives::v0::Id,
 	validator: bool,
@@ -511,6 +516,7 @@ pub async fn start_node<RuntimeApi, Executor>(
 	start_node_impl(
 		parachain_config,
 		collator_key,
+		author_id,
 		polkadot_config,
 		id,
 		validator,
@@ -522,6 +528,7 @@ pub async fn start_node<RuntimeApi, Executor>(
 
 pub fn start_dev(
 	config: Configuration,
+	author_id: Option<AccountId32>,
 	sealing: Sealing,
 	validator: bool
 ) -> sc_service::error::Result<TaskManager> {
@@ -542,6 +549,12 @@ pub fn start_dev(
 			_telemetry_worker_handle,
 		),
 	} = new_partial::<halongbay_runtime::RuntimeApi, HalongbayExecutor>(&config)?;
+
+	if let Some(author_id) = author_id {
+		inherent_data_providers
+			.register_provider(author_inherent::InherentDataProvider(author_id.encode()))
+			.unwrap();
+	}
 
 	inherent_data_providers
 		.register_provider(MockTimestampInherentDataProvider)

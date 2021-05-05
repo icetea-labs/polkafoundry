@@ -1,13 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-
 pub use pallet::*;
 use frame_support::pallet;
 #[cfg(test)]
 pub(crate) mod mock;
 #[cfg(test)]
 mod tests;
-mod taylor_series;
-mod inflation;
+
+pub mod taylor_series;
+pub mod inflation;
 
 pub(crate) const LOG_TARGET: &'static str = "runtime::staking";
 
@@ -30,11 +30,10 @@ pub mod pallet {
 	use sp_runtime::{Perbill};
 	use sp_std::{convert::{From}, vec::Vec};
 	use frame_support::sp_runtime::traits::{AtLeast32BitUnsigned};
-	use std::fmt::Debug;
 	use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
-	use std::cmp::Ordering;
 	use crate::inflation::compute_total_payout;
-	use std::ops::Mul;
+	use sp_std::{cmp::Ordering, prelude::*, ops::{Mul, AddAssign, Add, Sub}};
+	use frame_support::sp_std::fmt::Debug;
 
 	/// Counter for the number of round that have passed
 	pub type RoundIndex = u32;
@@ -78,6 +77,8 @@ pub mod pallet {
 		/// Consequently, the backward convert is used convert the u128s from sp-elections back to a
 		/// [`BalanceOf`].
 		type CurrencyToVote: CurrencyToVote<BalanceOf<Self>>;
+
+		type DesiredTarget: Get<u32>;
 	}
 
 	#[pallet::pallet]
@@ -88,7 +89,7 @@ pub mod pallet {
 		fn on_finalize(now: T::BlockNumber) {
 			let mut current_round = CurrentRound::<T>::get();
 			if current_round.should_goto_next_round(now) {
-				current_round.update(now, T::BlocksPerRound::get());
+				current_round.update(now, Settings::<T>::get().blocks_per_round);
 				let round_index = current_round.index;
 				// start a new round
 				CurrentRound::<T>::put(current_round);
@@ -109,6 +110,12 @@ pub mod pallet {
 		}
 	}
 
+	#[derive(Default, PartialEq, Clone, Encode, Decode, RuntimeDebug)]
+	pub struct SettingStruct {
+		pub bond_duration: u32,
+		pub blocks_per_round: u32,
+		pub desired_target: u32,
+	}
 	/// Just a Balance/BlockNumber tuple to encode when a chunk of funds will be unlocked.
 	#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 	pub struct UnlockChunk<Balance> {
@@ -188,7 +195,7 @@ pub mod pallet {
 	impl <AccountId, Balance> StakingCollators<AccountId, Balance>
 	where
 		AccountId: Ord + Clone,
-		Balance: Ord + Copy + Debug + Saturating + AtLeast32BitUnsigned + std::ops::AddAssign + From<u32>
+		Balance: Ord + Copy + Debug + Saturating + AtLeast32BitUnsigned + AddAssign + From<u32>
 	{
 		pub fn new (amount: Balance, next_round: RoundIndex) -> Self {
 			StakingCollators {
@@ -360,7 +367,7 @@ pub mod pallet {
 	}
 
 	impl <Balance>Leaving <Balance>
-		where Balance: Ord + Copy + Debug + Saturating + AtLeast32BitUnsigned + std::ops::AddAssign + From<u32>
+		where Balance: Ord + Copy + Debug + Saturating + AtLeast32BitUnsigned + AddAssign + From<u32>
 	{
 		pub fn new(remaining: Balance, unbonding: Vec<UnBondChunk<Balance>>, when: RoundIndex) -> Self {
 			Self {
@@ -523,8 +530,8 @@ pub mod pallet {
 		+ Copy
 		+ Debug
 		+ From<u32>
-		+ std::ops::Add<Output = BlockNumber>
-	 	+ std::ops::Sub<Output = BlockNumber>
+		+ Add<Output = BlockNumber>
+	 	+ Sub<Output = BlockNumber>
 	{
 		pub fn new(index: u32, start_in: BlockNumber, length: u32) -> Self {
 			RoundInfo {
@@ -625,11 +632,30 @@ pub mod pallet {
 			CurrentRound::<T>::put(round);
 			TotalStakedAt::<T>::insert(1u32, TotalStaked::<T>::get());
 			TotalIssuanceAt::<T>::insert(1u32, T::Currency::total_issuance());
+			Settings::<T>::put(SettingStruct {
+				bond_duration: T::BondDuration::get(),
+				blocks_per_round: T::BlocksPerRound::get(),
+				desired_target: T::DesiredTarget::get()
+			});
 		}
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		#[pallet::weight(0)]
+		pub fn config(
+			origin: OriginFor<T>,
+			settings: SettingStruct
+		) -> DispatchResultWithPostInfo {
+			ensure_root(origin)?;
+			Settings::<T>::put(settings.clone());
+
+			Self::deposit_event(Event::SettingChanged(
+				settings,
+			));
+			Ok(Default::default())
+		}
+
 		#[pallet::weight(0)]
 		pub fn bond(
 			origin: OriginFor<T>,
@@ -729,7 +755,7 @@ pub mod pallet {
 				Error::<T>::CandidateNotActive
 			);
 			let current_round = CurrentRound::<T>::get();
-			let after = collator.bond_less(less, current_round.index + T::BondDuration::get()).ok_or(Error::<T>::Underflow)?;
+			let after = collator.bond_less(less, current_round.index + Settings::<T>::get().bond_duration).ok_or(Error::<T>::Underflow)?;
 
 			ensure!(
 					after >= T::MinCollatorStake::get(),
@@ -754,7 +780,7 @@ pub mod pallet {
 			let collator = Collators::<T>::get(&who).ok_or(Error::<T>::BondNotExist)?;
 
 			let current_round = CurrentRound::<T>::get();
-			let when = current_round.index + T::BondDuration::get();
+			let when = current_round.index + Settings::<T>::get().bond_duration;
 
 			// leave all nominations
 			for nomination in collator.nominations {
@@ -886,7 +912,7 @@ pub mod pallet {
 			let after = nominator.nominate_less(Bond {
 				owner: candidate.clone(),
 				amount: less
-			}, current_round.index + T::BondDuration::get())
+			}, current_round.index + Settings::<T>::get().bond_duration)
 				.ok_or(Error::<T>::CandidateNotExist)?
 				.ok_or(Error::<T>::Underflow)?;
 
@@ -927,7 +953,7 @@ pub mod pallet {
 			let mut collator = Collators::<T>::get(&candidate).ok_or(Error::<T>::CandidateNotExist)?;
 			let current_round = CurrentRound::<T>::get();
 
-			nomination.rm_nomination(candidate.clone(), current_round.index + T::BondDuration::get())
+			nomination.rm_nomination(candidate.clone(), current_round.index + Settings::<T>::get().bond_duration)
 				.ok_or(Error::<T>::CandidateNotExist)?;
 
 			collator.rm_nomination(who.clone())
@@ -1240,7 +1266,7 @@ pub mod pallet {
 		}
 
 		fn desired_targets() -> data_provider::Result<(u32, Weight)> {
-			Ok((2u32, <T as frame_system::Config>::DbWeight::get().reads(1)))
+			Ok((Settings::<T>::get().desired_target, <T as frame_system::Config>::DbWeight::get().reads(1)))
 		}
 
 		fn next_election_prediction(_: T::BlockNumber) -> T::BlockNumber {
@@ -1268,6 +1294,11 @@ pub mod pallet {
 	#[pallet::getter(fn total_staked)]
 	pub type TotalStaked<T: Config> =
 	StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn settings)]
+	pub type Settings<T: Config> =
+	StorageValue<_, SettingStruct, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn total_staked_at)]
@@ -1361,6 +1392,7 @@ pub mod pallet {
 		NominatorLeaveCollator(T::AccountId, T::AccountId),
 		CollatorChoosen(RoundIndex, T::AccountId, BalanceOf<T>),
 		Rewarded(T::AccountId, BalanceOf<T>),
+		SettingChanged(SettingStruct),
 	}
 
 	/// Add reward points to block authors:

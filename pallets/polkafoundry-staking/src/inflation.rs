@@ -1,7 +1,7 @@
 use sp_runtime::{Perbill, traits::AtLeast32BitUnsigned};
 use crate::taylor_series::compute_inflation;
 use sp_arithmetic::PerThing;
-use std::ops::Mul;
+use sp_std::{ops::Mul};
 
 pub fn compute_total_payout<N>(
 	npos_token_staked: N,

@@ -118,7 +118,7 @@ parameter_types! {
 		})
 		.avg_block_initialization(AVERAGE_ON_INITIALIZE_RATIO)
 		.build_or_panic();
-	pub const SS58Prefix: u8 = 99;
+	pub const SS58Prefix: u8 = SS58PREFIX;
 }
 
 // Configure FRAME pallets to include in runtime.
@@ -378,7 +378,7 @@ impl pallet_ethereum::Config for Runtime {
 }
 
 parameter_types! {
-	pub const ChainId: u64 = 13;
+	pub const ChainId: u64 = CHAIN_ID;
 }
 
 impl pallet_evm::Config for Runtime {
