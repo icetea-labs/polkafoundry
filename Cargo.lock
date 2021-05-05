@@ -7910,6 +7910,7 @@ version = "0.0.1"
 dependencies = [
  "frame-support",
  "frame-system",
+ "polkafoundry-primitives",
  "sp-runtime",
 ]
 

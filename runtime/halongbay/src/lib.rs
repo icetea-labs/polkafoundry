@@ -23,7 +23,6 @@ use sp_version::NativeVersion;
 
 use codec::{Encode, Decode};
 use fp_rpc::TransactionStatus;
-use frame_system::limits::{BlockLength, BlockWeights};
 
 use pallet_evm::{
 	Account as EVMAccount, FeeCalculator, EnsureAddressTruncated, HashedAddressMapping, Runner
@@ -63,6 +62,7 @@ pub use polkafoundry_primitives::{
 use runtime_common::{
 	BlockHashCount, BlockWeights, BlockLength,
 	OffchainSolutionWeightLimit, OffchainSolutionLengthLimit,
+	NORMAL_DISPATCH_RATIO, MAXIMUM_BLOCK_WEIGHT
 };
 
 // Weights used in the runtime.
@@ -383,7 +383,7 @@ impl pallet_crowdloan_rewards::Config for Runtime {
 parameter_types! {
 	// no signed phase for now, just unsigned.
 	pub const SignedPhase: u32 = 0;
-	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_SLOTS / 4 as u32;
+	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_SLOTS / 4;
 
 	// fallback: run election on-chain.
 	pub const Fallback: pallet_election_provider_multi_phase::FallbackStrategy =
