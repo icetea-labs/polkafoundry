@@ -6,11 +6,10 @@ use frame_support::{
 use sp_io;
 use sp_runtime::{
 	Perbill,
-	PerU16,
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 };
-use sp_std::convert::{From, TryInto};
+use sp_std::convert::{From};
 use sp_core::H256;
 use frame_election_provider_support::onchain;
 
@@ -151,6 +150,7 @@ pub(crate) fn mock_test() -> sp_io::TestExternalities {
 		(100, 5000),
 		(200, 2000),
 		(300, 3000),
+		(400, 3000),
 		// nominator
 		(10, 1000),
 		(20, 500),
@@ -160,6 +160,7 @@ pub(crate) fn mock_test() -> sp_io::TestExternalities {
 		(100, 500),
 		(200, 500),
 		(300, 600),
+		(400, 400),
 	])
 }
 
@@ -192,4 +193,5 @@ pub(crate) fn run_to_block(n: u64) {
 pub(crate) fn set_author(round: u32, acc: u64, pts: u32) {
 	<TotalPoints<Test>>::mutate(round, |p| *p += pts);
 	<CollatorPoints<Test>>::mutate(round, acc, |p| *p += pts);
+	println!("total point ne {:?}", <TotalPoints<Test>>::get(round));
 }

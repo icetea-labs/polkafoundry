@@ -24,15 +24,13 @@ macro_rules! log {
 
 #[pallet]
 pub mod pallet {
-	use frame_support::{pallet_prelude::*, traits::{Currency, LockIdentifier, ReservableCurrency, CurrencyToVote, Imbalance}};
+	use frame_support::{pallet_prelude::*, traits::{Currency, ReservableCurrency, CurrencyToVote, Imbalance}};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::{Saturating, Verify, Zero};
-	use sp_runtime::{MultiSignature, SaturatedConversion, Perbill};
-	use sp_core::crypto::AccountId32;
-	use sp_std::{convert::{From, TryInto}, vec::Vec};
-	use frame_support::sp_runtime::traits::{Bounded, AtLeast32BitUnsigned};
+	use sp_runtime::traits::{Saturating, Zero};
+	use sp_runtime::{Perbill};
+	use sp_std::{convert::{From}, vec::Vec};
+	use frame_support::sp_runtime::traits::{AtLeast32BitUnsigned};
 	use std::fmt::Debug;
-	use std::cell::RefCell;
 	use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
 	use std::cmp::Ordering;
 	use crate::inflation::compute_total_payout;
@@ -72,7 +70,7 @@ pub mod pallet {
 			Self::AccountId,
 			Self::BlockNumber,
 			// we only accept an election provider that has staking as data provider.
-			DataProvider = Module<Self>,
+			DataProvider = Pallet<Self>,
 		>;
 		/// Convert a balance into a number used for election calculation. This must fit into a `u64`
 		/// but is allowed to be sensibly lossy. The `u64` is used to communicate with the
@@ -341,7 +339,7 @@ pub mod pallet {
 				}
 				)
 				.collect();
-			if let Some(less) = less {
+			if let Some(_) = less {
 				self.nominations = nominations;
 				Some(self.active)
 			} else {
@@ -753,14 +751,13 @@ pub mod pallet {
 			origin: OriginFor<T>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			let mut collator = Collators::<T>::get(&who).ok_or(Error::<T>::BondNotExist)?;
+			let collator = Collators::<T>::get(&who).ok_or(Error::<T>::BondNotExist)?;
 
 			let current_round = CurrentRound::<T>::get();
 			let when = current_round.index + T::BondDuration::get();
 
 			// leave all nominations
 			for nomination in collator.nominations {
-				collator.active -= nomination.amount;
 				T::Currency::unreserve(&nomination.owner, nomination.amount);
 			}
 
@@ -825,7 +822,6 @@ pub mod pallet {
 			Collators::<T>::insert(&candidate, collator);
 			T::Currency::reserve(&who, amount);
 
-			let current_round = CurrentRound::<T>::get();
 			let current_staked = TotalStaked::<T>::get();
 			TotalStaked::<T>::put(current_staked + amount);
 
@@ -861,7 +857,6 @@ pub mod pallet {
 			Nominators::<T>::insert(&who, nominator);
 			T::Currency::reserve(&who, extra);
 
-			let current_round = CurrentRound::<T>::get();
 			let current_staked = TotalStaked::<T>::get();
 			TotalStaked::<T>::put(current_staked + extra);
 
@@ -973,22 +968,22 @@ pub mod pallet {
 					5u32,
 					(T::BlocksPerRound::get() * 6000) as u64);
 
-				let commission_rate = Perbill::from_rational(
+				let commission_point = Perbill::from_rational(
 					50u32,
 					100
 				);
-				let stake_rate = Perbill::from_rational(
+				let stake_point = Perbill::from_rational(
 					50u32,
 					100
 				);
-				let total_points = TotalPoints::<T>::get(current_round);
-				for (acc, point) in CollatorPoints::<T>::drain_prefix(current_round) {
-					let exposure = RoundStakerClipped::<T>::get(&current_round, &acc);
-					let collator_exposure_part = stake_rate * Perbill::from_rational(
+				let total_points = TotalPoints::<T>::get(payout_round);
+				for (acc, exposure) in RoundStakerClipped::<T>::drain_prefix(payout_round) {
+					let point = CollatorPoints::<T>::get(&payout_round, &acc);
+					let collator_exposure_part = stake_point * Perbill::from_rational(
 						exposure.own,
-						exposure.total,
+						total_stake,
 					);
-					let collator_commission_part = commission_rate * Perbill::from_rational(
+					let collator_commission_part = commission_point * Perbill::from_rational(
 						point,
 						total_points
 					);
@@ -1000,7 +995,7 @@ pub mod pallet {
 					for nominator in exposure.others.iter() {
 						let nominator_exposure_part = Perbill::from_rational(
 							nominator.value,
-							exposure.total,
+							total_stake,
 						);
 						mint(
 							nominator_exposure_part.mul(payout),
@@ -1018,7 +1013,6 @@ pub mod pallet {
 					log!(warn, "election provider failed due to {:?}", e)
 				})
 				.and_then(|(res, weight)| {
-					println!("res ne {:?}", res);
 					<frame_system::Pallet<T>>::register_extra_weight_unchecked(
 						weight,
 						frame_support::weights::DispatchClass::Mandatory,
@@ -1033,12 +1027,10 @@ pub mod pallet {
 			current_round: RoundIndex,
 		) -> Result<Vec<T::AccountId>, ()> {
 			let exposures = Self::collect_exposures(flat_supports);
-			println!("collect exposures ne {:?}", exposures);
 			let elected_stashes = exposures.iter().cloned().map(|(x, _)| x).collect::<Vec<_>>();
 
 			exposures.into_iter().for_each(|(stash, exposure)| {
 				RoundStakerClipped::<T>::insert(current_round, stash.clone(), exposure.clone());
-
 				Self::deposit_event(Event::CollatorChoosen(current_round, stash, exposure.total));
 			});
 
@@ -1205,6 +1197,7 @@ pub mod pallet {
 				let vote_weight = weight_of_nominator(&nominator);
 				all_voters.push((nominator, vote_weight, targets))
 			}
+
 			all_voters
 		}
 

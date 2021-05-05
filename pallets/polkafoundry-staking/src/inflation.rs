@@ -1,7 +1,6 @@
-use sp_runtime::{Perbill, traits::AtLeast32BitUnsigned, curve::PiecewiseLinear};
+use sp_runtime::{Perbill, traits::AtLeast32BitUnsigned};
 use crate::taylor_series::compute_inflation;
 use sp_arithmetic::PerThing;
-use sp_arithmetic::traits::Saturating;
 use std::ops::Mul;
 
 pub fn compute_total_payout<N>(
