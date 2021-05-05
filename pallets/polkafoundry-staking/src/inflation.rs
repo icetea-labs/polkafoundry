@@ -17,14 +17,15 @@ pub fn compute_total_payout<N>(
 {
 	// Milliseconds per year for the Julian year (365.25 days).
 	const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
-	let i_0 = Perbill::from_rational(i_0, 100);
+	let i_0 = Perbill::from_rational(i_0, 1000);
 	let i_ideal = Perbill::from_rational(i_ideal, 100);
 	let x = Perbill::from_rational(npos_token_staked, total_tokens.clone());
 	let x_ideal = Perbill::from_rational(x_ideal, 100);
 	let d = Perbill::from_rational(d, 100);
 
 	let portion = Perbill::from_rational(round_duration,MILLISECONDS_PER_YEAR);
-	(portion * compute_i_npos(i_0, i_ideal, x, x_ideal, d)).mul(total_tokens)
+
+	portion * (compute_i_npos(i_0, i_ideal, x, x_ideal, d)).mul(total_tokens)
 }
 
 pub fn compute_i_npos<P: PerThing> (
@@ -35,12 +36,6 @@ pub fn compute_i_npos<P: PerThing> (
 	d: P,
 ) -> P {
 	let i_npos_ideal = i_ideal * x_ideal;
-
-	let compute = compute_inflation::<P>(
-		x,
-		x_ideal,
-		d
-	);
 	i_0.saturating_add(i_npos_ideal.saturating_sub(i_0) * compute_inflation::<P>(
 		x,
 		x_ideal,
@@ -127,5 +122,36 @@ mod test {
 
 			compute_inflation_works::<Percent>();
 		}
+	}
+
+	#[test]
+	fn compute_total_payout_work() {
+		const YEAR: u64 = 365 * 24 * 60 * 60 * 1000;
+
+		assert_eq!(super::compute_total_payout(0, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 2498);
+		assert_eq!(super::compute_total_payout(5_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 3_248);
+		assert_eq!(super::compute_total_payout(25_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 6_246);
+		assert_eq!(super::compute_total_payout(40_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 8_494);
+		assert_eq!(super::compute_total_payout(50_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 9_993);
+		assert_eq!(super::compute_total_payout(60_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 4_372);
+		assert_eq!(super::compute_total_payout(75_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 2_732);
+		assert_eq!(super::compute_total_payout(95_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 2_513);
+		assert_eq!(super::compute_total_payout(100_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 2_505);
+
+		const DAY: u64 = 24 * 60 * 60 * 1000;
+		assert_eq!(super::compute_total_payout(0, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, DAY), 7);
+		assert_eq!(super::compute_total_payout(25_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, DAY), 17);
+		assert_eq!(super::compute_total_payout(50_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, DAY), 27);
+		assert_eq!(super::compute_total_payout(100_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, DAY), 7);
+
+		const SIX_HOURS: u64 = 6 * 60 * 60 * 1000;
+		assert_eq!(super::compute_total_payout(0, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, SIX_HOURS), 2);
+		assert_eq!(super::compute_total_payout(25_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, SIX_HOURS), 4);
+		assert_eq!(super::compute_total_payout(50_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, SIX_HOURS), 7);
+		assert_eq!(super::compute_total_payout(100_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, SIX_HOURS), 2);
+
+		const HOUR: u64 = 60 * 60 * 1000;
+		assert_eq!(super::compute_total_payout(2_500_000_000_000_000_000_000_000_000u128, 5_000_000_000_000_000_000_000_000_000u128, 2_5u32, 20u32, 50u32, 5u32, HOUR), 57_038_500_000_000_000_000_000);
+
 	}
 }

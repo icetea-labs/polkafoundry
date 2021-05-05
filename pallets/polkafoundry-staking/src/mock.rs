@@ -69,6 +69,14 @@ impl pallet_utility::Config for Test {
 	type WeightInfo = ();
 }
 
+impl onchain::Config for Test {
+	type AccountId = u64;
+	type BlockNumber = u64;
+	type BlockWeights = BlockWeights;
+	type Accuracy = Perbill;
+	type DataProvider = Staking;
+}
+
 parameter_types! {
 	pub const BlocksPerRound: u32 = 10;
 	pub const MaxCollatorsPerNominator: u32 = 5;
@@ -77,14 +85,6 @@ parameter_types! {
 	pub const MinCollatorStake: u32 = 500;
 	pub const MinNominatorStake: u32 = 100;
 	pub const PayoutDuration: u32 = 2;
-}
-
-impl onchain::Config for Test {
-	type AccountId = u64;
-	type BlockNumber = u64;
-	type BlockWeights = BlockWeights;
-	type Accuracy = Perbill;
-	type DataProvider = Staking;
 }
 
 impl Config for Test {
@@ -122,7 +122,7 @@ pub struct ExtBuilder;
 impl ExtBuilder {
 	pub fn build(
 		balances: Vec<(AccountId, Balance)>,
-		stakers: Vec<(AccountId, Balance)>
+		stakers: Vec<(AccountId, Balance)>,
 	) -> sp_io::TestExternalities {
 		let mut storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 		pallet_balances::GenesisConfig::<Test> { balances }
@@ -143,24 +143,24 @@ impl ExtBuilder {
 }
 
 pub(crate) fn mock_test() -> sp_io::TestExternalities {
-	ExtBuilder::build(
-		vec![
-			// collator
-			(1, 1000),
-			(2, 500),
-			(3, 800),
-			(100, 5000),
-			(200, 2000),
-				// nominator
-			(10, 1000),
-			(20, 500),
-			(30, 800),
-		],
-		vec![
-			(100, 500),
-			(200, 500),
-		]
-	)
+	ExtBuilder::build(vec![
+		// collator
+		(1, 1000),
+		(2, 500),
+		(3, 800),
+		(100, 5000),
+		(200, 2000),
+		(300, 3000),
+		// nominator
+		(10, 1000),
+		(20, 500),
+		(30, 800),
+		(999, 200000000),
+	], vec![
+		(100, 500),
+		(200, 500),
+		(300, 600),
+	])
 }
 
 pub(crate) fn events() -> Vec<super::Event<Test>> {

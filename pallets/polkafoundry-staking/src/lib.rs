@@ -291,8 +291,6 @@ pub mod pallet {
 			match self.nominations.binary_search(&nomination) {
 				Ok(_) => false,
 				Err(_) => {
-					self.active += nomination.amount;
-					self.total += nomination.amount;
 					self.nominations.push(nomination);
 					true
 				}
@@ -302,8 +300,6 @@ pub mod pallet {
 		pub fn nominate_extra(&mut self, extra: Bond<AccountId, Balance>) -> Option<Balance> {
 			for bond in &mut self.nominations {
 				if bond.owner == extra.owner {
-					self.active += extra.amount;
-					self.total += extra.amount;
 					bond.amount += extra.amount;
 					return Some(bond.amount)
 				}
@@ -315,8 +311,6 @@ pub mod pallet {
 			for bond in &mut self.nominations {
 				if bond.owner == less.owner {
 					if bond.amount > less.amount {
-						self.total -= less.amount;
-						self.active -= less.amount;
 						bond.amount -= less.amount;
 						return Some(Some(bond.amount))
 					} else {
@@ -349,8 +343,6 @@ pub mod pallet {
 				.collect();
 			if let Some(less) = less {
 				self.nominations = nominations;
-				self.total -= less;
-				self.active -= less;
 				Some(self.active)
 			} else {
 				None
@@ -634,6 +626,7 @@ pub mod pallet {
 				RoundInfo::new(1u32, 0u32.into(), T::BlocksPerRound::get());
 			CurrentRound::<T>::put(round);
 			TotalStakedAt::<T>::insert(1u32, TotalStaked::<T>::get());
+			TotalIssuanceAt::<T>::insert(1u32, T::Currency::total_issuance());
 		}
 	}
 
@@ -928,6 +921,7 @@ pub mod pallet {
 
 			Ok(Default::default())
 		}
+
 		#[pallet::weight(0)]
 		pub fn nominator_leave_collator(
 			origin: OriginFor<T>,
@@ -963,6 +957,7 @@ pub mod pallet {
 					}
 				}
 			};
+
 			let duration = T::PayoutDuration::get();
 			if current_round > duration {
 				let payout_round = current_round - duration;
@@ -972,10 +967,10 @@ pub mod pallet {
 				let payout = compute_total_payout(
 					total_stake,
 					total_issuance,
-					2_5u32,
+					25u32,
 					20u32,
 					50u32,
-					0_05u32,
+					5u32,
 					(T::BlocksPerRound::get() * 6000) as u64);
 
 				let commission_rate = Perbill::from_rational(
@@ -1038,6 +1033,7 @@ pub mod pallet {
 			current_round: RoundIndex,
 		) -> Result<Vec<T::AccountId>, ()> {
 			let exposures = Self::collect_exposures(flat_supports);
+			println!("collect exposures ne {:?}", exposures);
 			let elected_stashes = exposures.iter().cloned().map(|(x, _)| x).collect::<Vec<_>>();
 
 			exposures.into_iter().for_each(|(stash, exposure)| {
@@ -1209,7 +1205,6 @@ pub mod pallet {
 				let vote_weight = weight_of_nominator(&nominator);
 				all_voters.push((nominator, vote_weight, targets))
 			}
-
 			all_voters
 		}
 
@@ -1252,7 +1247,7 @@ pub mod pallet {
 		}
 
 		fn desired_targets() -> data_provider::Result<(u32, Weight)> {
-			Ok((10u32, <T as frame_system::Config>::DbWeight::get().reads(1)))
+			Ok((2u32, <T as frame_system::Config>::DbWeight::get().reads(1)))
 		}
 
 		fn next_election_prediction(_: T::BlockNumber) -> T::BlockNumber {
