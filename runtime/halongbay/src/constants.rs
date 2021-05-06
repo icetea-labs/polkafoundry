@@ -36,3 +36,18 @@ pub mod weights {
 	/// u64 works for approximations because Weight is a very small unit compared to gas.
 	pub const WEIGHT_PER_GAS: u64 = WEIGHT_PER_SECOND / GAS_PER_SECOND;
 }
+
+pub mod version {
+	use sp_version::RuntimeVersion;
+	use sp_runtime::create_runtime_str;
+
+	pub const VERSION: RuntimeVersion = RuntimeVersion {
+		spec_name: create_runtime_str!("halongbay"),
+		impl_name: create_runtime_str!("halongbay"),
+		authoring_version: 1,
+		spec_version: 1,
+		impl_version: 1,
+		apis: crate::RUNTIME_API_VERSIONS,
+		transaction_version: 1,
+	};
+}

@@ -9,7 +9,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 use sp_std::prelude::*;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256, H160, H256};
 use sp_runtime::{
-	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys,
+	ApplyExtrinsicResult, generic, impl_opaque_keys,
 	transaction_validity::{TransactionValidity, TransactionSource, TransactionPriority},
 	AccountId32
 };
@@ -68,17 +68,7 @@ use runtime_common::{
 // Weights used in the runtime.
 mod weights;
 mod constants;
-pub use constants::{weights::*, time::*};
-
-pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("halongbay"),
-	impl_name: create_runtime_str!("halongbay"),
-	authoring_version: 1,
-	spec_version: 1,
-	impl_version: 1,
-	apis: RUNTIME_API_VERSIONS,
-	transaction_version: 1,
-};
+pub use constants::{weights::*, time::*, version::*};
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -380,54 +370,54 @@ impl pallet_crowdloan_rewards::Config for Runtime {
 	type RelayChainAccountId = AccountId32;
 }
 
-parameter_types! {
-	// no signed phase for now, just unsigned.
-	pub const SignedPhase: u32 = 0;
-	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_SLOTS / 4;
-
-	// fallback: run election on-chain.
-	pub const Fallback: pallet_election_provider_multi_phase::FallbackStrategy =
-		pallet_election_provider_multi_phase::FallbackStrategy::OnChain;
-	pub SolutionImprovementThreshold: Perbill = Perbill::from_rational(5u32, 10_000);
-
-	// miner configs
-	pub const MinerMaxIterations: u32 = 10;
-	pub NposSolutionPriority: TransactionPriority =
-		Perbill::from_percent(90) * TransactionPriority::max_value();
-}
-impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime where
-	Call: From<C>,
-{
-	type OverarchingCall = Call;
-	type Extrinsic = UncheckedExtrinsic;
-}
-
-sp_npos_elections::generate_solution_type!(
-	#[compact]
-	pub struct NposCompactSolution5::<
-		VoterIndex = u32,
-		TargetIndex = u16,
-		Accuracy = sp_runtime::PerU16,
-	>(5)
-);
-
-impl pallet_election_provider_multi_phase::Config for Runtime {
-	type Event = Event;
-	type Currency = Balances;
-	type SignedPhase = SignedPhase;
-	type UnsignedPhase = UnsignedPhase;
-	type SolutionImprovementThreshold = SolutionImprovementThreshold;
-	type MinerMaxIterations = MinerMaxIterations;
-	type MinerMaxWeight = OffchainSolutionWeightLimit;
-	type MinerMaxLength = OffchainSolutionLengthLimit;
-	type MinerTxPriority = NposSolutionPriority;
-	type DataProvider = Staking;
-	type OnChainAccuracy = Perbill;
-	type CompactSolution = NposCompactSolution5;
-	type Fallback = Fallback;
-	type BenchmarkingConfig = ();
-	type WeightInfo = weights::pallet_election_provider_multi_phase::WeightInfo<Runtime>;
-}
+// parameter_types! {
+// 	// no signed phase for now, just unsigned.
+// 	pub const SignedPhase: u32 = 0;
+// 	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_SLOTS / 4;
+//
+// 	// fallback: run election on-chain.
+// 	pub const Fallback: pallet_election_provider_multi_phase::FallbackStrategy =
+// 		pallet_election_provider_multi_phase::FallbackStrategy::OnChain;
+// 	pub SolutionImprovementThreshold: Perbill = Perbill::from_rational(5u32, 10_000);
+//
+// 	// miner configs
+// 	pub const MinerMaxIterations: u32 = 10;
+// 	pub NposSolutionPriority: TransactionPriority =
+// 		Perbill::from_percent(90) * TransactionPriority::max_value();
+// }
+// impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime where
+// 	Call: From<C>,
+// {
+// 	type OverarchingCall = Call;
+// 	type Extrinsic = UncheckedExtrinsic;
+// }
+//
+// sp_npos_elections::generate_solution_type!(
+// 	#[compact]
+// 	pub struct NposCompactSolution5::<
+// 		VoterIndex = u32,
+// 		TargetIndex = u16,
+// 		Accuracy = sp_runtime::PerU16,
+// 	>(5)
+// );
+//
+// impl pallet_election_provider_multi_phase::Config for Runtime {
+// 	type Event = Event;
+// 	type Currency = Balances;
+// 	type SignedPhase = SignedPhase;
+// 	type UnsignedPhase = UnsignedPhase;
+// 	type SolutionImprovementThreshold = SolutionImprovementThreshold;
+// 	type MinerMaxIterations = MinerMaxIterations;
+// 	type MinerMaxWeight = OffchainSolutionWeightLimit;
+// 	type MinerMaxLength = OffchainSolutionLengthLimit;
+// 	type MinerTxPriority = NposSolutionPriority;
+// 	type DataProvider = Staking;
+// 	type OnChainAccuracy = Perbill;
+// 	type CompactSolution = NposCompactSolution5;
+// 	type Fallback = Fallback;
+// 	type BenchmarkingConfig = ();
+// 	type WeightInfo = weights::pallet_election_provider_multi_phase::WeightInfo<Runtime>;
+// }
 
 parameter_types! {
 	pub const BlocksPerRound: u32 = 600;
@@ -440,8 +430,16 @@ parameter_types! {
 	pub const DesiredTarget: u32 = 2;
 }
 
+impl frame_election_provider_support::onchain::Config for Runtime {
+	type AccountId = AccountId32;
+	type BlockNumber = BlockNumber;
+	type BlockWeights = BlockWeights;
+	type Accuracy = Perbill;
+	type DataProvider = Staking;
+}
+
 impl polkafoundry_staking::Config for Runtime {
-	const MAX_COLLATORS_PER_NOMINATOR: u32 = <NposCompactSolution5 as sp_npos_elections::CompactSolution>::LIMIT as u32;
+	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
 	type Event = Event;
 	type Currency = Balances;
 	type BlocksPerRound = BlocksPerRound;
@@ -450,7 +448,7 @@ impl polkafoundry_staking::Config for Runtime {
 	type MinCollatorStake = MinCollatorStake;
 	type MinNominatorStake = MinNominatorStake;
 	type PayoutDuration = PayoutDuration;
-	type ElectionProvider = ElectionProviderMultiPhase;
+	type ElectionProvider = frame_election_provider_support::onchain::OnChainSequentialPhragmen<Self>;
 	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
 	type DesiredTarget = DesiredTarget;
 }
@@ -471,7 +469,7 @@ construct_runtime!(
 		ParachainInfo: parachain_info::{Pallet, Storage, Config},
 		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the template pallet in the runtime.
-		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>, ValidateUnsigned},
+		// ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>, ValidateUnsigned},
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},

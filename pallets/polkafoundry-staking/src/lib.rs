@@ -34,6 +34,7 @@ pub mod pallet {
 	use crate::inflation::compute_total_payout;
 	use sp_std::{cmp::Ordering, prelude::*, ops::{Mul, AddAssign, Add, Sub}};
 	use frame_support::sp_std::fmt::Debug;
+	use log::info;
 
 	/// Counter for the number of round that have passed
 	pub type RoundIndex = u32;
@@ -89,7 +90,8 @@ pub mod pallet {
 		fn on_finalize(now: T::BlockNumber) {
 			let mut current_round = CurrentRound::<T>::get();
 			if current_round.should_goto_next_round(now) {
-				current_round.update(now, Settings::<T>::get().blocks_per_round);
+				let block_per_round = Settings::<T>::get().blocks_per_round;
+				current_round.update(now, block_per_round);
 				let round_index = current_round.index;
 				// start a new round
 				CurrentRound::<T>::put(current_round);
@@ -106,6 +108,7 @@ pub mod pallet {
 				// update total stake of next round
 				TotalStakedAt::<T>::insert(round_index, TotalStaked::<T>::get());
 				TotalIssuanceAt::<T>::insert(round_index, T::Currency::total_issuance());
+				Self::deposit_event(Event::NewRoundStart(round_index, round_index + block_per_round));
 			}
 		}
 	}
@@ -618,6 +621,7 @@ pub mod pallet {
 					T::Currency::free_balance(&staker) >= balance,
 					"Account does not have enough balance to bond."
 				);
+				T::Currency::reserve(&staker, balance.clone());
 				total_staked += balance.clone();
 				Pallet::<T>::bond(
 					T::Origin::from(Some(staker.clone()).into()),
@@ -637,6 +641,7 @@ pub mod pallet {
 				blocks_per_round: T::BlocksPerRound::get(),
 				desired_target: T::DesiredTarget::get()
 			});
+			<Pallet<T>>::deposit_event(Event::NewRoundStart(1u32, 1u32 + T::BlocksPerRound::get() as u32));
 		}
 	}
 
@@ -972,6 +977,7 @@ pub mod pallet {
 	impl <T: Config> Pallet<T> {
 		fn payout_stakers(current_round: RoundIndex) {
 			let mint = |amount: BalanceOf<T>, to: T::AccountId| {
+				info!("mint ne {:?}", amount.clone());
 				if amount > T::Currency::minimum_balance() {
 					if let Ok(imb) = T::Currency::deposit_into_existing(&to, amount) {
 						Self::deposit_event(Event::Rewarded(to.clone(), imb.peek()));
@@ -1393,6 +1399,7 @@ pub mod pallet {
 		CollatorChoosen(RoundIndex, T::AccountId, BalanceOf<T>),
 		Rewarded(T::AccountId, BalanceOf<T>),
 		SettingChanged(SettingStruct),
+		NewRoundStart(RoundIndex, RoundIndex)
 	}
 
 	/// Add reward points to block authors:
