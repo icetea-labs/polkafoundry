@@ -27,7 +27,6 @@
     {
       "bin": "../target/release/polkafoundry",
       "id": "1111",
-      "balance": "1000000000000000000000",
       "chain": "../node/res/halongbay.json",
       "nodes": [
         {

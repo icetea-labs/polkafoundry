@@ -5,18 +5,19 @@ services:
     ports:
       - "9933:9933"
       - "9944:9944"
-    image: tungicetea/rococo:latest
+    image: tungicetea/rococo:127eb17a
     volumes:
       - "polkadot-data-alice:/data"
-      - ../node/res:/res
-    command:  --alice
-      --chain /res/rococo-local.json
-      --name node_alice
+      -  ../node/res:/spec
+    command:
+      polkadot
+      --alice
+      --base-path /tmp/alice
+      --chain /spec/rococo-local.json
       --rpc-cors=all
       --unsafe-rpc-external
       --unsafe-ws-external
       --rpc-methods=Unsafe
-      --discover-local
     networks:
       testing_net:
         ipv4_address: 172.99.1.1
@@ -27,19 +28,21 @@ services:
       - "30330:30333"
       - "8844:9944"
       - "8833:9933"
-    image: tungicetea/rococo:latest
+    image: tungicetea/rococo:127eb17a
     volumes:
       - "polkadot-data-bob:/data"
-      - ../node/res:/res
+      - ../node/res:/spec
     links:
       - "node_alice:alice"
-    command:  --bob
-      --chain /res/rococo-local.json
+    command:
+      polkadot
+      --bob
+      --base-path /tmp/bob
+      --chain /spec/rococo-local.json
       --rpc-cors=all
       --unsafe-rpc-external
       --unsafe-ws-external
       --rpc-methods=Unsafe
-      --discover-local
     networks:
       testing_net:
         ipv4_address: 172.99.1.2
@@ -50,10 +53,10 @@ services:
       - "5544:9944"
       - "5533:9933"
       - "20336:30333"
-    image: halongbay
+    image: tungicetea/halongbay:29be30f
     volumes:
       - "halongbay-collator-data:/data"
-      - ../node/res:/res
+      - ../node/res:/spec
     # links:
     #   - "node_alice:alice"
     command: --collator
@@ -61,15 +64,13 @@ services:
       --rpc-cors all
       --unsafe-ws-external
       --rpc-methods=Unsafe
-      --parachain-id 1111
+      --parachain-id=1111
       --author-id=0xea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32
-      --discover-local
-      --chain /res/halongbay.json
+      --chain /spec/halongbay.json
       --
+      --chain /spec/rococo-local.json
       --execution wasm
-      --chain /res/rococo-local.json
       --port 30335
-      --discover-local
     networks:
       testing_net:
         ipv4_address: 172.99.1.4

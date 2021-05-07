@@ -2,7 +2,10 @@
   "name": "Halongbay PC1",
   "id": "halongbay_staging_testnet",
   "chainType": "Local",
-  "bootNodes": [],
+  "bootNodes": [
+    "/ip4/54.169.215.160/tcp/30336/p2p/12D3KooWSD8N9JvdKnkHBbmCSPW2VhJuGmdH6r7vh5sbNeQwwgV1",
+    "/ip4/54.169.215.160/tcp/30339/p2p/12D3KooWGWJZfwwWEquAUGL1vEQ2MvDMpXjsJQca1bn9q3n55GUA"
+  ],
   "telemetryEndpoints": null,
   "protocolId": null,
   "properties": null,
