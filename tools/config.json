@@ -13,35 +13,35 @@
         "wsPort": 9955,
         "port": 30555
       }
-    ]
+    ],
+    "runtime_genesis_config": {
+      "parachainsConfiguration": {
+        "config": {
+          "validation_upgrade_frequency": 1,
+          "validation_upgrade_delay": 1
+        }
+      }
+    }
   },
   "parachains": [
     {
       "bin": "../target/release/polkafoundry",
-      "id": "14",
-      "rpcPort": 9933,
-      "wsPort": 9999,
-      "port": 31200,
+      "id": "1111",
       "balance": "1000000000000000000000",
-      "chain": "../tests/specs/polka-spec.json",
-      "flags": [
-        "--alice",
-        "--rpc-cors=all",
-        "--rpc-methods=unsafe",
-        "--",
-        "--execution=wasm"
-      ]
-    },
-    {
-      "bin": "../target/release/polkafoundry",
-      "id": "13",
-      "wsPort": 9988,
-      "port": 31100,
-      "balance": "1000000000000000000000",
-      "chain": "../tests/specs/polka-spec.json",
-      "flags": [
-        "--",
-        "--execution=wasm"
+      "chain": "../node/res/halongbay.json",
+      "nodes": [
+        {
+          "rpcPort": 9933,
+          "wsPort": 9999,
+          "port": 31200,
+          "flags": [
+            "--rpc-cors=all",
+            "--rpc-methods=unsafe",
+            "--author-id=0xea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32",
+            "--",
+            "--execution=wasm"
+          ]
+        }
       ]
     }
   ],

@@ -5,12 +5,12 @@ services:
     ports:
       - "9933:9933"
       - "9944:9944"
-    image: parity/rococo:rococo-v1-0.8.30-c4a0772-ee8441b9
+    image: tungicetea/rococo:latest
     volumes:
       - "polkadot-data-alice:/data"
-      - ../specs/halongbay-v1:/specs/halongbay-v1
+      - ../node/res:/res
     command:  --alice
-      --chain /specs/halongbay-v1/rococo-local.json
+      --chain /res/rococo-local.json
       --name node_alice
       --rpc-cors=all
       --unsafe-rpc-external
@@ -27,14 +27,14 @@ services:
       - "30330:30333"
       - "8844:9944"
       - "8833:9933"
-    image: parity/rococo:rococo-v1-0.8.30-c4a0772-ee8441b9
+    image: tungicetea/rococo:latest
     volumes:
       - "polkadot-data-bob:/data"
-      - ../specs/halongbay-v1:/specs/halongbay-v1
+      - ../node/res:/res
     links:
       - "node_alice:alice"
     command:  --bob
-      --chain /specs/halongbay-v1/rococo-local.json
+      --chain /res/rococo-local.json
       --rpc-cors=all
       --unsafe-rpc-external
       --unsafe-ws-external
@@ -44,40 +44,16 @@ services:
       testing_net:
         ipv4_address: 172.99.1.2
   ################################################################
-  node_validator:
-    container_name: rococo_validator
-    ports:
-      - "7744:9944"
-      - "7733:9933"
-      - "30331:30333"
-    image: parity/rococo:rococo-v1-0.8.30-c4a0772-ee8441b9
-    volumes:
-      - "polkadot-data-validator:/data"
-      - ../specs/halongbay-v1:/specs/halongbay-v1
-    links:
-      - "node_alice:alice"
-      - "node_bob:bob"
-    command: --validator
-      --chain /specs/halongbay-v1/rococo-local.json
-      --unsafe-rpc-external
-      --rpc-cors all
-      --unsafe-ws-external
-      --rpc-methods=Unsafe
-      --discover-local
-    networks:
-      testing_net:
-        ipv4_address: 172.99.1.3
-  ###############################################################
   node_halongbay_v1_collator:
     container_name: halongbay-v1_collator
     ports:
       - "5544:9944"
       - "5533:9933"
       - "20336:30333"
-    image: public.ecr.aws/o0b6j5s9/polkafoundry:rococo-latest
+    image: halongbay
     volumes:
       - "halongbay-collator-data:/data"
-      - ../specs/halongbay-v1:/specs/halongbay-v1
+      - ../node/res:/res
     # links:
     #   - "node_alice:alice"
     command: --collator
@@ -86,51 +62,22 @@ services:
       --unsafe-ws-external
       --rpc-methods=Unsafe
       --parachain-id 1111
+      --author-id=0xea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32
       --discover-local
-      --chain /specs/halongbay-v1/halongbaySpec.json
+      --chain /res/halongbay.json
       --
       --execution wasm
-      --chain /specs/halongbay-v1/rococo-local.json
+      --chain /res/rococo-local.json
       --port 30335
       --discover-local
     networks:
       testing_net:
         ipv4_address: 172.99.1.4
-  ###############################################################
-  node_halongbay_v1_full_node:
-    container_name: halongbay-v1_FullNode
-    ports:
-      - "4444:9944"
-      - "4433:9933"
-      - "20337:30333"
-    image: public.ecr.aws/o0b6j5s9/polkafoundry:rococo-latest
-    volumes:
-      - "halongbay-fullnode-data:/data"
-      - ../specs/halongbay-v1:/specs/halongbay-v1
-    # links:
-    #   - "node_alice:alice"
-    command: --parachain-id 1111
-      --unsafe-rpc-external
-      --rpc-cors all
-      --unsafe-ws-external
-      --rpc-methods=Unsafe
-      --discover-local
-      --chain /specs/halongbay-v1/halongbaySpec.json
-      --
-      --execution wasm
-      --chain /specs/halongbay-v1/rococo-local.json
-      --port 30335
-      --discover-local
-    networks:
-      testing_net:
-        ipv4_address: 172.99.1.5
 
 volumes:
   polkadot-data-alice:
   polkadot-data-bob:
-  polkadot-data-validator:
   halongbay-collator-data:
-  halongbay-fullnode-data:
 
 networks:
   testing_net:
