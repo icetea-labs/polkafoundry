@@ -1,7 +1,7 @@
 {
   "name": "Halongbay PC1",
   "id": "halongbay_staging_testnet",
-  "chainType": "Local",
+  "chainType": "Live",
   "bootNodes": [
     "/ip4/54.169.215.160/tcp/30336/p2p/12D3KooWPnd56VZctU52NYarLow4BfJ5nMjUCnfaSsribQFMjEZ5",
     "/ip4/54.169.215.160/tcp/30339/p2p/12D3KooWGWJZfwwWEquAUGL1vEQ2MvDMpXjsJQca1bn9q3n55GUA"
