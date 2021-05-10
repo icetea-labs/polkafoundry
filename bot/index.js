@@ -8,6 +8,7 @@ const Redis = require("ioredis");
 const TOKEN = process.env.TELEGRAM_TOKEN || '1401222730:AAGv-XwfbfiSYZkV-5zVHBkznYbYlUaWJRc';
 const GENESIS_ACCOUNT = process.env.GENESIS_ACCOUNT;
 const GENESIS_ACCOUNT_PRIVATE_KEY = process.env.GENESIS_ACCOUNT_PRIVATE_KEY;
+const NUMBER_ETH_SENT = process.env.NUMBER_ETH_SENT
 
 // create a bot that uses 'polling' to fetch new updates
 const bot = new TelegramBot(TOKEN, { polling: true });
@@ -39,7 +40,7 @@ const callWeb3 = async address => {
   const tx = await web3.eth.accounts.signTransaction({
       from: GENESIS_ACCOUNT,
       to: address,
-      value: web3.utils.toWei("1", "ether"),
+      value: web3.utils.toWei(NUMBER_ETH_SENT, "ether"),
       gasPrice: '0x01',
       gas: '0x100000',
     },
@@ -84,14 +85,14 @@ bot.onText(/\/faucet (.+)/, async (msg, match) => {
   const cacheKey = `faucet_${to_address}`;
 
   const ttl = await redis.ttl(cacheKey);
-  // if(ttl > 0) return bot.sendMessage(chatId, `@${username} has reached their daily quota. Only request once per day. Please wait after ${second2Time(ttl)}`);
+  if(ttl > 0) return bot.sendMessage(chatId, `@${username} has reached their daily quota. Only request once per day. Please wait after ${second2Time(ttl)}`);
 
   // call web3
   try {
     const transaction = await callWeb3(to_address);
     if (transaction) {
       await redis.set(cacheKey, '1', 'EX', 86400); // 1 day
-      bot.sendMessage(chatId, `Sent @${username} 1 ETH. Extrinsic hash: ${transaction}`);
+      bot.sendMessage(chatId, `Sent @${username} ${NUMBER_ETH_SENT} ETH. Extrinsic hash: ${transaction}`);
     } else {
       bot.sendMessage(chatId, `@${username} transaction failed`);
     }
