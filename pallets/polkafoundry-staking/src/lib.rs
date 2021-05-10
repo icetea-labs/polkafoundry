@@ -977,7 +977,6 @@ pub mod pallet {
 	impl <T: Config> Pallet<T> {
 		fn payout_stakers(current_round: RoundIndex) {
 			let mint = |amount: BalanceOf<T>, to: T::AccountId| {
-				info!("mint ne {:?}", amount.clone());
 				if amount > T::Currency::minimum_balance() {
 					if let Ok(imb) = T::Currency::deposit_into_existing(&to, amount) {
 						Self::deposit_event(Event::Rewarded(to.clone(), imb.peek()));
