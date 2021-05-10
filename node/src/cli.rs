@@ -1,8 +1,8 @@
 use std::path::PathBuf;
-
 use sc_cli;
 
 use structopt::{StructOpt, clap::arg_enum};
+use sp_runtime::AccountId32;
 
 arg_enum! {
 	/// Available Sealing methods.
@@ -114,6 +114,17 @@ pub struct RunCmd {
 	/// Options are "instant", "manual", or timer interval in milliseconds
 	#[structopt(long, default_value = "instant")]
 	pub sealing: Sealing,
+
+	// Special thank Moonbeam for this ideal
+	/// Public identity for participating in staking and receiving rewards
+	#[structopt(long, parse(try_from_str = parse_acc32))]
+	pub author_id: Option<AccountId32>,
+}
+
+fn parse_acc32(input: &str) -> Result<AccountId32, String> {
+	input
+		.parse::<AccountId32>()
+		.map_err(|_| "Failed to parse H160".to_string())
 }
 
 impl std::ops::Deref for RunCmd {

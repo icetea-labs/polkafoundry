@@ -10,6 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "polkadot-launch": "^1.2.0"
+    "polkadot-launch": "^1.4.1"
   }
 }

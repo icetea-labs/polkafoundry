@@ -24,6 +24,7 @@ version = '=2.0.0'
 hex-literal = { optional = true, version = '0.3.1' }
 serde = { features = ['derive'], optional = true, version = '1.0.119' }
 
+author-inherent = { default-features = false, path = '../../pallets/author-inherent' }
 # Substrate dependencies
 frame-benchmarking = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1', optional = true }
 frame-executive = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
@@ -31,6 +32,7 @@ frame-support = { default-features = false, git = 'https://github.com/paritytech
 frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 frame-system-benchmarking = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1', optional = true }
 frame-system-rpc-runtime-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+frame-election-provider-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 
 precompiles = { default-features = false, path = '../precompiles/' }
 pallet-aura = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
@@ -41,6 +43,7 @@ pallet-sudo = { default-features = false, git = 'https://github.com/paritytech/s
 pallet-timestamp = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 pallet-transaction-payment = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 pallet-transaction-payment-rpc-runtime-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+pallet-election-provider-multi-phase = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 
 sp-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
@@ -54,10 +57,12 @@ sp-session = { default-features = false, git = 'https://github.com/paritytech/su
 sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-transaction-pool = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-version = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+sp-npos-elections = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = 'rococo-v1' }
 
 pallet-evm = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
 pallet-ethereum = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
 pallet-crowdloan-rewards = { default-features = false, path = '../../pallets/crowdloan-rewards' }
+polkafoundry-staking = { default-features = false, path = '../../pallets/polkafoundry-staking' }
 
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
 
@@ -77,6 +82,7 @@ xcm-builder = { default-features = false, git = 'https://github.com/paritytech/p
 pallet-xcm = { default-features = false, git = 'https://github.com/paritytech/polkadot', branch = 'rococo-v1' }
 
 polkafoundry-primitives = { default-features = false, path = '../../primitives' }
+runtime-common = { default-features = false, path = '../common' }
 
 [features]
 default = ['std']
@@ -91,12 +97,14 @@ runtime-benchmarks = [
     'sp-runtime/runtime-benchmarks',
 ]
 std = [
+    'author-inherent/std',
     'codec/std',
     'serde',
     'frame-executive/std',
     'frame-support/std',
     'frame-system/std',
     'frame-system-rpc-runtime-api/std',
+    'frame-election-provider-support/std',
     'fp-rpc/std',
     'pallet-aura/std',
     'pallet-balances/std',
@@ -109,7 +117,9 @@ std = [
     'pallet-evm/std',
     'pallet-ethereum/std',
     'pallet-crowdloan-rewards/std',
+    'pallet-election-provider-multi-phase/std',
     'polkafoundry-primitives/std',
+    'polkafoundry-staking/std',
     'sp-api/std',
     'sp-block-builder/std',
     'sp-consensus-aura/std',
@@ -122,6 +132,7 @@ std = [
     'sp-transaction-pool/std',
     'sp-version/std',
     'sp-io/std',
+    'sp-npos-elections/std',
     'parachain-info/std',
 	'cumulus-pallet-xcmp-queue/std',
 	'cumulus-pallet-xcm/std',
@@ -132,4 +143,5 @@ std = [
     'xcm/std',
     'xcm-builder/std',
     'xcm-executor/std',
+    'runtime-common/std'
 ]
