@@ -394,11 +394,11 @@ impl pallet_evm::Config for Runtime {
 	type ChainId = ChainId;
 }
 
-impl pallet_crowdloan_rewards::Config for Runtime {
-	type Event = Event;
-	type RewardCurrency = Balances;
-	type RelayChainAccountId = AccountId32;
-}
+// impl pallet_crowdloan_rewards::Config for Runtime {
+// 	type Event = Event;
+// 	type RewardCurrency = Balances;
+// 	type RelayChainAccountId = AccountId32;
+// }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -418,7 +418,7 @@ construct_runtime!(
 		// Include the custom logic from the template pallet in the runtime.
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
-		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
+		// Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 
 		// XCM helpers.
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>},
