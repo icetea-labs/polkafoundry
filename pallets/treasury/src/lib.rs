@@ -64,9 +64,9 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(fn deposit_event)]
     pub enum Event<T: Config> {
-        /// Donor has made a charitable donation to the charity
+        /// Donor has made a donation to the Treasury
         DonationReceived(T::AccountId, BalanceOf<T>, BalanceOf<T>),
-        /// Charity has allocated funds to a cause
+        /// Treasury has allocated funds to a cause
         FundsAllocated(T::AccountId, BalanceOf<T>, BalanceOf<T>),
     }
 
@@ -78,7 +78,7 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
-        /// Donate some funds to the charity
+        /// Donate some funds to the Treasury
         #[pallet::weight(0)]
         pub fn donate(origin: OriginFor<T>, amount: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
@@ -97,7 +97,7 @@ pub mod pallet {
 
         /// Allocate the Treasury's pot
         ///
-        /// Take funds from the Charity's pot and send them somewhere. This call requires root origin,
+        /// Take funds from the Treasury's pot and send them somewhere. This call requires root origin,
         /// which means it must come from a governance mechanism such as Substrate's Democracy pallet.
         #[pallet::weight(0)]
         pub fn allocate(
