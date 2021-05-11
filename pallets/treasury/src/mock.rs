@@ -44,7 +44,7 @@ impl frame_system::Config for Test {
 }
 
 parameter_types! {
-    pub const ExistentialDeposit: u128 = 1;
+    pub const ExistentialDeposit: u128 = 500;
 }
 
 impl pallet_balances::Config for Test {
@@ -83,7 +83,7 @@ construct_runtime!(
 );
 
 pub const ONE_COIN_UNIT: Balance = 1_000_000_000_000;
-pub const MINIMUM_BALANCE: Balance = 1;
+pub const MINIMUM_BALANCE: Balance = 500;
 
 pub fn mock_test() -> sp_io::TestExternalities {
     let mut t = frame_system::GenesisConfig::default()

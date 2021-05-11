@@ -3,10 +3,24 @@ use frame_support::{assert_noop, assert_ok};
 use mock::*;
 
 #[test]
-fn init_reward_work() {
+fn donate_with_scanty_amount() {
     mock_test().execute_with(|| {
         let donor = Origin::signed(1);
-        assert_ok!(Treasury::donate(donor, 100 * ONE_COIN_UNIT));
+        let amount = 1;
+
+        assert_noop!(Treasury::donate(donor, amount), Error::<Test>::ScantyAmount);
+    })
+}
+
+#[test]
+fn allocate_with_scanty_amount() {
+    mock_test().execute_with(|| {
+        let reward = 1;
+
+        assert_noop!(
+            Treasury::allocate(Origin::root(), 1, reward),
+            Error::<Test>::ScantyAmount,
+        );
     })
 }
 
@@ -58,6 +72,6 @@ fn donate_error() {
     mock_test().execute_with(|| {
         let donor = Origin::signed(1);
         let fund = 1_000_000 * ONE_COIN_UNIT;
-        assert_noop!(Treasury::donate(donor, fund), Error::<Test>::FailedDonation,);
+        assert_noop!(Treasury::donate(donor, fund), Error::<Test>::FailedDonation);
     })
 }
