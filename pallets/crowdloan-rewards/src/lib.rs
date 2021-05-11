@@ -186,6 +186,11 @@ pub mod pallet {
 			info.claimed_reward = info.claimed_reward.saturating_add(amount);
 			Contributors::<T>::insert(&relay_account, info);
 
+			ensure!(
+				amount >= T::Currency::minimum_balance(),
+				Error::<T>::ScantyReward
+			);
+
 			T::Currency::transfer(
 				&T::PalletId::get().into_account(),
 				&who,
@@ -243,6 +248,8 @@ pub mod pallet {
 		WrongConversionU128ToBalance,
 		/// User cannot receive a reward
 		RewardFailed,
+		/// The amount of reward is lower than the minimum balance
+		ScantyReward,
 	}
 
 	#[pallet::event]
