@@ -1,5 +1,5 @@
 use crate::{self as pallet_crowdloan_rewards, Config};
-use frame_support::{construct_runtime, parameter_types};
+use frame_support::{construct_runtime, parameter_types, PalletId};
 use sp_core::{ed25519, Pair, H256};
 use sp_io;
 use sp_runtime::{
@@ -63,9 +63,18 @@ impl pallet_utility::Config for Test {
 	type WeightInfo = ();
 }
 
+parameter_types! {
+	pub const TreasuryPalletId: PalletId = PalletId(*b"Treasury");
+}
+
+impl pallet_treasury::Config for Test {
+	type PalletId = TreasuryPalletId;
+	type Currency = Balances;
+	type Event = Event;
+}
+
 impl Config for Test {
 	type Event = Event;
-	type RewardCurrency = Balances;
 	type RelayChainAccountId = [u8; 32];
 }
 
@@ -82,6 +91,7 @@ construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 		Utility: pallet_utility::{Pallet, Call, Storage, Event},
+		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -89,7 +99,12 @@ pub struct ExtBuilder;
 
 impl ExtBuilder {
 	pub fn build(contributions: Vec<([u8; 32], u32)>) -> sp_io::TestExternalities {
-		let storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+		let mut storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+		// Provide some initial balances
+		pallet_balances::GenesisConfig::<Test> {balances: vec![(100, 100_000_000)]}
+			.assimilate_storage(&mut storage)
+			.unwrap();
+
 		let mut ext = sp_io::TestExternalities::from(storage);
 		ext.execute_with(|| {
 			Crowdloan::initialize_reward(
