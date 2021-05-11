@@ -47,7 +47,7 @@ pub use pallet_timestamp::Call as TimestampCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{Permill, Perbill};
 pub use frame_support::{
-	construct_runtime, parameter_types, StorageValue,
+	construct_runtime, parameter_types, StorageValue, PalletId,
 	traits::{Randomness, IsInVec, All},
 	weights::{
 		Weight, IdentityFee, DispatchClass,
@@ -366,8 +366,17 @@ impl pallet_evm::Config for Runtime {
 
 impl pallet_crowdloan_rewards::Config for Runtime {
 	type Event = Event;
-	type RewardCurrency = Balances;
 	type RelayChainAccountId = AccountId32;
+}
+
+parameter_types! {
+	pub const TreasuryPalletId: PalletId = PalletId(*b"Treasury");
+}
+
+impl pallet_treasury::Config for Runtime {
+	type PalletId = TreasuryPalletId;
+	type Currency = Balances;
+	type Event = Event;
 }
 
 // parameter_types! {
@@ -473,6 +482,7 @@ construct_runtime!(
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
+		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>},
 		Staking: polkafoundry_staking::{Pallet, Call, Storage, Event<T>, Config<T>},
         AuthorInherent: author_inherent::{Pallet, Call, Storage, Inherent},
 

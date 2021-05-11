@@ -25,6 +25,7 @@ sp-std = { default-features = false, git = 'https://github.com/paritytech/substr
 
 pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
 pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+pallet-treasury = { default-features = false, path = "../treasury" }
 
 [features]
 default = ['std']
@@ -33,6 +34,7 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'pallet-balances/std',
+    'pallet-treasury/std',
     'pallet-utility/std',
     'sp-core/std',
     'sp-io/std',
