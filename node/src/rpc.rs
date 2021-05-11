@@ -128,7 +128,6 @@ pub fn create_full<C, P, BE>(
 			panic!("PolkaSmith runtime is not available. Please compile the node with `--features polkasmith` to enable it.");
 		},
 		_ => {
-			println!("halongbay ne");
 			#[cfg(feature = "halongbay")]
 				{
 					io.extend_with(
@@ -141,7 +140,7 @@ pub fn create_full<C, P, BE>(
 							signers,
 							is_authority,
 						))
-					);	
+					);
 				}
 			#[cfg(not(feature = "halongbay"))]
 			panic!("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.");

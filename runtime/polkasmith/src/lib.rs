@@ -118,7 +118,7 @@ parameter_types! {
 		})
 		.avg_block_initialization(AVERAGE_ON_INITIALIZE_RATIO)
 		.build_or_panic();
-	pub const SS58Prefix: u8 = 98;
+	pub const SS58Prefix: u8 = SS58PREFIX;
 }
 
 // Configure FRAME pallets to include in runtime.
@@ -378,7 +378,7 @@ impl pallet_ethereum::Config for Runtime {
 }
 
 parameter_types! {
-	pub const ChainId: u64 = 11;
+	pub const ChainId: u64 = CHAIN_ID;
 }
 
 impl pallet_evm::Config for Runtime {
@@ -394,11 +394,11 @@ impl pallet_evm::Config for Runtime {
 	type ChainId = ChainId;
 }
 
-impl pallet_crowdloan_rewards::Config for Runtime {
-	type Event = Event;
-	type RewardCurrency = Balances;
-	type RelayChainAccountId = AccountId32;
-}
+// impl pallet_crowdloan_rewards::Config for Runtime {
+// 	type Event = Event;
+// 	type RewardCurrency = Balances;
+// 	type RelayChainAccountId = AccountId32;
+// }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -418,7 +418,7 @@ construct_runtime!(
 		// Include the custom logic from the template pallet in the runtime.
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
-		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
+		// Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 
 		// XCM helpers.
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>},

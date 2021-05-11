@@ -91,6 +91,9 @@ fn get_money_work() {
 	let relay_account = pairs[0].public().into();
 	// 1 is contributor, 11 not
 	mock_test().execute_with(|| {
+		// user 100 donate fund to Treasury
+		assert_ok!(Treasury::donate(Origin::signed(100), 10_000_000));
+
 		assert_noop!(
 			Crowdloan::get_money(
 				Origin::signed(1),
@@ -117,9 +120,12 @@ fn get_money_work() {
 		assert_ok!(Crowdloan::get_money(
 				Origin::signed(1),
 		));
-		assert_ok!(Crowdloan::get_money(
+		assert_noop!(
+			Crowdloan::get_money(
 				Origin::signed(1),
-		));
+			),
+			Error::<Test>::ScantyReward
+		);
 		assert_eq!(
 			Crowdloan::contributors(&relay_account).unwrap().last_paid,
 			2u64
@@ -156,7 +162,6 @@ fn get_money_work() {
 			crate::Event::AssociatedAccount(11, pairs[1].public().into()),
 			crate::Event::AssociatedAccount(1, relay_account),
 			crate::Event::RewardPaid(1, 1000),
-			crate::Event::RewardPaid(1, 0),
 			crate::Event::RewardPaid(1, 3000),
 			crate::Event::RewardPaid(1, 1000),
 		];
@@ -171,6 +176,9 @@ fn update_associate_account_work() {
 	let proof1: MultiSignature = pairs[1].sign(&2u64.encode()).into();
 	let proof2: MultiSignature = pairs[0].sign(&3u64.encode()).into();
 	mock_test().execute_with(|| {
+		// user 100 donate fund to Treasury
+		assert_ok!(Treasury::donate(Origin::signed(100), 10_000_000));
+
 		Crowdloan::associate_account(
 			Origin::signed(1),
 			pairs[0].public().into(),

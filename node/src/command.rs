@@ -2,6 +2,7 @@ use std::{io::Write, net::SocketAddr};
 
 use sp_core::hexdisplay::HexDisplay;
 use sp_runtime::traits::Block as BlockT;
+use sp_runtime::AccountId32;
 
 use sc_cli::{
 	ChainSpec, CliConfiguration, DefaultConfigurationValues, ImportParams,
@@ -21,6 +22,8 @@ use polkadot_parachain::primitives::AccountIdConversion;
 use crate::{cli::{Cli, RelayChainCli, Subcommand}, chain_spec};
 use crate::service;
 use crate::service::IdentifyVariant;
+use crate::service::halongbay_runtime::AccountId;
+use std::str::FromStr;
 
 fn chain_name() -> String {
 	#[cfg(feature = "polkafoundry")]
@@ -277,16 +280,29 @@ pub fn run() -> Result<()> {
 		}
 		None => {
 			let runner = cli.create_runner(&*cli.run)?;
-
 			let collator = cli.run.base.validator || cli.collator;
+			let author_id: Option<AccountId32> = cli.run.author_id.clone();
+			if collator && author_id.is_none() {
+				return Err("Collator nodes must specify an author account id".into());
+			}
 
 			runner.run_node_until_exit(|config| async move {
 				let key = sp_core::Pair::generate().0;
 				if cli.run.start_dev {
+					// If no author id was supplied, use the one that is staked at genesis
+					// in the default development spec.
+					let author_id = author_id.or_else(|| {
+						Some(
+							AccountId::from_str("ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32")
+								.expect("Tung is a valid account"),
+						)
+					});
+
 					#[cfg(feature = "halongbay")]
 						{
 							return service::start_dev(
 								config,
+								author_id,
 								cli.run.sealing,
 								collator
 							);
@@ -336,6 +352,7 @@ pub fn run() -> Result<()> {
 								return service::start_node::<service::polkafoundry_runtime::RuntimeApi, service::PolkaFoundryExecutor>(
 									config,
 									key,
+									author_id,
 									polkadot_config,
 									id,
 									collator,
@@ -354,6 +371,7 @@ pub fn run() -> Result<()> {
 								return service::start_node::<service::polkasmith_runtime::RuntimeApi, service::PolkaSmithExecutor>(
 									config,
 									key,
+									author_id,
 									polkadot_config,
 									id,
 									collator,
@@ -373,6 +391,7 @@ pub fn run() -> Result<()> {
 								return service::start_node::<service::halongbay_runtime::RuntimeApi, service::HalongbayExecutor>(
 									config,
 									key,
+									author_id,
 									polkadot_config,
 									id,
 									collator,

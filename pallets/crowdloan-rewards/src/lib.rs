@@ -10,18 +10,16 @@ mod tests;
 
 #[pallet]
 pub mod pallet {
-	use frame_support::{dispatch::fmt::Debug, pallet_prelude::*, traits::Currency};
+	use frame_support::{dispatch::fmt::Debug, pallet_prelude::*, traits::Currency, traits::ExistenceRequirement::AllowDeath};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::{Saturating, Verify};
+	use sp_runtime::traits::{AccountIdConversion, Saturating, Verify};
 	use sp_runtime::{MultiSignature, SaturatedConversion};
 	use sp_core::crypto::AccountId32;
 	use sp_std::{convert::{From, TryInto}, vec::Vec};
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config + pallet_treasury::Config {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
-
-		type RewardCurrency: Currency<Self::AccountId>;
 
 		type RelayChainAccountId:
 		Parameter
@@ -33,9 +31,7 @@ pub mod pallet {
 		+ Into<AccountId32>;
 	}
 
-	type BalanceOf<T> = <<T as Config>::RewardCurrency as Currency<
-		<T as frame_system::Config>::AccountId,
-	>>::Balance;
+	type BalanceOf<T> = pallet_treasury::BalanceOf<T>;
 
 	#[derive(Default, Clone, Encode, Decode, RuntimeDebug)]
 	pub struct RewardInfo<T: Config> {
@@ -190,8 +186,17 @@ pub mod pallet {
 			info.claimed_reward = info.claimed_reward.saturating_add(amount);
 			Contributors::<T>::insert(&relay_account, info);
 
-			// TODO We need the charity pallet to pay for the rewards
-			T::RewardCurrency::deposit_creating(&who, amount);
+			ensure!(
+				amount >= T::Currency::minimum_balance(),
+				Error::<T>::ScantyReward
+			);
+
+			T::Currency::transfer(
+				&T::PalletId::get().into_account(),
+				&who,
+				amount,
+				AllowDeath,
+			).map_err(|_| Error::<T>::RewardFailed)?;
 
 			Self::deposit_event(Event::RewardPaid(
 				who,
@@ -241,6 +246,10 @@ pub mod pallet {
 		BadRelayAccount,
 		/// Invalid conversion while calculating payable amount
 		WrongConversionU128ToBalance,
+		/// User cannot receive a reward
+		RewardFailed,
+		/// The amount of reward is lower than the minimum balance
+		ScantyReward,
 	}
 
 	#[pallet::event]

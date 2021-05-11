@@ -1,12 +1,17 @@
-use crate::{self as pallet_crowdloan_rewards, Config};
-use frame_support::{construct_runtime, parameter_types, PalletId};
-use sp_core::{ed25519, Pair, H256};
+use crate::{self as stake, Config, CollatorPoints, TotalPoints};
+use frame_support::{
+	construct_runtime, parameter_types,
+	traits::{GenesisBuild, OnFinalize, OnInitialize},
+};
 use sp_io;
 use sp_runtime::{
+	Perbill,
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 };
-use sp_std::convert::{From, TryInto};
+use sp_std::convert::{From};
+use sp_core::H256;
+use frame_election_provider_support::onchain;
 
 pub type AccountId = u64;
 pub type Balance = u128;
@@ -63,19 +68,38 @@ impl pallet_utility::Config for Test {
 	type WeightInfo = ();
 }
 
-parameter_types! {
-	pub const TreasuryPalletId: PalletId = PalletId(*b"Treasury");
+impl onchain::Config for Test {
+	type AccountId = u64;
+	type BlockNumber = u64;
+	type BlockWeights = BlockWeights;
+	type Accuracy = Perbill;
+	type DataProvider = Staking;
 }
 
-impl pallet_treasury::Config for Test {
-	type PalletId = TreasuryPalletId;
-	type Currency = Balances;
-	type Event = Event;
+parameter_types! {
+	pub const BlocksPerRound: u32 = 10;
+	pub const MaxCollatorsPerNominator: u32 = 5;
+	pub const MaxNominationsPerCollator: u32 = 2;
+	pub const BondDuration: u32 = 2;
+	pub const MinCollatorStake: u32 = 500;
+	pub const MinNominatorStake: u32 = 100;
+	pub const PayoutDuration: u32 = 2;
+	pub const DesiredTarget: u32 = 2;
 }
 
 impl Config for Test {
+	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
 	type Event = Event;
-	type RelayChainAccountId = [u8; 32];
+	type Currency = Balances;
+	type BlocksPerRound = BlocksPerRound;
+	type MaxNominationsPerCollator = MaxNominationsPerCollator;
+	type BondDuration = BondDuration;
+	type MinCollatorStake = MinCollatorStake;
+	type MinNominatorStake = MinNominatorStake;
+	type PayoutDuration = PayoutDuration;
+	type ElectionProvider = onchain::OnChainSequentialPhragmen<Self>;
+	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
+	type DesiredTarget = DesiredTarget;
 }
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
@@ -89,30 +113,29 @@ construct_runtime!(
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
-		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
+		Staking: stake::{Pallet, Call, Storage, Event<T>},
 		Utility: pallet_utility::{Pallet, Call, Storage, Event},
-		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
 pub struct ExtBuilder;
 
 impl ExtBuilder {
-	pub fn build(contributions: Vec<([u8; 32], u32)>) -> sp_io::TestExternalities {
+	pub fn build(
+		balances: Vec<(AccountId, Balance)>,
+		stakers: Vec<(AccountId, Balance)>,
+	) -> sp_io::TestExternalities {
 		let mut storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
-		// Provide some initial balances
-		pallet_balances::GenesisConfig::<Test> {balances: vec![(100, 100_000_000)]}
+		pallet_balances::GenesisConfig::<Test> { balances }
 			.assimilate_storage(&mut storage)
+			.unwrap();
+		stake::GenesisConfig::<Test> {
+			stakers,
+		}.assimilate_storage(&mut storage)
 			.unwrap();
 
 		let mut ext = sp_io::TestExternalities::from(storage);
 		ext.execute_with(|| {
-			Crowdloan::initialize_reward(
-				Origin::root(),
-				contributions.clone(),
-				10,
-				10
-			).unwrap();
 			System::set_block_number(1)
 		});
 
@@ -120,27 +143,26 @@ impl ExtBuilder {
 	}
 }
 
-pub(crate) fn get_ed25519_pairs(num: u32) -> Vec<ed25519::Pair> {
-	let seed: u128 = 12345678901234567890123456789012;
-	let mut pairs = Vec::new();
-	for i in 0..num {
-		pairs.push(ed25519::Pair::from_seed(
-			(seed.clone() + i as u128)
-				.to_string()
-				.as_bytes()
-				.try_into()
-				.unwrap(),
-		))
-	}
-	pairs
-}
-
 pub(crate) fn mock_test() -> sp_io::TestExternalities {
-	let pairs = get_ed25519_pairs(3);
 	ExtBuilder::build(vec![
-		([1u8; 32].into(), 500),
-		([2u8; 32].into(), 500),
-		(pairs[0].public().into(), 500),
+		// collator
+		(1, 1000),
+		(2, 500),
+		(3, 800),
+		(100, 5000),
+		(200, 2000),
+		(300, 3000),
+		(400, 3000),
+		// nominator
+		(10, 1000),
+		(20, 500),
+		(30, 800),
+		(999, 200000000),
+	], vec![
+		(100, 500),
+		(200, 500),
+		(300, 600),
+		(400, 400),
 	])
 }
 
@@ -149,7 +171,7 @@ pub(crate) fn events() -> Vec<super::Event<Test>> {
 		.into_iter()
 		.map(|r| r.event)
 		.filter_map(|e| {
-			if let Event::pallet_crowdloan_rewards(inner) = e {
+			if let Event::stake(inner) = e {
 				Some(inner)
 			} else {
 				None
@@ -160,7 +182,18 @@ pub(crate) fn events() -> Vec<super::Event<Test>> {
 
 pub(crate) fn run_to_block(n: u64) {
 	while System::block_number() < n {
+		Staking::on_finalize(System::block_number());
+		Balances::on_finalize(System::block_number());
+		System::on_finalize(System::block_number());
 		System::set_block_number(System::block_number() + 1);
+		System::on_initialize(System::block_number());
+		Balances::on_initialize(System::block_number());
+		Staking::on_initialize(System::block_number());
 	}
 }
 
+pub(crate) fn set_author(round: u32, acc: u64, pts: u32) {
+	<TotalPoints<Test>>::mutate(round, |p| *p += pts);
+	<CollatorPoints<Test>>::mutate(round, acc, |p| *p += pts);
+	println!("total point ne {:?}", <TotalPoints<Test>>::get(round));
+}
