@@ -48,20 +48,13 @@ pub mod pallet {
         amount: BalanceOf<T>,
     }
 
-    /// Number of proposals that have been made.
-    #[pallet::storage]
-    #[pallet::getter(fn proposal_count)]
-    pub type ProposalCount<T: Config> = StorageValue<_, ProposalIndex, ValueQuery>;
-
-    /// Proposals that have been made.
-    #[pallet::storage]
-    pub type Proposals<T: Config> = StorageMap<_, Blake2_128Concat, ProposalIndex, Proposal<T>>;
-
     /// Error for the treasury module.
     #[pallet::error]
     pub enum Error<T> {
         /// Balance is too low.
         InsufficientBalance,
+        /// The amount is lower than the minimum balance
+        ScantyAmount,
         /// Donation is not successful
         FailedDonation,
         /// Allocation is not successful
@@ -71,8 +64,6 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(fn deposit_event)]
     pub enum Event<T: Config> {
-        /// Some of our funds have been burnt.
-        Burnt(BalanceOf<T>),
         /// Donor has made a charitable donation to the charity
         DonationReceived(T::AccountId, BalanceOf<T>, BalanceOf<T>),
         /// Charity has allocated funds to a cause
@@ -92,6 +83,11 @@ pub mod pallet {
         pub fn donate(origin: OriginFor<T>, amount: BalanceOf<T>) -> DispatchResultWithPostInfo {
             let sender = ensure_signed(origin)?;
 
+            ensure!(
+                amount >= T::Currency::minimum_balance(),
+                Error::<T>::ScantyAmount,
+            );
+
             T::Currency::transfer(&sender, &Self::account_id(), amount, AllowDeath)
                 .map_err(|_| Error::<T>::FailedDonation)?;
             Self::deposit_event(Event::DonationReceived(sender, amount, Self::pot()));
@@ -99,7 +95,7 @@ pub mod pallet {
             Ok(Default::default())
         }
 
-        /// Allocate the Charity's funds
+        /// Allocate the Treasury's pot
         ///
         /// Take funds from the Charity's pot and send them somewhere. This call requires root origin,
         /// which means it must come from a governance mechanism such as Substrate's Democracy pallet.
@@ -111,18 +107,14 @@ pub mod pallet {
         ) -> DispatchResultWithPostInfo {
             ensure_root(origin)?;
 
+            ensure!(
+                amount >= T::Currency::minimum_balance(),
+                Error::<T>::ScantyAmount,
+            );
+
             T::Currency::transfer(&Self::account_id(), &dest, amount, AllowDeath)
                 .map_err(|_| Error::<T>::FailedAllocation)?;
 
-            let c = ProposalCount::<T>::get();
-            ProposalCount::<T>::put(c + 1);
-            Proposals::<T>::insert(
-                c,
-                Proposal {
-                    user: dest.clone(),
-                    amount,
-                },
-            );
             Self::deposit_event(Event::FundsAllocated(dest, amount, Self::pot()));
             Ok(Default::default())
         }
