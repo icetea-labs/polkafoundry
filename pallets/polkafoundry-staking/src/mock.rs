@@ -85,6 +85,8 @@ parameter_types! {
 	pub const MinNominatorStake: u32 = 100;
 	pub const PayoutDuration: u32 = 2;
 	pub const DesiredTarget: u32 = 2;
+	pub const StakingRewardInterest: u32 = 50;
+	pub const CommissionRewardInterest: u32 = 50;
 }
 
 impl Config for Test {
@@ -100,6 +102,8 @@ impl Config for Test {
 	type ElectionProvider = onchain::OnChainSequentialPhragmen<Self>;
 	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
 	type DesiredTarget = DesiredTarget;
+	type StakingRewardInterest = StakingRewardInterest;
+	type CommissionRewardInterest = CommissionRewardInterest;
 }
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;

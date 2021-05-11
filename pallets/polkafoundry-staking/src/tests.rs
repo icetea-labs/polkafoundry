@@ -669,14 +669,17 @@ fn payout_stakers_work() {
 		let expected = vec![
 			crate::Event::CollatorChoosen(2, 200, 500),
 			crate::Event::CollatorChoosen(2, 300, 600),
+			crate::Event::NewRoundStart(2, 12),
 			crate::Event::Nominate(100,400),
 			crate::Event::Nominate(300,800),
 			crate::Event::CollatorChoosen(3, 100, 900),
 			crate::Event::CollatorChoosen(3, 300, 1400),
+			crate::Event::NewRoundStart(3, 13),
 			crate::Event::Rewarded(300, 3),
 			crate::Event::Rewarded(200, 2),
 			crate::Event::CollatorChoosen(4, 100, 900),
 			crate::Event::CollatorChoosen(4, 300, 1400),
+			crate::Event::NewRoundStart(4, 14),
 		];
 		assert_eq!(events(), expected);
 	})

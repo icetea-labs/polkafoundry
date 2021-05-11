@@ -31,7 +31,7 @@ pub mod pallet {
 	use sp_std::{convert::{From}, vec::Vec};
 	use frame_support::sp_runtime::traits::{AtLeast32BitUnsigned};
 	use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
-	use crate::inflation::compute_total_payout;
+	use crate::inflation::{compute_total_payout, compute_collator_reward};
 	use sp_std::{cmp::Ordering, prelude::*, ops::{Mul, AddAssign, Add, Sub}};
 	use frame_support::sp_std::fmt::Debug;
 	use log::info;
@@ -80,6 +80,8 @@ pub mod pallet {
 		type CurrencyToVote: CurrencyToVote<BalanceOf<Self>>;
 
 		type DesiredTarget: Get<u32>;
+		type StakingRewardInterest: Get<u32>;
+		type CommissionRewardInterest: Get<u32>;
 	}
 
 	#[pallet::pallet]
@@ -118,6 +120,8 @@ pub mod pallet {
 		pub bond_duration: u32,
 		pub blocks_per_round: u32,
 		pub desired_target: u32,
+		pub commission_reward_interest: u32,
+		pub staking_reward_interest: u32,
 	}
 	/// Just a Balance/BlockNumber tuple to encode when a chunk of funds will be unlocked.
 	#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
@@ -597,7 +601,6 @@ pub mod pallet {
 		pub others: Vec<IndividualExposure<AccountId, Balance>>,
 	}
 
-
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
 		pub stakers: Vec<(T::AccountId, BalanceOf<T>)>,
@@ -639,7 +642,9 @@ pub mod pallet {
 			Settings::<T>::put(SettingStruct {
 				bond_duration: T::BondDuration::get(),
 				blocks_per_round: T::BlocksPerRound::get(),
-				desired_target: T::DesiredTarget::get()
+				desired_target: T::DesiredTarget::get(),
+				staking_reward_interest: T::StakingRewardInterest::get(),
+				commission_reward_interest: T::CommissionRewardInterest::get(),
 			});
 			<Pallet<T>>::deposit_event(Event::NewRoundStart(1u32, 1u32 + T::BlocksPerRound::get() as u32));
 		}
@@ -999,29 +1004,15 @@ pub mod pallet {
 					5u32,
 					(T::BlocksPerRound::get() * 6000) as u64);
 
-				let commission_point = Perbill::from_rational(
-					50u32,
-					100
-				);
-				let stake_point = Perbill::from_rational(
-					50u32,
-					100
-				);
+				let commission_reward_interest = Perbill::from_percent(Settings::<T>::get().commission_reward_interest);
+				let staking_reward_interest = Perbill::from_percent(Settings::<T>::get().staking_reward_interest);
 				let total_points = TotalPoints::<T>::get(payout_round);
 				for (acc, exposure) in RoundStakerClipped::<T>::drain_prefix(payout_round) {
-					let point = CollatorPoints::<T>::get(&payout_round, &acc);
-					let collator_exposure_part = stake_point * Perbill::from_rational(
-						exposure.own,
-						total_stake,
-					);
-					let collator_commission_part = commission_point * Perbill::from_rational(
-						point,
-						total_points
-					);
-					mint(
-						collator_exposure_part.mul(payout) + collator_commission_part.mul(payout),
-						acc.clone()
-					);
+					let point = CollatorPoints::<T>::take(&payout_round, &acc);
+					let collator_reward = compute_collator_reward(payout,
+														 staking_reward_interest, exposure.own, total_stake,
+														commission_reward_interest, point.into(), total_points.into());
+					mint(collator_reward, acc.clone());
 
 					for nominator in exposure.others.iter() {
 						let nominator_exposure_part = Perbill::from_rational(

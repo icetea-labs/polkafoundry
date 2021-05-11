@@ -437,6 +437,8 @@ parameter_types! {
 	pub const MinNominatorStake: u32 = 100;
 	pub const PayoutDuration: u32 = 2;
 	pub const DesiredTarget: u32 = 2;
+	pub const StakingRewardInterest: u32 = 50;
+	pub const CommissionRewardInterest: u32 = 50;
 }
 
 impl frame_election_provider_support::onchain::Config for Runtime {
@@ -460,6 +462,8 @@ impl polkafoundry_staking::Config for Runtime {
 	type ElectionProvider = frame_election_provider_support::onchain::OnChainSequentialPhragmen<Self>;
 	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
 	type DesiredTarget = DesiredTarget;
+	type StakingRewardInterest = StakingRewardInterest;
+	type CommissionRewardInterest = CommissionRewardInterest;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

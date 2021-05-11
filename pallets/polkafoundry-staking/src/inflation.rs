@@ -42,6 +42,33 @@ pub fn compute_i_npos<P: PerThing> (
 	))
 }
 
+pub fn compute_own_point<N>(
+	interest: Perbill,
+	own: N,
+	total: N,
+) -> Perbill
+	where N: AtLeast32BitUnsigned + Clone,
+{
+	interest * Perbill::from_rational(own, total)
+}
+
+pub fn compute_collator_reward<N>(
+	payout: N,
+	staking_reward_interest: Perbill,
+	own_staking: N,
+	total_staking: N,
+	commission_reward_interest: Perbill,
+	own_commission: N,
+	total_commission: N
+) -> N
+	where N: AtLeast32BitUnsigned + Clone
+{
+	let staking_point = compute_own_point(staking_reward_interest, own_staking, total_staking);
+	let commission_point = compute_own_point(commission_reward_interest, own_commission, total_commission);
+
+	staking_point.mul(payout.clone()) + commission_point.mul(payout.clone())
+}
+
 #[cfg(test)]
 mod test {
 	use sp_arithmetic::{PerThing, Perbill, PerU16, Percent, Perquintill};
@@ -151,6 +178,44 @@ mod test {
 
 		const HOUR: u64 = 60 * 60 * 1000;
 		assert_eq!(super::compute_total_payout(2_500_000_000_000_000_000_000_000_000u128, 5_000_000_000_000_000_000_000_000_000u128, 2_5u32, 20u32, 50u32, 5u32, HOUR), 57_038_500_000_000_000_000_000);
+	}
 
+	#[test]
+	fn compute_collator_reward_work() {
+		const STAKING_REWARD_INTEREST: u32 = 10; // 10%
+		const COMMISSION_REWARD_INTEREST: u32 = 10; // 10%
+		const TOTAL_STAKING: u128 = 100_000;
+		const TOTAL_COMMISSION: u128 = 100_000;
+		const MINIMUM_STAKING: u128 = 1000;
+		const MINIMUM_COMMISSION: u128 = 1000;
+		const PAYOUT: u128 = 100_000_000;
+
+		assert_eq!(super::compute_collator_reward(PAYOUT,
+												  Perbill::from_percent(STAKING_REWARD_INTEREST), MINIMUM_STAKING, TOTAL_STAKING,
+												  Perbill::from_percent(COMMISSION_REWARD_INTEREST), MINIMUM_COMMISSION, TOTAL_COMMISSION), 200_000);
+
+		assert_eq!(super::compute_collator_reward(10 * PAYOUT,
+												  Perbill::from_percent(STAKING_REWARD_INTEREST), MINIMUM_STAKING, TOTAL_STAKING,
+												  Perbill::from_percent(COMMISSION_REWARD_INTEREST), MINIMUM_COMMISSION, TOTAL_COMMISSION), 2_000_000);
+
+		assert_eq!(super::compute_collator_reward(PAYOUT,
+												  Perbill::from_percent(STAKING_REWARD_INTEREST * 5), MINIMUM_STAKING, TOTAL_STAKING,
+												  Perbill::from_percent(COMMISSION_REWARD_INTEREST * 5), MINIMUM_COMMISSION, TOTAL_COMMISSION), 1_000_000);
+
+		assert_eq!(super::compute_collator_reward(PAYOUT,
+												  Perbill::from_percent(STAKING_REWARD_INTEREST), MINIMUM_STAKING * 30, TOTAL_STAKING,
+												  Perbill::from_percent(COMMISSION_REWARD_INTEREST), MINIMUM_COMMISSION, TOTAL_COMMISSION), 3_100_000);
+
+		assert_eq!(super::compute_collator_reward(PAYOUT,
+												  Perbill::from_percent(STAKING_REWARD_INTEREST), MINIMUM_STAKING, TOTAL_STAKING,
+												  Perbill::from_percent(COMMISSION_REWARD_INTEREST), MINIMUM_COMMISSION * 25, TOTAL_COMMISSION), 2_600_000);
+
+		assert_eq!(super::compute_collator_reward(PAYOUT,
+												  Perbill::from_percent(STAKING_REWARD_INTEREST), MINIMUM_STAKING, TOTAL_STAKING,
+												  Perbill::from_percent(COMMISSION_REWARD_INTEREST), MINIMUM_COMMISSION * 25, TOTAL_COMMISSION), 2_600_000);
+
+		assert_eq!(super::compute_collator_reward(PAYOUT,
+												  Perbill::from_percent(STAKING_REWARD_INTEREST), MINIMUM_STAKING * 30, TOTAL_STAKING,
+												  Perbill::from_percent(COMMISSION_REWARD_INTEREST), MINIMUM_COMMISSION * 30, TOTAL_COMMISSION), 6_000_000);
 	}
 }
