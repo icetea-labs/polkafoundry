@@ -697,6 +697,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "bridge"
+version = "0.0.1"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-balances",
+ "pallet-utility",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "bs58"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2766,6 +2783,7 @@ dependencies = [
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
+ "pallet-treasury 0.0.1",
  "pallet-xcm",
  "parachain-info",
  "parity-scale-codec",
@@ -3584,7 +3602,7 @@ dependencies = [
  "pallet-tips",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
- "pallet-treasury",
+ "pallet-treasury 3.0.0",
  "pallet-utility",
  "pallet-vesting",
  "parity-scale-codec",
@@ -4937,7 +4955,7 @@ source = "git+https://github.com/paritytech/substrate.git?branch=rococo-v1#2be8f
 dependencies = [
  "frame-support",
  "frame-system",
- "pallet-treasury",
+ "pallet-treasury 3.0.0",
  "parity-scale-codec",
  "sp-runtime",
  "sp-std",
@@ -4965,6 +4983,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "pallet-balances",
+ "pallet-treasury 0.0.1",
  "pallet-utility",
  "parity-scale-codec",
  "serde",
@@ -5463,7 +5482,7 @@ source = "git+https://github.com/paritytech/substrate.git?branch=rococo-v1#2be8f
 dependencies = [
  "frame-support",
  "frame-system",
- "pallet-treasury",
+ "pallet-treasury 3.0.0",
  "parity-scale-codec",
  "serde",
  "sp-runtime",
@@ -5512,6 +5531,24 @@ dependencies = [
  "parity-scale-codec",
  "sp-api",
  "sp-runtime",
+]
+
+[[package]]
+name = "pallet-treasury"
+version = "0.0.1"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "impl-trait-for-tuples 0.2.1",
+ "pallet-balances",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+ "sp-storage",
 ]
 
 [[package]]
@@ -6644,7 +6681,7 @@ dependencies = [
  "pallet-tips",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
- "pallet-treasury",
+ "pallet-treasury 3.0.0",
  "pallet-utility",
  "pallet-vesting",
  "parity-scale-codec",
@@ -6694,7 +6731,7 @@ dependencies = [
  "pallet-staking",
  "pallet-timestamp",
  "pallet-transaction-payment",
- "pallet-treasury",
+ "pallet-treasury 3.0.0",
  "pallet-vesting",
  "parity-scale-codec",
  "polkadot-primitives",
@@ -7085,7 +7122,6 @@ dependencies = [
  "hex-literal",
  "pallet-aura",
  "pallet-balances",
- "pallet-crowdloan-rewards",
  "pallet-ethereum",
  "pallet-evm",
  "pallet-grandpa",
@@ -7159,7 +7195,6 @@ dependencies = [
  "hex-literal",
  "pallet-aura",
  "pallet-balances",
- "pallet-crowdloan-rewards",
  "pallet-ethereum",
  "pallet-evm",
  "pallet-grandpa",
@@ -11682,7 +11717,7 @@ dependencies = [
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
- "pallet-treasury",
+ "pallet-treasury 3.0.0",
  "pallet-utility",
  "pallet-vesting",
  "parity-scale-codec",
