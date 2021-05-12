@@ -108,7 +108,8 @@ pub mod pallet {
 				// update total stake of next round
 				TotalStakedAt::<T>::insert(round_index, TotalStaked::<T>::get());
 				TotalIssuanceAt::<T>::insert(round_index, T::Currency::total_issuance());
-				Self::deposit_event(Event::NewRoundStart(round_index, round_index + block_per_round));
+
+				Self::deposit_event(Event::NewRoundStart(round_index, round_index * block_per_round));
 			}
 		}
 	}
@@ -293,7 +294,6 @@ pub mod pallet {
 		}
 
 		/// Add nomination for collator
-		/// Plus the `active` and `total`
 		/// Will be count as vote weight for collator
 		pub fn add_nomination(&mut self, nomination: Bond<AccountId, Balance>) -> bool {
 			match self.nominations.binary_search(&nomination) {
@@ -621,7 +621,7 @@ pub mod pallet {
 					T::Currency::free_balance(&staker) >= balance,
 					"Account does not have enough balance to bond."
 				);
-				T::Currency::reserve(&staker, balance.clone());
+
 				total_staked += balance.clone();
 				Pallet::<T>::bond(
 					T::Origin::from(Some(staker.clone()).into()),
