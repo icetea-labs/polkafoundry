@@ -7,6 +7,17 @@ pub type ChainId = u8;
 pub type DepositNonce = u64;
 pub type ResourceId = [u8; 32];
 
+/// Helper function to concatenate a chain ID and some bytes to produce a resource ID.
+/// The common format is (31 bytes unique ID + 1 byte chain ID).
+pub fn derive_resource_id(chain: u8, id: &[u8]) -> ResourceId {
+	let mut r_id: ResourceId = [0; 32];
+	r_id[31] = chain; // last byte is chain id
+	let range = if id.len() > 31 { 31 } else { id.len() }; // Use at most 31 bytes
+	for i in 0..range {
+		r_id[30 - i] = id[range - 1 - i]; // Ensure left padding for eth compatibility
+	}
+	return r_id;
+}
 
 #[pallet]
 pub mod pallet {
@@ -16,15 +27,16 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_support::weights::GetDispatchInfo;
 	use frame_support::PalletId;
-	use frame_support::sp_runtime::traits::AccountIdConversion;
 	use frame_support::traits::EnsureOrigin;
 
 	use sp_core::U256;
-	use sp_runtime::traits::Dispatchable;
+	use sp_runtime::traits::{AccountIdConversion, Dispatchable};
+	use sp_std::prelude::*;
+
 	use super::{ChainId, DepositNonce, ResourceId};
 
 	const DEFAULT_RELAYER_THRESHOLD: u32 = 1;
-	const PALLET_ID: PalletId = PalletId(*b"cb/bridg");
+	const PALLET_ID: PalletId = PalletId(*b"polkf/bg");
 
 	#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 	pub enum ProposalStatus {
@@ -321,7 +333,7 @@ pub mod pallet {
 			prop: Box<T::Proposal>,
 		) -> DispatchResultWithPostInfo {
 			if let Some(mut votes) = <Votes<T>>::get(src_id, (nonce, prop.clone())) {
-				let now = <frame_system::Module<T>>::block_number();
+				let now = <frame_system::Pallet<T>>::block_number();
 				ensure!(!votes.is_complete(), Error::<T>::ProposalAlreadyComplete);
 				ensure!(!votes.is_expired(now), Error::<T>::ProposalExpired);
 

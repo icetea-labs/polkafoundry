@@ -64,6 +64,8 @@ pallet-ethereum = { default-features = false, git = 'https://github.com/polkafou
 pallet-crowdloan-rewards = { default-features = false, path = '../../pallets/crowdloan-rewards' }
 polkafoundry-staking = { default-features = false, path = '../../pallets/polkafoundry-staking' }
 pallet-treasury = { default-features = false, path = "../../pallets/treasury" }
+pallet-bridge = { default-features = false, path = "../../pallets/bridge" }
+pallet-bridge-executor = { default-features = false, path = "../../pallets/bridge-executor" }
 
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
 
@@ -109,6 +111,8 @@ std = [
     'fp-rpc/std',
     'pallet-aura/std',
     'pallet-balances/std',
+    'pallet-bridge/std',
+    'pallet-bridge-executor/std',
     'pallet-grandpa/std',
     'pallet-randomness-collective-flip/std',
     'pallet-sudo/std',

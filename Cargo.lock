@@ -2756,6 +2756,8 @@ dependencies = [
  "hex-literal",
  "pallet-aura",
  "pallet-balances",
+ "pallet-bridge",
+ "pallet-bridge-executor",
  "pallet-crowdloan-rewards",
  "pallet-election-provider-multi-phase",
  "pallet-ethereum",

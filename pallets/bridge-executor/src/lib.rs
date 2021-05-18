@@ -36,9 +36,6 @@ pub mod pallet {
 
 		/// The currency mechanism.
 		type Currency: Currency<Self::AccountId>;
-
-		/// Ids can be defined by the runtime and passed in, perhaps from blake2b_128 hashes.
-		type HashId: Get<ResourceId>;
 		type NativeTokenId: Get<ResourceId>;
 	}
 
@@ -53,22 +50,23 @@ pub mod pallet {
 			dest_id: bridge::ChainId
 		) -> DispatchResultWithPostInfo {
 			let source = ensure_signed(origin)?;
-			ensure!(<bridge::Module<T>>::chain_whitelisted(dest_id), Error::<T>::InvalidTransfer);
-			let bridge_id = <bridge::Module<T>>::account_id();
+			ensure!(<bridge::Pallet<T>>::chain_whitelisted(dest_id), Error::<T>::InvalidTransfer);
+			let bridge_id = <bridge::Pallet<T>>::account_id();
 			T::Currency::transfer(&source, &bridge_id, amount.into(), AllowDeath)?;
 
 			let resource_id = T::NativeTokenId::get();
-			<bridge::Module<T>>::transfer_fungible(dest_id, resource_id, recipient, U256::from(amount.saturated_into::<u128>()))
+			<bridge::Pallet<T>>::transfer_fungible(dest_id, resource_id, recipient, U256::from(amount.saturated_into::<u128>()))
 		}
-
 	}
-
-	#[pallet::event]
-	#[pallet::generate_deposit(fn deposit_event)]
-	pub enum Event<T: Config>{}
 
 	#[pallet::error]
 	pub enum Error<T>{
 		InvalidTransfer
 	}
+
+	#[pallet::event]
+	#[pallet::generate_deposit(fn deposit_event)]
+	pub enum Event<T: Config> {
+	}
+
 }
