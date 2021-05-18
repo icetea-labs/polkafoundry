@@ -436,7 +436,6 @@ fn force_onboard_work() {
 fn collator_unbond_work() {
 	mock_test().execute_with(|| {
 		run_to_block(11);
-
 		assert_ok!(
 			Staking::nominate(
 				Origin::signed(10),
@@ -444,6 +443,7 @@ fn collator_unbond_work() {
 				500
 			),
 		);
+
 		assert_eq!(Balances::reserved_balance(&10), 500);
 		assert_noop!(
 			Staking::collator_unbond(

@@ -369,11 +369,42 @@ pub mod pallet {
 			Self::deposit_event(Event::ProposalRejected(src_id, nonce));
 			Ok(Default::default())
 		}
+
+		/// Increments the deposit nonce for the specified chain ID
+		fn bump_nonce(id: ChainId) -> DepositNonce {
+			let nonce = Self::chains(id)
+				.unwrap_or_default()
+				.unwrap_or_default() + 1;
+			<ChainNonces::<T>>::insert(id, Some(nonce));
+			nonce
+		}
+
+		/// Initiates a transfer of a fungible asset out of the chain. This should be called by another pallet.
+		pub fn transfer_fungible(
+			dest_id: ChainId,
+			resource_id: ResourceId,
+			to: Vec<u8>,
+			amount: U256,
+		) -> DispatchResultWithPostInfo {
+			ensure!(
+				Self::chain_whitelisted(dest_id),
+				Error::<T>::ChainNotWhitelisted
+      	    );
+			let nonce = Self::bump_nonce(dest_id);
+			Self::deposit_event(Event::FungibleTransfer(
+				dest_id,
+				nonce,
+				resource_id,
+				amount,
+				to,
+			));
+			Ok(Default::default())
+		}
 	}
 
 	/// All whitelisted chains and their respective transaction counts
 	#[pallet::storage]
-	#[pallet::getter(fn nominators)]
+	#[pallet::getter(fn chains)]
 	pub type ChainNonces<T: Config> =
 	StorageMap<_, Blake2_128Concat, ChainId, Option<DepositNonce>>;
 

@@ -1,5 +1,5 @@
 [package]
-name = "pallet-bridge"
+name = "pallet-bridge-executor"
 version = "0.0.1"
 authors = ["Tung <tung.nguyen@icetea.io>"]
 edition = "2018"
@@ -22,9 +22,11 @@ sp-core = { default-features = false, git = 'https://github.com/paritytech/subst
 sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+sp-arithmetic = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
 
 pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
 pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "rococo-v1", default-features = false }
+pallet-bridge = { default-features = false, path = '../bridge' }
 
 [features]
 default = ['std']
@@ -34,6 +36,7 @@ std = [
     'frame-system/std',
     'pallet-balances/std',
     'pallet-utility/std',
+    'pallet-bridge/std',
     'log/std',
     'sp-core/std',
     'sp-io/std',

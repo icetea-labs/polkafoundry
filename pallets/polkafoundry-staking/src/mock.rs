@@ -195,5 +195,4 @@ pub(crate) fn run_to_block(n: u64) {
 pub(crate) fn set_author(round: u32, acc: u64, pts: u32) {
 	<TotalPoints<Test>>::mutate(round, |p| *p += pts);
 	<CollatorPoints<Test>>::mutate(round, acc, |p| *p += pts);
-	println!("total point ne {:?}", <TotalPoints<Test>>::get(round));
 }
