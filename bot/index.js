@@ -92,7 +92,7 @@ bot.onText(/\/faucet (.+)/, async (msg, match) => {
     const transaction = await callWeb3(to_address);
     if (transaction) {
       await redis.set(cacheKey, '1', 'EX', 86400); // 1 day
-      bot.sendMessage(chatId, `Sent @${username} ${NUMBER_ETH_SENT} ETH. Extrinsic hash: ${transaction}`);
+      bot.sendMessage(chatId, `Sent @${username} ${NUMBER_ETH_SENT} PKF. Extrinsic hash: ${transaction}`);
     } else {
       bot.sendMessage(chatId, `@${username} transaction failed`);
     }
