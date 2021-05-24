@@ -41,7 +41,10 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 		pallet_ethereum: halongbay::EthereumConfig {},
 		polkafoundry_staking: halongbay::StakingConfig {
 			stakers: vec![(hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(), 10_000_000_000_000_000)]
-		}
+		},
+		pallet_bridge_executor: halongbay::BridgeExecutorConfig {
+			bridge_tokenid: hex!["000000000000000000000021605f71845f372A9ed84253d2D024B7B10999f400"].into(),
+		},
 	}
 }
 

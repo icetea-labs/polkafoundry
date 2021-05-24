@@ -20,7 +20,6 @@ use sp_api::impl_runtime_apis;
 use sp_version::RuntimeVersion;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
-use sp_io::hashing::blake2_128;
 
 use codec::{Encode, Decode};
 use fp_rpc::TransactionStatus;
@@ -467,8 +466,6 @@ impl polkafoundry_staking::Config for Runtime {
 parameter_types! {
     pub const BridgeChainId: u8 = 1;
     pub const ProposalLifetime: BlockNumber = 50;
-        // Note: Chain ID is 0 indicating this is native to another chain
-    pub NativeTokenId: pallet_bridge::ResourceId = pallet_bridge::derive_resource_id(0, &blake2_128(b"HLB"));
 }
 
 impl pallet_bridge::Config for Runtime {
@@ -483,7 +480,6 @@ impl pallet_bridge_executor::Config for Runtime {
 	type Event = Event;
 	type BridgeOrigin = pallet_bridge::EnsureBridge<Runtime>;
 	type Currency = Balances;
-	type NativeTokenId = NativeTokenId;
 }
 
 
@@ -516,7 +512,7 @@ construct_runtime!(
 		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin},
 		CumulusXcm: cumulus_pallet_xcm::{Pallet, Origin},
 		ChainBridge: pallet_bridge::{Pallet, Call, Storage, Event<T>},
-		BridgeExecutor: pallet_bridge_executor::{Pallet, Call, Event<T>},
+		BridgeExecutor: pallet_bridge_executor::{Pallet, Call, Storage, Event, Config},
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
 	}

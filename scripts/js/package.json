@@ -5,9 +5,11 @@
   "license": "MIT",
   "dependencies": {
     "@polkadot/api": "^4.4.1",
+    "@polkadot/keyring": "^6.1.1",
     "@polkadot/util": "^6.0.5",
-    "@polkadot/util-crypto": "^6.0.5",
+    "@polkadot/util-crypto": "^6.1.1",
     "bn.js": "^5.2.0",
-    "dotenv": "^8.2.0"
+    "dotenv": "^8.2.0",
+    "ethers": "^5.1.4"
   }
 }

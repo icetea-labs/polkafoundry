@@ -1,18 +1,34 @@
 use std::path::PathBuf;
+use std::str::FromStr;
+
 use sc_cli;
 
 use structopt::{StructOpt, clap::arg_enum};
 use sp_runtime::AccountId32;
 
-arg_enum! {
-	/// Available Sealing methods.
-	#[allow(missing_docs)]
-	#[derive(Debug, Copy, Clone, StructOpt)]
-	pub enum Sealing {
-		// Seal using rpc method.
-		Manual,
-		// Seal when transaction is executed.
-		Instant,
+#[derive(Debug)]
+pub enum Sealing {
+	// Seal using rpc method.
+	Manual,
+	// Seal when transaction is executed.
+	Instant,
+	/// Author blocks at a regular interval specified in milliseconds
+	Interval(u64),
+}
+
+impl FromStr for Sealing {
+	type Err = String;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(match s {
+			"instant" => Self::Instant,
+			"manual" => Self::Manual,
+			s => {
+				let millis =
+					u64::from_str_radix(s, 10).map_err(|_| "couldn't decode sealing param")?;
+				Self::Interval(millis)
+			}
+		})
 	}
 }
 

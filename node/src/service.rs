@@ -1,6 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
-
-use std::{sync::{Arc, Mutex}, cell::RefCell, collections::{HashMap, BTreeMap}};
+use async_io::Timer;
+use std::{sync::{Arc, Mutex}, cell::RefCell, collections::{HashMap, BTreeMap}, time::Duration};
 
 use sp_core::{H256};
 use sp_runtime::traits::BlakeTwo256;
@@ -615,6 +615,15 @@ pub fn start_dev(
 					command_sink = Some(sink);
 					Box::new(stream)
 				}
+				Sealing::Interval(millis) => Box::new(StreamExt::map(
+					Timer::interval(Duration::from_millis(millis)),
+					|_| EngineCommand::SealNewBlock {
+						create_empty: true,
+						finalize: false,
+						parent_hash: None,
+						sender: None,
+					},
+				)),
 			};
 
 		let select_chain = sc_consensus::LongestChain::new(backend.clone());

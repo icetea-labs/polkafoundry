@@ -7041,6 +7041,7 @@ dependencies = [
 name = "polkafoundry"
 version = "0.0.1"
 dependencies = [
+ "async-io",
  "author-inherent",
  "clap",
  "cumulus-client-consensus-relay-chain",
