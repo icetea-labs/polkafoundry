@@ -944,9 +944,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.67"
+version = "1.0.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3c69b077ad434294d3ce9f1f6143a2a4b89a8a2d54ef813d85003a4fd1137fd"
+checksum = "4a72c244c1ff497a746a7e1fb3d14bd08420ecda70c8f25c7112f2781652d787"
 dependencies = [
  "jobserver",
 ]
@@ -2008,9 +2008,9 @@ checksum = "68b91989ae21441195d7d9b9993a2f9295c7e1a8c96255d8b729accddc124797"
 
 [[package]]
 name = "erased-serde"
-version = "0.3.13"
+version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0465971a8cc1fa2455c8465aaa377131e1f1cf4983280f474a13e68793aa770c"
+checksum = "e5b36e6f2295f393f44894c6031f67df4d185b984cd54d08f768ce678007efcd"
 dependencies = [
  "serde",
 ]
@@ -2419,7 +2419,7 @@ dependencies = [
 [[package]]
 name = "frame-benchmarking-cli"
 version = "3.0.0"
-source = "git+https://github.com/paritytech/substrate.git?branch=master#c0be5844f0b44f9f54fb802cef98fa5fdf561c28"
+source = "git+https://github.com/paritytech/substrate.git?branch=master#90cfb952f2e11bc6d327faf04b30dc5f4cf89df8"
 dependencies = [
  "Inflector",
  "chrono",
@@ -2558,7 +2558,7 @@ dependencies = [
 [[package]]
 name = "frame-system-benchmarking"
 version = "3.0.0"
-source = "git+https://github.com/paritytech/substrate.git?branch=master#c0be5844f0b44f9f54fb802cef98fa5fdf561c28"
+source = "git+https://github.com/paritytech/substrate.git?branch=master#90cfb952f2e11bc6d327faf04b30dc5f4cf89df8"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -4564,9 +4564,9 @@ checksum = "b16bd47d9e329435e309c58469fe0791c2d0d1ba96ec0954152a5ae2b04387dc"
 
 [[package]]
 name = "memmap2"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "397d1a6d6d0563c0f5462bbdae662cf6c784edf5e828e40c7257f85d82bf56dd"
+checksum = "723e3ebdcdc5c023db1df315364573789f8857c11b631a2fdfad7c00f5c046b4"
 dependencies = [
  "libc",
 ]
@@ -5082,7 +5082,7 @@ dependencies = [
 [[package]]
 name = "pallet-aura"
 version = "3.0.0"
-source = "git+https://github.com/paritytech/substrate.git?branch=master#c0be5844f0b44f9f54fb802cef98fa5fdf561c28"
+source = "git+https://github.com/paritytech/substrate.git?branch=master#90cfb952f2e11bc6d327faf04b30dc5f4cf89df8"
 dependencies = [
  "frame-support",
  "frame-system",
@@ -8348,7 +8348,7 @@ dependencies = [
 [[package]]
 name = "sc-cli"
 version = "0.9.0"
-source = "git+https://github.com/paritytech/substrate.git?branch=master#c0be5844f0b44f9f54fb802cef98fa5fdf561c28"
+source = "git+https://github.com/paritytech/substrate.git?branch=master#90cfb952f2e11bc6d327faf04b30dc5f4cf89df8"
 dependencies = [
  "chrono",
  "fdlimit",
@@ -8576,7 +8576,7 @@ dependencies = [
 [[package]]
 name = "sc-consensus-manual-seal"
 version = "0.9.0"
-source = "git+https://github.com/paritytech/substrate.git?branch=master#c0be5844f0b44f9f54fb802cef98fa5fdf561c28"
+source = "git+https://github.com/paritytech/substrate.git?branch=master#90cfb952f2e11bc6d327faf04b30dc5f4cf89df8"
 dependencies = [
  "assert_matches",
  "async-trait",
@@ -10530,7 +10530,7 @@ dependencies = [
 [[package]]
 name = "substrate-build-script-utils"
 version = "3.0.0"
-source = "git+https://github.com/paritytech/substrate.git?branch=master#c0be5844f0b44f9f54fb802cef98fa5fdf561c28"
+source = "git+https://github.com/paritytech/substrate.git?branch=master#90cfb952f2e11bc6d327faf04b30dc5f4cf89df8"
 dependencies = [
  "platforms",
 ]
@@ -10591,7 +10591,7 @@ dependencies = [
 [[package]]
 name = "substrate-wasm-builder"
 version = "4.0.0"
-source = "git+https://github.com/paritytech/substrate.git?branch=master#c0be5844f0b44f9f54fb802cef98fa5fdf561c28"
+source = "git+https://github.com/paritytech/substrate.git?branch=master#90cfb952f2e11bc6d327faf04b30dc5f4cf89df8"
 dependencies = [
  "ansi_term 0.12.1",
  "atty",
