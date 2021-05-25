@@ -1,6 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use std::{sync::{Arc, Mutex}, cell::RefCell, collections::{HashMap, BTreeMap}};
+use std::{sync::{Arc, Mutex}, collections::{HashMap, BTreeMap}};
 
 use sp_core::{H256};
 use sp_runtime::traits::BlakeTwo256;
@@ -17,6 +17,7 @@ use sc_service::{Configuration, PartialComponents, Role, TFullBackend, TFullClie
 use sc_executor::native_executor_instance;
 use sc_telemetry::{Telemetry, TelemetryHandle, TelemetryWorker, TelemetryWorkerHandle};
 use sc_consensus_manual_seal::{run_manual_seal, EngineCommand, ManualSealParams};
+use sc_consensus::LongestChain;
 use sc_client_api::{BlockchainEvents, ExecutorProvider};
 use sc_network::NetworkService;
 pub use sc_executor::NativeExecutor;
@@ -26,9 +27,6 @@ use cumulus_client_service::{
 	prepare_node_config, start_collator, start_full_node, StartCollatorParams, StartFullNodeParams,
 };
 use cumulus_client_network::build_block_announce_validator;
-use cumulus_client_consensus_relay_chain::{
-	build_relay_chain_consensus, BuildRelayChainConsensusParams,
-};
 use cumulus_primitives_parachain_inherent::{ParachainInherentData, INHERENT_IDENTIFIER as PARACHAIN_INHERENT_IDENTIFIER};
 use cumulus_primitives_core::PersistedValidationData;
 use cumulus_test_relay_sproof_builder::RelayStateSproofBuilder;
@@ -40,7 +38,6 @@ use futures::{Stream, StreamExt};
 use fc_rpc_core::types::{FilterPool, PendingTransactions};
 use fc_consensus::FrontierBlockImport;
 use runtime_primitives::{Block, Hash};
-use halongbay_runtime::{SLOT_DURATION};
 use polkadot_primitives::v0::CollatorPair;
 
 use crate::cli::Sealing;
@@ -58,7 +55,7 @@ pub use polkasmith_runtime;
 #[cfg(feature = "halongbay")]
 pub use halongbay_runtime;
 use sp_runtime::AccountId32;
-use codec::{Decode, Encode};
+use codec::{Decode};
 
 // Our native executor instance.
 #[cfg(feature = "polkafoundry")]
@@ -152,21 +149,23 @@ impl InherentDataProvider for MockParachainInherentDataProvider {
 	}
 }
 
+type MaybeSelectChain = Option<LongestChain<FullBackend, Block>>;
+
 /// Starts a `ServiceBuilder` for a full service.
 ///
 /// Use this macro if you don't actually need the full service, but just the builder in order to
 /// be able to perform chain operations.
 pub fn new_partial<RuntimeApi, Executor>(
 	config: &Configuration,
+	dev: bool,
 ) -> Result<
 	PartialComponents<
 		FullClient<RuntimeApi, Executor>,
 		FullBackend,
-		(),
+		MaybeSelectChain,
 		sp_consensus::import_queue::BasicQueue<Block, PrefixedMemoryDB<BlakeTwo256>>,
 		sc_transaction_pool::FullPool<Block, FullClient<RuntimeApi, Executor>>,
 		(
-			FrontierBlockImport<Block, Arc<FullClient<RuntimeApi, Executor>>, FullClient<RuntimeApi, Executor>>,
 			PendingTransactions,
 			Option<FilterPool>,
 			Option<Telemetry>,
@@ -221,33 +220,47 @@ pub fn new_partial<RuntimeApi, Executor>(
 	let frontier_block_import = FrontierBlockImport::new(client.clone(), client.clone(), true);
 	let slot_duration = cumulus_client_consensus_aura::slot_duration(&*client)?;
 
-	let import_queue = cumulus_client_consensus_aura::import_queue::<
-		sp_consensus_aura::sr25519::AuthorityPair,
-		_,
-		_,
-		_,
-		_,
-		_,
-		_,
-	>(cumulus_client_consensus_aura::ImportQueueParams {
-		block_import: frontier_block_import.clone(),
-		client: client.clone(),
-		create_inherent_data_providers: move |_, _| async move {
-			let time = sp_timestamp::InherentDataProvider::from_system_time();
+	let select_chain = if dev {
+		Some(sc_consensus::LongestChain::new(backend.clone()))
+	} else {
+		None
+	};
 
-			let slot =
-				sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_duration(
-					*time,
-					slot_duration.slot_duration(),
-				);
+	let import_queue = if dev {
+		sc_consensus_manual_seal::import_queue(
+			Box::new(frontier_block_import.clone()),
+			&task_manager.spawn_essential_handle(),
+			config.prometheus_registry(),
+		)
+	} else {
+		cumulus_client_consensus_aura::import_queue::<
+			sp_consensus_aura::sr25519::AuthorityPair,
+			_,
+			_,
+			_,
+			_,
+			_,
+			_,
+		>(cumulus_client_consensus_aura::ImportQueueParams {
+			block_import: frontier_block_import.clone(),
+			client: client.clone(),
+			create_inherent_data_providers: move |_, _| async move {
+				let time = sp_timestamp::InherentDataProvider::from_system_time();
 
-			Ok((time, slot))
-		},
-		registry: config.prometheus_registry().clone(),
-		can_author_with: sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
-		spawner: &task_manager.spawn_essential_handle(),
-		telemetry: telemetry.as_ref().map(|telemetry| telemetry.handle()),
-	})?;
+				let slot =
+					sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_duration(
+						*time,
+						slot_duration.slot_duration(),
+					);
+
+				Ok((time, slot))
+			},
+			registry: config.prometheus_registry().clone(),
+			can_author_with: sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
+			spawner: &task_manager.spawn_essential_handle(),
+			telemetry: telemetry.as_ref().map(|telemetry| telemetry.handle()),
+		})?
+	};
 
 	let params = PartialComponents {
 		backend,
@@ -256,8 +269,8 @@ pub fn new_partial<RuntimeApi, Executor>(
 		keystore_container,
 		task_manager,
 		transaction_pool,
-		select_chain: (),
-		other: (frontier_block_import, pending_transactions, filter_pool, telemetry, telemetry_worker_handle),
+		select_chain,
+		other: (pending_transactions, filter_pool, telemetry, telemetry_worker_handle),
 	};
 
 	Ok(params)
@@ -270,7 +283,7 @@ pub fn new_partial<RuntimeApi, Executor>(
 async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 	parachain_config: Configuration,
 	collator_key: CollatorPair,
-	author_id: Option<AccountId32>,
+	_author_id: Option<AccountId32>,
 	polkadot_config: Configuration,
 	id: ParaId,
 	_rpc_ext_builder: RB,
@@ -304,10 +317,9 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 	}
 
 	let parachain_config = prepare_node_config(parachain_config);
-	let params = new_partial::<RuntimeApi, Executor>(&parachain_config)?;
+	let params = new_partial::<RuntimeApi, Executor>(&parachain_config, false)?;
 
 	let (
-		block_import,
 		pending_transactions,
 		filter_pool,
 		mut telemetry,
@@ -318,7 +330,8 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 		cumulus_client_service::build_polkadot_full_node(
 			polkadot_config,
 			collator_key.clone(),
-			telemetry_worker_handle)
+			telemetry_worker_handle,
+			)
 			.map_err(
 				|e| match e {
 					polkadot_service::Error::Sub(x) => x,
@@ -615,16 +628,18 @@ pub fn start_dev(
 		mut task_manager,
 		import_queue,
 		keystore_container,
-		select_chain: _,
+		select_chain: maybe_select_chain,
 		transaction_pool,
 		other: (
-			block_import,
 			pending_transactions,
 			filter_pool,
 			telemetry,
 			_telemetry_worker_handle,
 		),
-	} = new_partial::<halongbay_runtime::RuntimeApi, HalongbayExecutor>(&config)?;
+	} = new_partial::<halongbay_runtime::RuntimeApi, HalongbayExecutor>(&config, true)?;
+
+	let select_chain =
+		maybe_select_chain.expect("In PolkaFoundry dev mode, `new_partial` will use `LongestChainRule`; qed");
 
 	let (network, network_status_sinks, system_rpc_tx, network_starter) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
@@ -677,12 +692,10 @@ pub fn start_dev(
 				}
 			};
 
-		let select_chain = sc_consensus::LongestChain::new(backend.clone());
-
 		task_manager.spawn_essential_handle().spawn_blocking(
 			"authorship_task",
 			run_manual_seal(ManualSealParams {
-				block_import,
+				block_import: client.clone(),
 				env,
 				client: client.clone(),
 				pool: transaction_pool.pool().clone(),
@@ -825,7 +838,7 @@ pub fn new_chain_ops(
 					import_queue,
 					task_manager,
 					..
-				} = new_partial::<polkafoundry_runtime::RuntimeApi, PolkaFoundryExecutor>(config)?;
+				} = new_partial::<polkafoundry_runtime::RuntimeApi, PolkaFoundryExecutor>(config, false)?;
 				Ok((Arc::new(Client::PolkaFoundry(client)), backend, import_queue, task_manager))
 			}
 		#[cfg(not(feature = "polkafoundry"))]
@@ -839,7 +852,7 @@ pub fn new_chain_ops(
 					import_queue,
 					task_manager,
 					..
-				} = new_partial::<polkasmith_runtime::RuntimeApi, PolkaSmithExecutor>(config)?;
+				} = new_partial::<polkasmith_runtime::RuntimeApi, PolkaSmithExecutor>(config, false)?;
 				Ok((Arc::new(Client::PolkaSmith(client)), backend, import_queue, task_manager))
 			}
 		#[cfg(not(feature = "polkasmith"))]
@@ -853,7 +866,7 @@ pub fn new_chain_ops(
 					import_queue,
 					task_manager,
 					..
-				} = new_partial::<halongbay_runtime::RuntimeApi, HalongbayExecutor>(config)?;
+				} = new_partial::<halongbay_runtime::RuntimeApi, HalongbayExecutor>(config, true)?;
 				Ok((Arc::new(Client::Halongbay(client)), backend, import_queue, task_manager))
 			}
 		#[cfg(not(feature = "halongbay"))]
