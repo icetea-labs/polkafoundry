@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use sc_service::ChainType;
+use sc_chain_spec::{Properties};
 
 use polkafoundry_runtime as polkafoundry;
 
@@ -58,8 +59,18 @@ pub fn polkafoundry_staging_testnet_config() ->  Result<PolkafoundryChainSpec, S
 		None,
 		None,
 		Extensions {
-			relay_chain: "rococo-local".into(),
+			relay_chain: "polkadot-local".into(),
 			para_id: 1111_u32.into(),
 		},
 	))
+}
+
+fn chain_properties() -> Option<Properties> {
+	let mut p = Properties::new();
+
+	p.insert("tokenSymbol".into(), "PKF".into());
+	p.insert("tokenDecimals".into(), 18.into());
+	p.insert("ss58Format".into(), 99.into());
+
+	Some(p)
 }

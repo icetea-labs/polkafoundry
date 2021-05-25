@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use sc_service::ChainType;
+use sc_chain_spec::{Properties};
 
 use polkasmith_runtime as polkasmith;
 use crate::chain_spec::{Extensions};
@@ -54,10 +55,20 @@ pub fn polkasmith_staging_testnet_config() ->  Result<PolkaSmithChainSpec, Strin
 		boot_nodes,
 		None,
 		None,
-		None,
+		chain_properties(),
 		Extensions {
 			relay_chain: "kusama-local".into(),
 			para_id: 2009_u32.into(),
 		},
 	))
+}
+
+fn chain_properties() -> Option<Properties> {
+	let mut p = Properties::new();
+
+	p.insert("tokenSymbol".into(), "PKS".into());
+	p.insert("tokenDecimals".into(), 18.into());
+	p.insert("ss58Format".into(), 98.into());
+
+	Some(p)
 }
