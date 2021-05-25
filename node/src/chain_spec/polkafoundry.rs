@@ -39,6 +39,8 @@ fn polkafoundry_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkafound
 			accounts: BTreeMap::new(),
 		},
 		pallet_ethereum: polkafoundry::EthereumConfig {},
+		pallet_aura: Default::default(),
+		cumulus_pallet_aura_ext: Default::default(),
 	}
 }
 

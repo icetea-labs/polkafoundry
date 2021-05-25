@@ -37,6 +37,8 @@ fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::
 			accounts: BTreeMap::new(),
 		},
 		pallet_ethereum: polkasmith::EthereumConfig {},
+		pallet_aura: Default::default(),
+		cumulus_pallet_aura_ext: Default::default(),
 	}
 }
 
@@ -54,8 +56,8 @@ pub fn polkasmith_staging_testnet_config() ->  Result<PolkaSmithChainSpec, Strin
 		None,
 		None,
 		Extensions {
-			relay_chain: "rococo-local".into(),
-			para_id: 1111_u32.into(),
+			relay_chain: "kusama-local".into(),
+			para_id: 2009_u32.into(),
 		},
 	))
 }

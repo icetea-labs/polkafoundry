@@ -1,5 +1,5 @@
 pub mod time {
-	use polkafoundry_primitives::{BlockNumber};
+	use runtime_primitives::{BlockNumber};
 	/// This determines the average expected block time that we are targeting.
 	/// Blocks will be produced at a minimum duration defined by `SLOT_DURATION`.
 	/// `SLOT_DURATION` is picked up by `pallet_timestamp` which is in turn picked
