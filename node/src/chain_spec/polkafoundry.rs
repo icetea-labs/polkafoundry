@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use sc_service::ChainType;
 use sc_chain_spec::{Properties};
+use sp_core::{crypto::UncheckedInto};
 
 use polkafoundry_runtime as polkafoundry;
 
@@ -40,7 +41,10 @@ fn polkafoundry_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkafound
 			accounts: BTreeMap::new(),
 		},
 		pallet_ethereum: polkafoundry::EthereumConfig {},
-		pallet_aura: Default::default(),
+		pallet_aura: polkafoundry::AuraConfig {
+			authorities: vec![hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"]
+				.unchecked_into()]
+		},
 		cumulus_pallet_aura_ext: Default::default(),
 	}
 }

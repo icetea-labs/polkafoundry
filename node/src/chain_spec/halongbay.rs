@@ -2,10 +2,12 @@ use std::collections::BTreeMap;
 use sc_service::ChainType;
 use sc_chain_spec::{Properties};
 
+use sp_core::{crypto::UncheckedInto};
+
 use halongbay_runtime as halongbay;
+use hex_literal::hex;
 
 use crate::chain_spec::{Extensions};
-use hex_literal::hex;
 
 /// The `ChainSpec` parametrised for the halongbay runtime.
 pub type HalongbayChainSpec = sc_service::GenericChainSpec<halongbay::GenesisConfig, Extensions>;
@@ -43,7 +45,10 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 		polkafoundry_staking: halongbay::StakingConfig {
 			stakers: vec![(hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(), 10_000_000_000_000_000)]
 		},
-		pallet_aura: Default::default(),
+		pallet_aura: halongbay::AuraConfig {
+			authorities: vec![hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"]
+				.unchecked_into()]
+		},
 		cumulus_pallet_aura_ext: Default::default(),
 	}
 }
