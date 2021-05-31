@@ -359,13 +359,9 @@ parameter_types! {
 
 impl pallet_ethereum::Config for Runtime {
 	type Event = Event;
-	type FindAuthor = AuthorInherent;
+	type FindAuthor = ();
 	type StateRoot = pallet_ethereum::IntermediateStateRoot;
 	type BlockGasLimit = BlockGasLimit;
-}
-
-impl author_inherent::Config for Runtime {
-	type EventHandler = Staking;
 }
 
 parameter_types! {
@@ -460,28 +456,28 @@ parameter_types! {
 	pub const DesiredTarget: u32 = 2;
 }
 
-impl frame_election_provider_support::onchain::Config for Runtime {
-	type AccountId = AccountId32;
-	type BlockNumber = BlockNumber;
-	type BlockWeights = BlockWeights;
-	type Accuracy = Perbill;
-	type DataProvider = Staking;
-}
+// impl frame_election_provider_support::onchain::Config for Runtime {
+// 	type AccountId = AccountId32;
+// 	type BlockNumber = BlockNumber;
+// 	type BlockWeights = BlockWeights;
+// 	type Accuracy = Perbill;
+// 	type DataProvider = Staking;
+// }
 
-impl polkafoundry_staking::Config for Runtime {
-	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
-	type Event = Event;
-	type Currency = Balances;
-	type BlocksPerRound = BlocksPerRound;
-	type MaxNominationsPerCollator = MaxNominationsPerCollator;
-	type BondDuration = BondDuration;
-	type MinCollatorStake = MinCollatorStake;
-	type MinNominatorStake = MinNominatorStake;
-	type PayoutDuration = PayoutDuration;
-	type ElectionProvider = frame_election_provider_support::onchain::OnChainSequentialPhragmen<Self>;
-	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
-	type DesiredTarget = DesiredTarget;
-}
+// impl polkafoundry_staking::Config for Runtime {
+// 	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
+// 	type Event = Event;
+// 	type Currency = Balances;
+// 	type BlocksPerRound = BlocksPerRound;
+// 	type MaxNominationsPerCollator = MaxNominationsPerCollator;
+// 	type BondDuration = BondDuration;
+// 	type MinCollatorStake = MinCollatorStake;
+// 	type MinNominatorStake = MinNominatorStake;
+// 	type PayoutDuration = PayoutDuration;
+// 	type ElectionProvider = frame_election_provider_support::onchain::OnChainSequentialPhragmen<Self>;
+// 	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
+// 	type DesiredTarget = DesiredTarget;
+// }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -505,7 +501,6 @@ construct_runtime!(
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>},
 		// Staking: polkafoundry_staking::{Pallet, Call, Storage, Event<T>, Config<T>},
-        AuthorInherent: author_inherent::{Pallet, Call, Storage, Inherent},
 		Aura: pallet_aura::{Pallet, Config<T>},
 		AuraExt: cumulus_pallet_aura_ext::{Pallet, Config},
 		// XCM helpers.

@@ -42,9 +42,9 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 			accounts: BTreeMap::new(),
 		},
 		pallet_ethereum: halongbay::EthereumConfig {},
-		polkafoundry_staking: halongbay::StakingConfig {
-			stakers: vec![(hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(), 10_000_000_000_000_000)]
-		},
+		// polkafoundry_staking: halongbay::StakingConfig {
+		// 	stakers: vec![(hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(), 10_000_000_000_000_000)]
+		// },
 		pallet_aura: halongbay::AuraConfig {
 			authorities: vec![hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"]
 				.unchecked_into()]
