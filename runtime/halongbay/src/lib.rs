@@ -504,7 +504,7 @@ construct_runtime!(
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>},
-		Staking: polkafoundry_staking::{Pallet, Call, Storage, Event<T>, Config<T>},
+		// Staking: polkafoundry_staking::{Pallet, Call, Storage, Event<T>, Config<T>},
         AuthorInherent: author_inherent::{Pallet, Call, Storage, Inherent},
 		Aura: pallet_aura::{Pallet, Config<T>},
 		AuraExt: cumulus_pallet_aura_ext::{Pallet, Config},
