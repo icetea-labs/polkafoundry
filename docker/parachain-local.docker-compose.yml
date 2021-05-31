@@ -3,8 +3,9 @@ services:
   node_alice:
     container_name: rococo_alice
     ports:
-      - "9933:9933"
-      - "9944:9944"
+      - "7733:9933"
+      - "7744:9944"
+      - "30335:30333"
     image: tungicetea/rococo:127eb17a
     volumes:
       - "polkadot-data-alice:/data"
@@ -25,9 +26,8 @@ services:
   node_bob:
     container_name: rococo_bob
     ports:
-      - "30330:30333"
-      - "8844:9944"
-      - "8833:9933"
+      - "30337:30333"
+      - "3344:9944"
     image: tungicetea/rococo:127eb17a
     volumes:
       - "polkadot-data-bob:/data"
@@ -48,11 +48,11 @@ services:
         ipv4_address: 172.99.1.2
   ################################################################
   node_halongbay_v1_collator:
-    container_name: halongbay-v1_collator
+    container_name: halongbay_parachain1
     ports:
-      - "5544:9944"
-      - "5533:9933"
-      - "20336:30333"
+      - "6644:9944"
+      - "6633:9933"
+      - "30336:30333"
     image: tungicetea/halongbay:29be30f
     volumes:
       - "halongbay-collator-data:/data"
@@ -74,11 +74,40 @@ services:
     networks:
       testing_net:
         ipv4_address: 172.99.1.4
+  ################################################################
+  node_halongbay_v1_collator2:
+    container_name: halongbay_parachain2
+    ports:
+      - "5544:9944"
+      - "5533:9933"
+      - "30339:30333"
+    image: tungicetea/halongbay:29be30f
+    volumes:
+      - "halongbay-collator-data2:/data"
+      - ../node/res:/spec
+    # links:
+    #   - "node_alice:alice"
+    command: --collator
+      --unsafe-rpc-external
+      --rpc-cors all
+      --unsafe-ws-external
+      --rpc-methods=Unsafe
+      --parachain-id=1111
+      --author-id=0x365580bfd5f6ed0a319e216dd69caf4d355bcaef02b691200e81db94017eeb26
+      --chain /spec/halongbay.json
+      --
+      --chain /spec/rococo-local.json
+      --execution wasm
+      --port 30335
+    networks:
+      testing_net:
+        ipv4_address: 172.99.1.5
 
 volumes:
   polkadot-data-alice:
   polkadot-data-bob:
   halongbay-collator-data:
+  halongbay-collator-data2:
 
 networks:
   testing_net:
