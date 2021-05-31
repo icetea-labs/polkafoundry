@@ -353,15 +353,13 @@ impl cumulus_ping::Config for Runtime {
 }
 
 parameter_types! {
-	pub BlockGasLimit: U256
-		= U256::from(NORMAL_DISPATCH_RATIO * MAXIMUM_BLOCK_WEIGHT / WEIGHT_PER_GAS);
+	pub BlockGasLimit: U256 = U256::from(u32::max_value());
 }
 
 impl pallet_ethereum::Config for Runtime {
 	type Event = Event;
 	type FindAuthor = ();
 	type StateRoot = pallet_ethereum::IntermediateStateRoot;
-	type BlockGasLimit = BlockGasLimit;
 }
 
 parameter_types! {
@@ -379,6 +377,8 @@ impl pallet_evm::Config for Runtime {
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
 	type Precompiles = precompiles::PolkafoundryPrecompiles<Self>;
 	type ChainId = ChainId;
+	type BlockGasLimit = BlockGasLimit;
+	type OnChargeTransaction = ();
 }
 
 impl pallet_crowdloan_rewards::Config for Runtime {
@@ -759,10 +759,6 @@ impl_runtime_apis! {
 				Ethereum::current_receipts(),
 				Ethereum::current_transaction_statuses()
 			)
-		}
-
-		fn current_block_gas_limit() -> U256 {
-			<Runtime as pallet_ethereum::Config>::BlockGasLimit::get()
 		}
 	}
 

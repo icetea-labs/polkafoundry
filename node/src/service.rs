@@ -356,7 +356,7 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 	let mut task_manager = params.task_manager;
 	let import_queue = params.import_queue;
 
-	let (network, network_status_sinks, system_rpc_tx, start_network) =
+	let (network, system_rpc_tx, start_network) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &parachain_config,
 			client: client.clone(),
@@ -412,7 +412,6 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 		keystore: params.keystore_container.sync_keystore(),
 		backend: backend.clone(),
 		network: network.clone(),
-		network_status_sinks,
 		system_rpc_tx,
 		telemetry: telemetry.as_mut(),
 	})?;
@@ -642,7 +641,7 @@ pub fn start_dev(
 	let select_chain =
 		maybe_select_chain.expect("In PolkaFoundry dev mode, `new_partial` will use `LongestChainRule`; qed");
 
-	let (network, network_status_sinks, system_rpc_tx, network_starter) =
+	let (network, system_rpc_tx, network_starter) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &config,
 			client: client.clone(),
@@ -744,7 +743,10 @@ pub fn start_dev(
 		rpc_extensions_builder,
 		on_demand: None,
 		remote_blockchain: None,
-		backend, network_status_sinks, system_rpc_tx, config, telemetry: None,
+		backend,
+		system_rpc_tx,
+		config,
+		telemetry: None,
 	})?;
 
 	// Spawn Frontier EthFilterApi maintenance task.
