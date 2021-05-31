@@ -12,19 +12,19 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 serde = { version = "1.0.101", optional = true, features = ["derive"] }
 codec = { package = "parity-scale-codec", version = "2.0.0", default-features = false, features = ["derive"] }
-sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
-sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
-frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
-frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
-pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 impl-trait-for-tuples = "0.2.1"
 
-frame-benchmarking = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1', optional = true }
+frame-benchmarking = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master', optional = true }
 
 [dev-dependencies]
-sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
-sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
-sp-storage = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'rococo-v1' }
+sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+sp-storage = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
 [features]
 default = ["std"]

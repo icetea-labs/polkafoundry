@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 use sc_service::ChainType;
+use sc_chain_spec::{Properties};
+use sp_core::{crypto::UncheckedInto};
 
 use polkasmith_runtime as polkasmith;
 use crate::chain_spec::{Extensions};
@@ -37,6 +39,11 @@ fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::
 			accounts: BTreeMap::new(),
 		},
 		pallet_ethereum: polkasmith::EthereumConfig {},
+		pallet_aura: polkasmith::AuraConfig {
+			authorities: vec![hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"]
+				.unchecked_into()]
+		},
+		cumulus_pallet_aura_ext: Default::default(),
 	}
 }
 
@@ -52,10 +59,20 @@ pub fn polkasmith_staging_testnet_config() ->  Result<PolkaSmithChainSpec, Strin
 		boot_nodes,
 		None,
 		None,
-		None,
+		chain_properties(),
 		Extensions {
-			relay_chain: "rococo-local".into(),
-			para_id: 1111_u32.into(),
+			relay_chain: "kusama-local".into(),
+			para_id: 2009_u32.into(),
 		},
 	))
+}
+
+fn chain_properties() -> Option<Properties> {
+	let mut p = Properties::new();
+
+	p.insert("tokenSymbol".into(), "PKS".into());
+	p.insert("tokenDecimals".into(), 18.into());
+	p.insert("ss58Format".into(), 98.into());
+
+	Some(p)
 }

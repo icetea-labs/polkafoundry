@@ -19,7 +19,7 @@ use sc_consensus_manual_seal::rpc::{ManualSeal, ManualSealApi};
 
 use fc_rpc_core::types::{PendingTransactions, FilterPool};
 use jsonrpc_pubsub::manager::SubscriptionManager;
-use polkafoundry_primitives::{Hash, AccountId, Index, Block, Balance};
+use runtime_primitives::{Hash, AccountId, Index, Block, Balance};
 use crate::cli;
 
 /// Full client dependencies.
