@@ -11,7 +11,7 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - redis
+      - swapery-redis
     command: sh start.sh
     networks:
       botlink:
