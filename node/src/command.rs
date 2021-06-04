@@ -16,7 +16,7 @@ use codec::Encode;
 use cumulus_client_service::genesis::generate_genesis_block;
 use cumulus_primitives_core::ParaId;
 use log::info;
-use polkafoundry_primitives::Block;
+use runtime_primitives::Block;
 use polkadot_parachain::primitives::AccountIdConversion;
 
 use crate::{cli::{Cli, RelayChainCli, Subcommand}, chain_spec};

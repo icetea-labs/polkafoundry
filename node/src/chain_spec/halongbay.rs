@@ -1,5 +1,8 @@
 use std::collections::BTreeMap;
 use sc_service::ChainType;
+use sc_chain_spec::{Properties};
+
+use sp_core::{crypto::UncheckedInto};
 
 use halongbay_runtime as halongbay;
 
@@ -39,9 +42,11 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 			accounts: BTreeMap::new(),
 		},
 		pallet_ethereum: halongbay::EthereumConfig {},
-		polkafoundry_staking: halongbay::StakingConfig {
-			stakers: vec![(hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(), 10_000_000_000_000_000)]
-		}
+		pallet_aura: halongbay::AuraConfig {
+			authorities: vec![hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"]
+				.unchecked_into()]
+		},
+		cumulus_pallet_aura_ext: Default::default(),
 	}
 }
 
@@ -57,10 +62,20 @@ pub fn halongbay_staging_testnet_config() ->  Result<HalongbayChainSpec, String>
 		boot_nodes,
 		None,
 		None,
-		None,
+		chain_properties(),
 		Extensions {
 			relay_chain: "rococo-local".into(),
 			para_id: 1111_u32.into(),
 		},
 	))
+}
+
+fn chain_properties() -> Option<Properties> {
+	let mut p = Properties::new();
+
+	p.insert("tokenSymbol".into(), "HLB".into());
+	p.insert("tokenDecimals".into(), 12.into());
+	p.insert("ss58Format".into(), 42.into());
+
+	Some(p)
 }
