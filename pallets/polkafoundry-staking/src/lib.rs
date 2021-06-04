@@ -29,7 +29,7 @@ pub mod pallet {
 	use sp_runtime::traits::{Saturating, Zero};
 	use sp_runtime::{Perbill};
 	use sp_std::{convert::{From}, vec::Vec};
-	use frame_support::sp_runtime::traits::{AtLeast32BitUnsigned};
+	use frame_support::sp_runtime::traits::{AtLeast32BitUnsigned, UnixTime, Convert};
 	use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
 	use crate::inflation::compute_total_payout;
 	use sp_std::{cmp::Ordering, prelude::*, ops::{Mul, AddAssign, Add, Sub}};
@@ -40,6 +40,8 @@ pub mod pallet {
 	pub type RoundIndex = u32;
 	/// Counter for the number of "reward" points earned by a given collator
 	pub type RewardPoint = u32;
+	pub type EraIndex = u32;
+	pub type SessionIndex = u32;
 
 	type BalanceOf<T> = <<T as Config>::Currency as Currency<
 		<T as frame_system::Config>::AccountId,
@@ -49,6 +51,11 @@ pub mod pallet {
 	pub trait Config: frame_system::Config {
 		/// Overarching event type
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		/// Time used for computing era duration.
+		///
+		/// It is guaranteed to start being called from the first `on_finalize`. Thus value at genesis
+		/// is not used.
+		type UnixTime: UnixTime;
 		/// The staking balance
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 		/// Number of block per round
@@ -78,6 +85,12 @@ pub mod pallet {
 		/// Consequently, the backward convert is used convert the u128s from sp-elections back to a
 		/// [`BalanceOf`].
 		type CurrencyToVote: CurrencyToVote<BalanceOf<Self>>;
+		/// Number of sessions per era.
+		type SessionsPerEra: Get<SessionIndex>;
+		/// Number of eras that staked funds must remain bonded for.
+		type BondingDuration: Get<EraIndex>;
+		/// Interface for interacting with a session module.
+		type SessionInterface: self::SessionInterface<Self::AccountId>;
 
 		type DesiredTarget: Get<u32>;
 	}
@@ -111,6 +124,46 @@ pub mod pallet {
 
 				Self::deposit_event(Event::NewRoundStart(round_index, round_index * block_per_round));
 			}
+		}
+	}
+
+	/// Means for interacting with a specialized version of the `session` trait.
+///
+/// This is needed because `Staking` sets the `ValidatorIdOf` of the `pallet_session::Config`
+	pub trait SessionInterface<AccountId>: frame_system::Config {
+		/// Disable a given validator by stash ID.
+		///
+		/// Returns `true` if new era should be forced at the end of this session.
+		/// This allows preventing a situation where there is too many validators
+		/// disabled and block production stalls.
+		fn disable_validator(validator: &AccountId) -> Result<bool, ()>;
+		/// Get the validators from session.
+		fn validators() -> Vec<AccountId>;
+		/// Prune historical session tries up to but not including the given index.
+		fn prune_historical_up_to(up_to: SessionIndex);
+	}
+
+	impl<T: Config> SessionInterface<<T as frame_system::Config>::AccountId> for T where
+		T: pallet_session::Config<ValidatorId = <T as frame_system::Config>::AccountId>,
+		T: pallet_session::historical::Config<
+			FullIdentification = Exposure<<T as frame_system::Config>::AccountId, BalanceOf<T>>,
+			FullIdentificationOf = ExposureOf<T>,
+		>,
+		T::SessionHandler: pallet_session::SessionHandler<<T as frame_system::Config>::AccountId>,
+		T::SessionManager: pallet_session::SessionManager<<T as frame_system::Config>::AccountId>,
+		T::ValidatorIdOf:
+		Convert<<T as frame_system::Config>::AccountId, Option<<T as frame_system::Config>::AccountId>>,
+	{
+		fn disable_validator(validator: &<T as frame_system::Config>::AccountId) -> Result<bool, ()> {
+			<pallet_session::Pallet<T>>::disable(validator)
+		}
+
+		fn validators() -> Vec<<T as frame_system::Config>::AccountId> {
+			<pallet_session::Pallet<T>>::validators()
+		}
+
+		fn prune_historical_up_to(up_to: SessionIndex) {
+			<pallet_session::historical::Pallet<T>>::prune_up_to(up_to);
 		}
 	}
 
@@ -516,6 +569,18 @@ pub mod pallet {
 				None
 			}
 		}
+	}
+
+	/// Information regarding the active era (era in used in session).
+	#[derive(Encode, Decode, RuntimeDebug)]
+	pub struct ActiveEraInfo {
+		/// Index of era.
+		pub index: EraIndex,
+		/// Moment of start expressed as millisecond from `$UNIX_EPOCH`.
+		///
+		/// Start can be none if start hasn't been set for the era yet,
+		/// Start is set on the first on_finalize of the era to guarantee usage of `Time`.
+		start: Option<u64>,
 	}
 
 	#[derive(Default, Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug)]
@@ -1284,6 +1349,28 @@ pub mod pallet {
 	#[pallet::getter(fn current_round)]
 	pub type CurrentRound<T: Config> =
 	StorageValue<_, RoundInfo<T::BlockNumber>, ValueQuery>;
+	/// The current era index.
+	///
+	/// This is the latest planned era, depending on how the Session pallet queues the validator
+	/// set, it might be active or not.
+	#[pallet::storage]
+	#[pallet::getter(fn current_round)]
+	pub type CurrentEra<T: Config> =
+	StorageValue<_, Option<EraIndex>, ValueQuery>;
+
+	/// The active era information, it holds index and start.
+	///
+	/// The active era is the era being currently rewarded. Validator set of this era must be
+	/// equal to [`SessionInterface::validators`].
+	#[pallet::storage]
+	#[pallet::getter(fn active_era)]
+	pub type ActiveEra<T: Config> =
+	StorageValue<_, Option<ActiveEraInfo>, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn bonded_eras)]
+	pub type BondedEras<T: Config> =
+	StorageValue<_, Vec<(EraIndex, SessionIndex)>, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn collators)]
@@ -1402,20 +1489,29 @@ pub mod pallet {
 	}
 
 	/// Add reward points to block authors:
-	/// * 20 points to the block producer for producing a block in the chain
-	impl<T: Config> author_inherent::EventHandler<T::AccountId> for Pallet<T> {
+	/// * 20 points to the block producer for producing a block in
+	impl<T> pallet_authorship::EventHandler<T::AccountId, T::BlockNumber> for Pallet<T>
+		where
+			T: Config + pallet_authorship::Config + pallet_session::Config,
+	{
 		fn note_author(author: T::AccountId) {
 			let now = <CurrentRound<T>>::get().index;
 			let score_plus_20 = <CollatorPoints<T>>::get(now, &author) + 20;
 			<CollatorPoints<T>>::insert(now, author, score_plus_20);
 			<TotalPoints<T>>::mutate(now, |x| *x += 20);
 		}
-	}
 
-	impl<T: Config> author_inherent::CanAuthor<T::AccountId> for Pallet<T> {
-		fn can_author(account: &T::AccountId) -> bool {
-			Self::can_author(account)
+		// just ignore it
+		fn note_uncle(_author: T::AccountId, _age: T::BlockNumber) {
+
 		}
 	}
 
+
+	/// A typed conversion from stash account ID to the active exposure of nominators
+	/// on that account.
+	///
+	/// Active exposure is the exposure of the validator set currently validating, i.e. in
+	/// `active_era`. It can differ from the latest planned exposure in `current_era`.
+	pub struct ExposureOf<T>(sp_std::marker::PhantomData<T>);
 }

@@ -43,6 +43,7 @@ pallet-timestamp = { default-features = false, git = 'https://github.com/parityt
 pallet-transaction-payment = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 pallet-transaction-payment-rpc-runtime-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 pallet-election-provider-multi-phase = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
+pallet-session = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 
 sp-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
 sp-io = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'master' }
