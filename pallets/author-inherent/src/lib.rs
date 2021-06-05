@@ -24,12 +24,11 @@ use frame_support::{
 	log, decl_error, decl_module, decl_storage, ensure,
 	traits::FindAuthor,
 	weights::{DispatchClass, Weight},
+	inherent::{InherentData, ProvideInherent, InherentIdentifier},
 };
 use frame_system::{ensure_none, Config as System};
 use parity_scale_codec::{Decode, Encode};
-#[cfg(feature = "std")]
-use sp_inherents::ProvideInherentData;
-use sp_inherents::{InherentData, InherentIdentifier, IsFatalError, ProvideInherent};
+use sp_inherents::{IsFatalError};
 use sp_runtime::{ConsensusEngineId, DigestItem, RuntimeString};
 use sp_std::vec::Vec;
 use sp_core::H160;
@@ -129,8 +128,8 @@ decl_module! {
 
 impl<T: Config> FindAuthor<H160> for Module<T> {
 	fn find_author<'a, I>(_digests: I) -> Option<H160>
-	where
-		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
+		where
+			I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
 	{
 		// We don't use the digests at all.
 		// This will only return the correct author _after_ the authorship inherent is processed.
@@ -179,11 +178,8 @@ pub type InherentType = Vec<u8>;
 pub struct InherentDataProvider(pub InherentType);
 
 #[cfg(feature = "std")]
-impl ProvideInherentData for InherentDataProvider {
-	fn inherent_identifier(&self) -> &'static InherentIdentifier {
-		&INHERENT_IDENTIFIER
-	}
-
+#[async_trait::async_trait]
+impl sp_inherents::InherentDataProvider for InherentDataProvider {
 	fn provide_inherent_data(
 		&self,
 		inherent_data: &mut InherentData,
@@ -191,8 +187,18 @@ impl ProvideInherentData for InherentDataProvider {
 		inherent_data.put_data(INHERENT_IDENTIFIER, &self.0)
 	}
 
-	fn error_to_string(&self, error: &[u8]) -> Option<String> {
-		InherentError::try_from(&INHERENT_IDENTIFIER, error).map(|e| format!("{:?}", e))
+	async fn try_handle_error(
+		&self,
+		identifier: &InherentIdentifier,
+		error: &[u8],
+	) -> Option<Result<(), sp_inherents::Error>> {
+		if *identifier != INHERENT_IDENTIFIER {
+			return None
+		}
+
+		let error = InherentError::decode(&mut &error[..]).ok()?;
+
+		Some(Err(sp_inherents::Error::Application(Box::from(format!("{:?}", error)))))
 	}
 }
 

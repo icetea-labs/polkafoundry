@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use polkafoundry_primitives::{Block, AccountId, Nonce, Balance, BlakeTwo256};
+use runtime_primitives::{Block, AccountId, Nonce, Balance, BlakeTwo256};
 use sp_runtime::{
 	generic::{BlockId, SignedBlock},
 	traits::{Block as BlockT},
@@ -274,6 +274,7 @@ sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block>
 + sp_offchain::OffchainWorkerApi<Block>
 + sp_session::SessionKeys<Block>
 + fp_rpc::EthereumRuntimeRPCApi<Block>
++ cumulus_primitives_core::CollectCollationInfo<Block>
 	where
 		<Self as sp_api::ApiExt<Block>>::StateBackend: sp_api::StateBackend<BlakeTwo256>,
 {}
@@ -288,6 +289,7 @@ impl<Api> RuntimeApiCollection for Api
 		+ sp_api::Metadata<Block>
 		+ sp_offchain::OffchainWorkerApi<Block>
 		+ sp_session::SessionKeys<Block>
-		+ fp_rpc::EthereumRuntimeRPCApi<Block>,
-<Self as sp_api::ApiExt<Block>>::StateBackend: sp_api::StateBackend<BlakeTwo256>,
+		+ fp_rpc::EthereumRuntimeRPCApi<Block>
+		+ cumulus_primitives_core::CollectCollationInfo<Block>,
+		<Self as sp_api::ApiExt<Block>>::StateBackend: sp_api::StateBackend<BlakeTwo256>,
 {}

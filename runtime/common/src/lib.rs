@@ -7,7 +7,7 @@ use frame_support::{
 use frame_system::limits;
 use sp_runtime::{Perbill};
 pub use frame_support::weights::constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight};
-pub use polkafoundry_primitives::BlockNumber;
+pub use runtime_primitives::BlockNumber;
 
 /// We assume that ~10% of the block weight is consumed by `on_initalize` handlers.
 /// This is used to limit the maximal weight of a single extrinsic.

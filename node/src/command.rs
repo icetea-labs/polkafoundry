@@ -16,7 +16,7 @@ use codec::Encode;
 use cumulus_client_service::genesis::generate_genesis_block;
 use cumulus_primitives_core::ParaId;
 use log::info;
-use polkafoundry_primitives::Block;
+use runtime_primitives::Block;
 use polkadot_parachain::primitives::AccountIdConversion;
 
 use crate::{cli::{Cli, RelayChainCli, Subcommand}, chain_spec};
@@ -279,32 +279,20 @@ pub fn run() -> Result<()> {
 			Ok(())
 		}
 		None => {
-			let runner = cli.create_runner(&*cli.run)?;
-			let collator = cli.run.base.validator || cli.collator;
-			let author_id: Option<AccountId32> = cli.run.author_id.clone();
-			if collator && author_id.is_none() {
-				return Err("Collator nodes must specify an author account id".into());
-			}
-
+			let runner = cli.create_runner(&cli.run.normalize())?;
 			runner.run_node_until_exit(|config| async move {
 				let key = sp_core::Pair::generate().0;
+
 				if cli.run.start_dev {
 					// If no author id was supplied, use the one that is staked at genesis
 					// in the default development spec.
-					let author_id = author_id.or_else(|| {
-						Some(
-							AccountId::from_str("ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32")
-								.expect("Tung is a valid account"),
-						)
-					});
 
 					#[cfg(feature = "halongbay")]
 						{
 							return service::start_dev(
 								config,
-								author_id,
 								cli.run.sealing,
-								collator
+								true
 							);
 						}
 					#[cfg(not(feature = "halongbay"))]
@@ -316,14 +304,13 @@ pub fn run() -> Result<()> {
 				let para_id = extension.map(|e| e.para_id);
 
 				let polkadot_cli = RelayChainCli::new(
-					config.base_path.as_ref().map(|x| x.path().join("polkadot")),
-					relay_chain_id,
+					&config,
 					[RelayChainCli::executable_name().to_string()]
 						.iter()
 						.chain(cli.relaychain_args.iter()),
 				);
 
-				let id = ParaId::from(cli.run.parachain_id.or(para_id).unwrap_or(1111));
+				let id = ParaId::from(cli.run.parachain_id.or(para_id).unwrap_or(2018));
 
 				let parachain_account =
 					AccountIdConversion::<polkadot_primitives::v0::AccountId>::into_account(&id);
@@ -342,7 +329,14 @@ pub fn run() -> Result<()> {
 				info!("Parachain id: {:?}", id);
 				info!("Parachain Account: {}", parachain_account);
 				info!("Parachain genesis state: {}", genesis_state);
-				info!("Is collating: {}", if collator { "yes" } else { "no" });
+				info!(
+					"Is collating: {}",
+					if config.role.is_authority() {
+						"yes"
+					} else {
+						"no"
+					}
+				);
 				info!("Runtime {:?}", cli.run.force_chain);
 
 				match cli.run.force_chain {
@@ -350,13 +344,7 @@ pub fn run() -> Result<()> {
 						#[cfg(feature = "polkafoundry")]
 							{
 								return service::start_node::<service::polkafoundry_runtime::RuntimeApi, service::PolkaFoundryExecutor>(
-									config,
-									key,
-									author_id,
-									polkadot_config,
-									id,
-									collator,
-									cli.run.force_chain
+									config, key, polkadot_config, id,cli.run.force_chain
 								)
 									.await
 									.map(|r| r.0)
@@ -369,13 +357,7 @@ pub fn run() -> Result<()> {
 						#[cfg(feature = "polkasmith")]
 							{
 								return service::start_node::<service::polkasmith_runtime::RuntimeApi, service::PolkaSmithExecutor>(
-									config,
-									key,
-									author_id,
-									polkadot_config,
-									id,
-									collator,
-									cli.run.force_chain
+									config, key, polkadot_config, id,cli.run.force_chain
 								)
 									.await
 									.map(|r| r.0)
@@ -389,13 +371,7 @@ pub fn run() -> Result<()> {
 						#[cfg(feature = "halongbay")]
 							{
 								return service::start_node::<service::halongbay_runtime::RuntimeApi, service::HalongbayExecutor>(
-									config,
-									key,
-									author_id,
-									polkadot_config,
-									id,
-									collator,
-									cli.run.force_chain
+									config, key, polkadot_config, id,cli.run.force_chain
 								)
 									.await
 									.map(|r| r.0)

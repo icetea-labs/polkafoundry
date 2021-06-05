@@ -20,6 +20,7 @@ use sp_api::impl_runtime_apis;
 use sp_version::RuntimeVersion;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
+use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 
 use codec::{Encode, Decode};
 use fp_rpc::TransactionStatus;
@@ -30,15 +31,16 @@ use pallet_evm::{
 use polkadot_parachain::primitives::Sibling;
 
 // XCM imports
-use xcm::v0::{Junction, MultiLocation, NetworkId};
+use xcm::v0::{MultiAsset, MultiLocation, MultiLocation::*, Junction::*, BodyId, NetworkId};
 use xcm_builder::{
 	AccountId32Aliases, CurrencyAdapter, LocationInverter, ParentIsDefault, RelayChainAsNative,
 	SiblingParachainAsNative, SiblingParachainConvertsVia, SignedAccountId32AsNative,
-	SovereignSignedViaLocation, FixedRateOfConcreteFungible, EnsureXcmOrigin,
+	SovereignSignedViaLocation, EnsureXcmOrigin,
 	AllowTopLevelPaidExecutionFrom, TakeWeightCredit, FixedWeightBounds, IsConcrete, NativeAsset,
-	AllowUnpaidExecutionFrom, ParentAsSuperuser,
+	AllowUnpaidExecutionFrom, ParentAsSuperuser, UsingComponents
 };
 use xcm_executor::{Config, XcmExecutor};
+use xcm::v0::Xcm;
 
 // A few exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
@@ -47,14 +49,14 @@ pub use pallet_timestamp::Call as TimestampCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{Permill, Perbill};
 pub use frame_support::{
-	construct_runtime, parameter_types, StorageValue, PalletId,
+	construct_runtime, parameter_types, StorageValue, PalletId, match_type,
 	traits::{Randomness, IsInVec, All},
 	weights::{
 		Weight, IdentityFee, DispatchClass,
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
 	},
 };
-pub use polkafoundry_primitives::{
+pub use runtime_primitives::{
 	AccountId, AccountIndex, Balance, BlockNumber,
 	DigestItem, Index, Hash, Moment, Nonce, Signature,
 };
@@ -141,6 +143,10 @@ impl frame_system::Config for Runtime {
 	type OnSetCode = cumulus_pallet_parachain_system::ParachainSetCode<Self>;
 }
 
+impl pallet_aura::Config for Runtime {
+	type AuthorityId = AuraId;
+}
+
 parameter_types! {
 	pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
 }
@@ -158,7 +164,7 @@ parameter_types! {
 	pub const MaxLocks: u32 = 50;
 }
 
-pub const HLB: Balance = 1_000_000_000_000;
+pub const HLB: Balance = 1_000_000_000_000_000_000;
 
 impl pallet_balances::Config for Runtime {
 	type MaxLocks = MaxLocks;
@@ -188,33 +194,37 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
+impl cumulus_pallet_dmp_queue::Config for Runtime {
+	type Event = Event;
+	type XcmExecutor = XcmExecutor<XcmConfig>;
+	type ExecuteOverweightOrigin = frame_system::EnsureRoot<AccountId>;
+}
+
 parameter_types! {
 	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT / 4;
+	pub const ReservedDmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT / 4;
 }
 
 impl cumulus_pallet_parachain_system::Config for Runtime {
 	type Event = Event;
 	type OnValidationData = ();
-	type SelfParaId = parachain_info::Module<Runtime>;
-	type DownwardMessageHandlers = cumulus_primitives_utility::UnqueuedDmpAsParent<
-		MaxDownwardMessageWeight,
-		XcmExecutor<XcmConfig>,
-		Call,
-	>;
+	type SelfParaId = parachain_info::Pallet<Runtime>;
 	type OutboundXcmpMessageSource = XcmpQueue;
+	type DmpMessageHandler = DmpQueue;
+	type ReservedDmpWeight = ReservedDmpWeight;
 	type XcmpMessageHandler = XcmpQueue;
 	type ReservedXcmpWeight = ReservedXcmpWeight;
 }
 
 impl parachain_info::Config for Runtime {}
 
+impl cumulus_pallet_aura_ext::Config for Runtime {}
+
 parameter_types! {
-	pub const RococoLocation: MultiLocation = MultiLocation::X1(Junction::Parent);
+	pub const RococoLocation: MultiLocation = X1(Parent);
 	pub const RococoNetwork: NetworkId = NetworkId::Polkadot;
 	pub RelayChainOrigin: Origin = cumulus_pallet_xcm::Origin::Relay.into();
-	pub Ancestry: MultiLocation = Junction::Parachain {
-		id: ParachainInfo::parachain_id().into()
-	}.into();
+	pub Ancestry: MultiLocation = X1(Parachain(ParachainInfo::parachain_id().into()));
 }
 
 type LocationToAccountId = (
@@ -235,6 +245,8 @@ type LocalAssetTransactor = CurrencyAdapter<
 	LocationToAccountId,
 	// Our chain's account ID type (we can't get away without mentioning it explicitly):
 	AccountId,
+	// We don't track any teleports.
+	(),
 >;
 
 /// This is the type we use to convert an (incoming) XCM origin into a local `Origin` instance,
@@ -261,19 +273,21 @@ pub type XcmOriginToTransactDispatchOrigin = (
 
 parameter_types! {
 	pub UnitWeightCost: Weight = 1_000;
-}
-
-parameter_types! {
 	// 1_000_000_000_000 => 1 unit of asset for 1 unit of Weight.
 	// TODO: Should take the actual weight price. This is just 1_000 ROC per second of weight.
-	pub const WeightPrice: (MultiLocation, u128) = (MultiLocation::X1(Junction::Parent), 1_000);
-	pub AllowUnpaidFrom: Vec<MultiLocation> = vec![ MultiLocation::X1(Junction::Parent) ];
+	pub const WeightPrice: (MultiLocation, u128) = (X1(Parent), 1_000);
+}
+
+match_type! {
+	pub type ParentOrParentsUnitPlurality: impl Contains<MultiLocation> = {
+		X1(Parent) | X2(Parent, Plurality { id: BodyId::Unit, .. })
+	};
 }
 
 pub type Barrier = (
 	TakeWeightCredit,
 	AllowTopLevelPaidExecutionFrom<All<MultiLocation>>,
-	AllowUnpaidExecutionFrom<IsInVec<AllowUnpaidFrom>>,	// <- Parent gets free execution
+	AllowUnpaidExecutionFrom<ParentOrParentsUnitPlurality>,
 );
 
 pub struct XcmConfig;
@@ -288,7 +302,7 @@ impl Config for XcmConfig {
 	type LocationInverter = LocationInverter<Ancestry>;
 	type Barrier = Barrier;
 	type Weigher = FixedWeightBounds<UnitWeightCost, Call>;
-	type Trader = FixedRateOfConcreteFungible<WeightPrice>;
+	type Trader = UsingComponents<IdentityFee<Balance>, RococoLocation, AccountId, Balances, ()>;
 	type ResponseHandler = ();	// Don't handle responses for now.
 }
 
@@ -313,10 +327,17 @@ impl pallet_xcm::Config for Runtime {
 	type SendXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
 	type XcmRouter = XcmRouter;
 	type ExecuteXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
+	type XcmExecuteFilter = All<(MultiLocation, Xcm<Call>)>;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
+	type XcmTeleportFilter = All<(MultiLocation, Vec<MultiAsset>)>;
+	type XcmReserveTransferFilter = ();
+	type Weigher = FixedWeightBounds<UnitWeightCost, Call>;
 }
 
-impl cumulus_pallet_xcm::Config for Runtime {}
+impl cumulus_pallet_xcm::Config for Runtime {
+	type Event = Event;
+	type XcmExecutor = XcmExecutor<XcmConfig>;
+}
 
 impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type Event = Event;
@@ -332,19 +353,14 @@ impl cumulus_ping::Config for Runtime {
 }
 
 parameter_types! {
-	pub BlockGasLimit: U256
-		= U256::from(NORMAL_DISPATCH_RATIO * MAXIMUM_BLOCK_WEIGHT / WEIGHT_PER_GAS);
+	pub BlockGasLimit: U256 = U256::from(u32::max_value());
 }
 
 impl pallet_ethereum::Config for Runtime {
 	type Event = Event;
-	type FindAuthor = AuthorInherent;
+	type FindAuthor = ();
 	type StateRoot = pallet_ethereum::IntermediateStateRoot;
 	type BlockGasLimit = BlockGasLimit;
-}
-
-impl author_inherent::Config for Runtime {
-	type EventHandler = Staking;
 }
 
 parameter_types! {
@@ -362,6 +378,8 @@ impl pallet_evm::Config for Runtime {
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
 	type Precompiles = precompiles::PolkafoundryPrecompiles<Self>;
 	type ChainId = ChainId;
+	type BlockGasLimit = BlockGasLimit;
+	type OnChargeTransaction = ();
 }
 
 impl pallet_crowdloan_rewards::Config for Runtime {
@@ -439,34 +457,34 @@ parameter_types! {
 	pub const DesiredTarget: u32 = 2;
 }
 
-impl frame_election_provider_support::onchain::Config for Runtime {
-	type AccountId = AccountId32;
-	type BlockNumber = BlockNumber;
-	type BlockWeights = BlockWeights;
-	type Accuracy = Perbill;
-	type DataProvider = Staking;
-}
+// impl frame_election_provider_support::onchain::Config for Runtime {
+// 	type AccountId = AccountId32;
+// 	type BlockNumber = BlockNumber;
+// 	type BlockWeights = BlockWeights;
+// 	type Accuracy = Perbill;
+// 	type DataProvider = Staking;
+// }
 
-impl polkafoundry_staking::Config for Runtime {
-	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
-	type Event = Event;
-	type Currency = Balances;
-	type BlocksPerRound = BlocksPerRound;
-	type MaxNominationsPerCollator = MaxNominationsPerCollator;
-	type BondDuration = BondDuration;
-	type MinCollatorStake = MinCollatorStake;
-	type MinNominatorStake = MinNominatorStake;
-	type PayoutDuration = PayoutDuration;
-	type ElectionProvider = frame_election_provider_support::onchain::OnChainSequentialPhragmen<Self>;
-	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
-	type DesiredTarget = DesiredTarget;
-}
+// impl polkafoundry_staking::Config for Runtime {
+// 	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
+// 	type Event = Event;
+// 	type Currency = Balances;
+// 	type BlocksPerRound = BlocksPerRound;
+// 	type MaxNominationsPerCollator = MaxNominationsPerCollator;
+// 	type BondDuration = BondDuration;
+// 	type MinCollatorStake = MinCollatorStake;
+// 	type MinNominatorStake = MinNominatorStake;
+// 	type PayoutDuration = PayoutDuration;
+// 	type ElectionProvider = frame_election_provider_support::onchain::OnChainSequentialPhragmen<Self>;
+// 	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
+// 	type DesiredTarget = DesiredTarget;
+// }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
 		Block = Block,
-		NodeBlock = polkafoundry_primitives::Block,
+		NodeBlock = runtime_primitives::Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
@@ -483,13 +501,14 @@ construct_runtime!(
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>},
-		Staking: polkafoundry_staking::{Pallet, Call, Storage, Event<T>, Config<T>},
-        AuthorInherent: author_inherent::{Pallet, Call, Storage, Inherent},
-
+		// Staking: polkafoundry_staking::{Pallet, Call, Storage, Event<T>, Config<T>},
+		Aura: pallet_aura::{Pallet, Config<T>},
+		AuraExt: cumulus_pallet_aura_ext::{Pallet, Config},
 		// XCM helpers.
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>},
 		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin},
-		CumulusXcm: cumulus_pallet_xcm::{Pallet, Origin},
+		CumulusXcm: cumulus_pallet_xcm::{Pallet, Call, Event<T>, Origin},
+		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>},
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
 	}
@@ -506,11 +525,11 @@ impl fp_rpc::ConvertTransaction<UncheckedExtrinsic> for TransactionConverter {
 	}
 }
 
-impl fp_rpc::ConvertTransaction<polkafoundry_primitives::UncheckedExtrinsic> for TransactionConverter {
-	fn convert_transaction(&self, transaction: pallet_ethereum::Transaction) -> polkafoundry_primitives::UncheckedExtrinsic {
+impl fp_rpc::ConvertTransaction<runtime_primitives::UncheckedExtrinsic> for TransactionConverter {
+	fn convert_transaction(&self, transaction: pallet_ethereum::Transaction) -> runtime_primitives::UncheckedExtrinsic {
 		let extrinsic = UncheckedExtrinsic::new_unsigned(pallet_ethereum::Call::<Runtime>::transact(transaction).into());
 		let encoded = extrinsic.encode();
-		polkafoundry_primitives::UncheckedExtrinsic::decode(&mut &encoded[..]).expect("Encoded extrinsic is always valid")
+		runtime_primitives::UncheckedExtrinsic::decode(&mut &encoded[..]).expect("Encoded extrinsic is always valid")
 	}
 }
 
@@ -588,10 +607,6 @@ impl_runtime_apis! {
 		) -> sp_inherents::CheckInherentsResult {
 			data.check_extrinsics(&block)
 		}
-
-		fn random_seed() -> <Block as BlockT>::Hash {
-			RandomnessCollectiveFlip::random_seed().0
-		}
 	}
 
 	impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
@@ -606,6 +621,16 @@ impl_runtime_apis! {
 	impl sp_offchain::OffchainWorkerApi<Block> for Runtime {
 		fn offchain_worker(header: &<Block as BlockT>::Header) {
 			Executive::offchain_worker(header)
+		}
+	}
+
+	impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
+		fn slot_duration() -> sp_consensus_aura::SlotDuration {
+			sp_consensus_aura::SlotDuration::from_millis(Aura::slot_duration())
+		}
+
+		fn authorities() -> Vec<AuraId> {
+			Aura::authorities()
 		}
 	}
 
@@ -742,6 +767,12 @@ impl_runtime_apis! {
 		}
 	}
 
+	impl cumulus_primitives_core::CollectCollationInfo<Block> for Runtime {
+		fn collect_collation_info() -> cumulus_primitives_core::CollationInfo {
+			ParachainSystem::collect_collation_info()
+		}
+	}
+
 	impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance>
 		for Runtime {
 		fn query_info(
@@ -799,4 +830,7 @@ impl_runtime_apis! {
 	}
 }
 
-cumulus_pallet_parachain_system::register_validate_block!(Runtime, Executive);
+cumulus_pallet_parachain_system::register_validate_block!(
+	Runtime,
+	cumulus_pallet_aura_ext::BlockExecutor::<Runtime, Executive>,
+);
