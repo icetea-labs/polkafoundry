@@ -37,13 +37,13 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 				.collect(),
 		},
 		pallet_sudo: halongbay::SudoConfig { key: endowed_accounts[0].clone() },
-		parachain_info: halongbay::ParachainInfoConfig { parachain_id: 1111.into() },
+		parachain_info: halongbay::ParachainInfoConfig { parachain_id: 2018.into() },
 		pallet_evm: halongbay::EVMConfig {
 			accounts: BTreeMap::new(),
 		},
 		pallet_ethereum: halongbay::EthereumConfig {},
 		pallet_aura: halongbay::AuraConfig {
-			authorities: vec![hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"]
+			authorities: vec![hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"]
 				.unchecked_into()]
 		},
 		cumulus_pallet_aura_ext: Default::default(),
@@ -65,7 +65,7 @@ pub fn halongbay_staging_testnet_config() ->  Result<HalongbayChainSpec, String>
 		chain_properties(),
 		Extensions {
 			relay_chain: "rococo-local".into(),
-			para_id: 1111_u32.into(),
+			para_id: 2018_u32.into(),
 		},
 	))
 }
@@ -74,7 +74,7 @@ fn chain_properties() -> Option<Properties> {
 	let mut p = Properties::new();
 
 	p.insert("tokenSymbol".into(), "HLB".into());
-	p.insert("tokenDecimals".into(), 12.into());
+	p.insert("tokenDecimals".into(), 18.into());
 	p.insert("ss58Format".into(), 42.into());
 
 	Some(p)

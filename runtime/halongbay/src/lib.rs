@@ -164,7 +164,7 @@ parameter_types! {
 	pub const MaxLocks: u32 = 50;
 }
 
-pub const HLB: Balance = 1_000_000_000_000;
+pub const HLB: Balance = 1_000_000_000_000_000_000;
 
 impl pallet_balances::Config for Runtime {
 	type MaxLocks = MaxLocks;

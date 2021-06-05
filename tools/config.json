@@ -26,8 +26,8 @@
   "parachains": [
     {
       "bin": "../target/release/polkafoundry",
-      "id": "1111",
-      "chain": "../node/res/halongbay.json",
+      "id": "2018",
+      "chain": "./halongbay.json",
       "nodes": [
         {
           "rpcPort": 9933,
@@ -36,7 +36,7 @@
           "flags": [
             "--rpc-cors=all",
             "--rpc-methods=unsafe",
-            "--author-id=0xea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32",
+            "--force-authoring",
             "--",
             "--execution=wasm"
           ]
@@ -45,14 +45,7 @@
     }
   ],
   "simpleParachains": [],
-  "hrmpChannels": [
-    {
-      "sender": 200,
-      "recipient": 300,
-      "maxCapacity": 8,
-      "maxMessageSize": 512
-    }
-  ],
+  "hrmpChannels": [],
   "types": {
   }
 }

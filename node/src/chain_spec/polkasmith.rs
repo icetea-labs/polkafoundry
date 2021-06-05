@@ -40,7 +40,7 @@ fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::
 		},
 		pallet_ethereum: polkasmith::EthereumConfig {},
 		pallet_aura: halongbay::AuraConfig {
-			authorities: vec![hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"]
+			authorities: vec![hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"]
 				.unchecked_into()]
 		},
 		cumulus_pallet_aura_ext: Default::default(),

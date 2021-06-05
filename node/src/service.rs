@@ -208,8 +208,6 @@ pub fn new_partial<RuntimeApi, Executor>(
 			telemetry
 		});
 
-	let registry = config.prometheus_registry();
-
 	let transaction_pool = sc_transaction_pool::BasicPool::new_full(
 		config.transaction_pool.clone(),
 		config.role.is_authority().into(),
@@ -288,7 +286,6 @@ pub fn new_partial<RuntimeApi, Executor>(
 async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 	parachain_config: Configuration,
 	collator_key: CollatorPair,
-	_author_id: Option<AccountId32>,
 	polkadot_config: Configuration,
 	id: ParaId,
 	_rpc_ext_builder: RB,
@@ -530,10 +527,8 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 pub async fn start_node<RuntimeApi, Executor>(
 	parachain_config: Configuration,
 	collator_key: CollatorPair,
-	author_id: Option<AccountId32>,
 	polkadot_config: Configuration,
-	id: polkadot_primitives::v0::Id,
-	validator: bool,
+	id: ParaId,
 	runtime: cli::ForceChain
 ) -> sc_service::error::Result<(TaskManager, Arc<TFullClient<Block, RuntimeApi, Executor>>)>
 	where
@@ -545,7 +540,6 @@ pub async fn start_node<RuntimeApi, Executor>(
 	start_node_impl(
 		parachain_config,
 		collator_key,
-		author_id,
 		polkadot_config,
 		id,
 		|_| Default::default(),
@@ -618,7 +612,6 @@ pub async fn start_node<RuntimeApi, Executor>(
 
 pub fn start_dev(
 	config: Configuration,
-	author_id: Option<AccountId32>,
 	sealing: Sealing,
 	validator: bool
 ) -> sc_service::error::Result<TaskManager> {
