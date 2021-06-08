@@ -1,6 +1,6 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
-use std::{sync::{Arc, Mutex}, cell::RefCell, collections::{HashMap, BTreeMap}};
+use std::{sync::{Arc, Mutex}, collections::{HashMap, BTreeMap}};
 
 use sp_core::{H256};
 use sp_runtime::traits::BlakeTwo256;
@@ -27,9 +27,6 @@ use cumulus_client_service::{
 	prepare_node_config, start_collator, start_full_node, StartCollatorParams, StartFullNodeParams,
 };
 use cumulus_client_network::build_block_announce_validator;
-use cumulus_client_consensus_relay_chain::{
-	build_relay_chain_consensus, BuildRelayChainConsensusParams,
-};
 use cumulus_primitives_parachain_inherent::{ParachainInherentData, INHERENT_IDENTIFIER as PARACHAIN_INHERENT_IDENTIFIER};
 use cumulus_primitives_core::PersistedValidationData;
 use cumulus_test_relay_sproof_builder::RelayStateSproofBuilder;
@@ -37,7 +34,6 @@ use futures::{Stream, StreamExt};
 use fc_rpc_core::types::{FilterPool, PendingTransactions};
 use fc_consensus::FrontierBlockImport;
 use runtime_primitives::{Block, Hash};
-use halongbay_runtime::{SLOT_DURATION};
 use cumulus_client_consensus_aura::{build_aura_consensus, BuildAuraConsensusParams, SlotProportion};
 use cumulus_client_consensus_common::ParachainConsensus;
 use cumulus_primitives_core::ParaId;
@@ -56,8 +52,7 @@ pub use polkasmith_runtime;
 
 #[cfg(feature = "halongbay")]
 pub use halongbay_runtime;
-use sp_runtime::AccountId32;
-use codec::{Encode, Decode};
+use codec::{Decode};
 
 // Our native executor instance.
 #[cfg(feature = "polkafoundry")]
@@ -731,7 +726,7 @@ pub fn start_dev(
 		remote_blockchain: None,
 		backend,
 		system_rpc_tx,
-		config, 
+		config,
 		telemetry: None,
 	})?;
 

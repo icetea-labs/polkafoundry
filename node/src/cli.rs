@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use sc_cli;
 
 use structopt::{StructOpt, clap::arg_enum};
-use sp_runtime::AccountId32;
 use crate::chain_spec;
 
 arg_enum! {
@@ -115,12 +114,6 @@ pub struct RunCmd {
 	/// Options are "instant", "manual", or timer interval in milliseconds
 	#[structopt(long, default_value = "instant")]
 	pub sealing: Sealing,
-}
-
-fn parse_acc32(input: &str) -> Result<AccountId32, String> {
-	input
-		.parse::<AccountId32>()
-		.map_err(|_| "Failed to parse H160".to_string())
 }
 
 impl std::ops::Deref for RunCmd {

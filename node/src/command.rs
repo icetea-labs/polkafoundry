@@ -2,7 +2,6 @@ use std::{io::Write, net::SocketAddr};
 
 use sp_core::hexdisplay::HexDisplay;
 use sp_runtime::traits::Block as BlockT;
-use sp_runtime::AccountId32;
 
 use sc_cli::{
 	ChainSpec, CliConfiguration, DefaultConfigurationValues, ImportParams,
@@ -22,8 +21,6 @@ use polkadot_parachain::primitives::AccountIdConversion;
 use crate::{cli::{Cli, RelayChainCli, Subcommand}, chain_spec};
 use crate::service;
 use crate::service::IdentifyVariant;
-use crate::service::halongbay_runtime::AccountId;
-use std::str::FromStr;
 
 fn chain_name() -> String {
 	#[cfg(feature = "polkafoundry")]
@@ -298,7 +295,6 @@ pub fn run() -> Result<()> {
 				}
 
 				let extension = chain_spec::Extensions::try_get(&*config.chain_spec);
-				let relay_chain_id = extension.map(|e| e.relay_chain.clone());
 				let para_id = extension.map(|e| e.para_id);
 
 				let polkadot_cli = RelayChainCli::new(
