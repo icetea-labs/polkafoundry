@@ -24,17 +24,21 @@ macro_rules! log {
 
 #[pallet]
 pub mod pallet {
-	use frame_support::{pallet_prelude::*, traits::{Currency, ReservableCurrency, CurrencyToVote, Imbalance}};
+	use frame_support::{
+		pallet_prelude::*,
+		traits::{Currency, ReservableCurrency, CurrencyToVote, Imbalance, UnixTime, EstimateNextNewSession}
+	};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::{Saturating, Zero};
+	use sp_runtime::traits::{Saturating, Zero, AtLeast32BitUnsigned, Convert, SaturatedConversion};
 	use sp_runtime::{Perbill};
 	use sp_std::{convert::{From}, vec::Vec};
-	use frame_support::sp_runtime::traits::{AtLeast32BitUnsigned, UnixTime, Convert};
 	use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
 	use crate::inflation::compute_total_payout;
 	use sp_std::{cmp::Ordering, prelude::*, ops::{Mul, AddAssign, Add, Sub}};
-	use frame_support::sp_std::fmt::Debug;
 	use log::info;
+	use pallet_session::historical;
+	use serde::{Serialize, Deserialize};
+	use frame_support::sp_std::fmt::Debug;
 
 	/// Counter for the number of round that have passed
 	pub type RoundIndex = u32;
@@ -91,6 +95,8 @@ pub mod pallet {
 		type BondingDuration: Get<EraIndex>;
 		/// Interface for interacting with a session module.
 		type SessionInterface: self::SessionInterface<Self::AccountId>;
+		/// Something that can estimate the next session change, accurately or as a best effort guess.
+		type NextNewSession: EstimateNextNewSession<Self::BlockNumber>;
 
 		type DesiredTarget: Get<u32>;
 	}
@@ -100,36 +106,50 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_finalize(now: T::BlockNumber) {
-			let mut current_round = CurrentRound::<T>::get();
-			if current_round.should_goto_next_round(now) {
-				let block_per_round = Settings::<T>::get().blocks_per_round;
-				current_round.update(now, block_per_round);
-				let round_index = current_round.index;
-				// start a new round
-				CurrentRound::<T>::put(current_round);
-				// pay for stakers
-				Self::payout_stakers(round_index);
-				// onboard, unlock bond, unbond collators
-				Self::update_collators(round_index);
-				// unbond all nominators
-				Self::update_nominators(round_index);
-				// execute all delayed collator exits
-				Self::execute_exit_queue(round_index);
-				// select winner candidates in this round
-				Self::enact_election(round_index);
-				// update total stake of next round
-				TotalStakedAt::<T>::insert(round_index, TotalStaked::<T>::get());
-				TotalIssuanceAt::<T>::insert(round_index, T::Currency::total_issuance());
+		fn on_initialize(_now: T::BlockNumber) -> Weight {
+			// just return the weight of the on_finalize.
+			T::DbWeight::get().reads(1)
+		}
 
-				Self::deposit_event(Event::NewRoundStart(round_index, round_index * block_per_round));
+		fn on_finalize(now: T::BlockNumber) {
+			if let Some(mut active_era) = Self::active_era() {
+				if active_era.start.is_none() {
+					let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
+					active_era.start = Some(now_as_millis_u64);
+					// This write only ever happens once, we don't include it in the weight in general
+					ActiveEra::<T>::put(Some(active_era));
+				}
 			}
+			//
+			// let mut current_round = CurrentRound::<T>::get();
+			// if current_round.should_goto_next_round(now) {
+			// 	let block_per_round = Settings::<T>::get().blocks_per_round;
+			// 	current_round.update(now, block_per_round);
+			// 	let round_index = current_round.index;
+			// 	// start a new round
+			// 	CurrentRound::<T>::put(current_round);
+			// 	// pay for stakers
+			// 	Self::payout_stakers(round_index);
+			// 	// // onboard, unlock bond, unbond collators
+			// 	// Self::update_collators(round_index);
+			// 	// unbond all nominators
+			// 	Self::update_nominators(round_index);
+			// 	// execute all delayed collator exits
+			// 	Self::execute_exit_queue(round_index);
+			// 	// select winner candidates in this round
+			// 	Self::enact_election(round_index);
+			// 	// update total stake of next round
+			// 	TotalStakedAt::<T>::insert(round_index, TotalStaked::<T>::get());
+			// 	TotalIssuanceAt::<T>::insert(round_index, T::Currency::total_issuance());
+			//
+			// 	Self::deposit_event(Event::NewRoundStart(round_index, round_index * block_per_round));
+			// }
 		}
 	}
 
 	/// Means for interacting with a specialized version of the `session` trait.
-///
-/// This is needed because `Staking` sets the `ValidatorIdOf` of the `pallet_session::Config`
+	///
+	/// This is needed because `Staking` sets the `ValidatorIdOf` of the `pallet_session::Config`
 	pub trait SessionInterface<AccountId>: frame_system::Config {
 		/// Disable a given validator by stash ID.
 		///
@@ -167,6 +187,24 @@ pub mod pallet {
 		}
 	}
 
+	/// Mode of era-forcing.
+	#[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug)]
+	#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+	pub enum Forcing {
+		/// Not forcing anything - just let whatever happen.
+		NotForcing,
+		/// Force a new era, then reset to `NotForcing` as soon as it is done.
+		ForceNew,
+		/// Avoid a new era indefinitely.
+		ForceNone,
+		/// Force a new era at the end of all sessions indefinitely.
+		ForceAlways,
+	}
+
+	impl Default for Forcing {
+		fn default() -> Self { Forcing::NotForcing }
+	}
+
 	#[derive(Default, PartialEq, Clone, Encode, Decode, RuntimeDebug)]
 	pub struct SettingStruct {
 		pub bond_duration: u32,
@@ -186,8 +224,8 @@ pub mod pallet {
 	pub struct UnBondChunk<Balance> {
 		/// Amount of funds to be unbonded.
 		pub value: Balance,
-		/// Round number at which point it'll be unbonded.
-		pub round: RoundIndex,
+		/// era number at which point it'll be unbonded.
+		pub era: EraIndex,
 	}
 
 	#[derive(Default, Clone, Encode, Decode, RuntimeDebug)]
@@ -228,6 +266,8 @@ pub mod pallet {
 	/// The ledger of a (bonded) stash.
 	#[derive(Clone, Encode, Decode, RuntimeDebug)]
 	pub struct StakingCollators<AccountId, Balance> {
+		/// The stash account whose balance is actually locked and at stake.
+		pub stash: AccountId,
 		/// The total amount of the account's balance that we are currently accounting for.
 		/// It's just `active` plus all the `unlocking` plus all the `nomination` balances then minus all the unbonding balances.
 		pub total: Balance,
@@ -244,9 +284,6 @@ pub mod pallet {
 		pub unbonding: Vec<UnBondChunk<Balance>>,
 		/// Status of staker
 		pub status: StakerStatus,
-		/// List of eras for which the stakers behind a validator have claimed rewards. Only updated
-		/// for validators.
-		pub claimed_rewards: Vec<RoundIndex>,
 	}
 
 	impl <AccountId, Balance> StakingCollators<AccountId, Balance>
@@ -254,18 +291,18 @@ pub mod pallet {
 		AccountId: Ord + Clone,
 		Balance: Ord + Copy + Debug + Saturating + AtLeast32BitUnsigned + AddAssign + From<u32>
 	{
-		pub fn new (amount: Balance, next_round: RoundIndex) -> Self {
+		pub fn new (stash: AccountId, amount: Balance, next_era: EraIndex) -> Self {
 			StakingCollators {
+				stash,
 				total: amount,
-				active: 0u32.into(),
+				active: amount,
 				nominations: vec![],
 				unlocking: vec![UnlockChunk {
 					value: amount,
-					round: next_round
+					round: next_era
 				}],
 				unbonding: vec![],
 				status: StakerStatus::default(),
-				claimed_rewards: vec![]
 			}
 		}
 
@@ -279,21 +316,19 @@ pub mod pallet {
 		}
 		/// Bond extra for collator
 		/// Active in next round
-		pub fn bond_extra (&mut self, extra: Balance, next_round: RoundIndex) {
+		pub fn bond_extra (&mut self, extra: Balance) {
 			self.total += extra;
-			self.unlocking.push(UnlockChunk {
-				value: extra,
-				round: next_round
-			});
+			self.active += extra;
 		}
+
 		/// Bond less for collator
 		/// Unbonding amount delay of `BondDuration` round
-		pub fn bond_less (&mut self, less: Balance, can_withdraw_round: RoundIndex) -> Option<Balance> {
+		pub fn bond_less (&mut self, less: Balance, era: EraIndex) -> Option<Balance> {
 			if self.active > less {
 				self.active -= less;
 				self.unbonding.push(UnBondChunk {
 					value: less,
-					round: can_withdraw_round
+					era
 				});
 
 				Some(self.active)
@@ -314,20 +349,21 @@ pub mod pallet {
 				.collect();
 
 			Self {
+				stash: self.stash,
 				total: self.total,
 				active,
 				nominations: self.nominations,
 				unlocking,
 				unbonding: self.unbonding,
 				status: self.status,
-				claimed_rewards: self.claimed_rewards
 			}
 		}
 		/// Remove all the locked bond after `BondDuration`
-		pub fn consolidate_unbonded(self, current_round: RoundIndex) -> Self {
+		/// Update `total` `active` updated immediately when call `bond_less`
+		pub fn consolidate_unbonded(self, active_era: EraIndex) -> Self {
 			let mut total = self.total;
 			let unbonding = self.unbonding.into_iter()
-				.filter(|chunk| if chunk.round > current_round  {
+				.filter(|chunk| if chunk.era > active_era  {
 					true
 				} else {
 					total -= chunk.value;
@@ -336,18 +372,18 @@ pub mod pallet {
 				.collect();
 
 			Self {
+				stash: self.stash,
 				total,
 				active: self.active,
 				nominations: self.nominations,
 				unlocking: self.unlocking,
 				unbonding,
 				status: self.status,
-				claimed_rewards: self.claimed_rewards
 			}
 		}
 
 		/// Add nomination for collator
-		/// Will be count as vote weight for collator
+		/// Will be counted as vote weight for collator
 		pub fn add_nomination(&mut self, nomination: Bond<AccountId, Balance>) -> bool {
 			match self.nominations.binary_search(&nomination) {
 				Ok(_) => false,
@@ -434,6 +470,27 @@ pub mod pallet {
 		}
 	}
 
+	/// A destination account for payment.
+	#[derive(PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug)]
+	pub enum RewardDestination<AccountId> {
+		/// Pay into the stash account, increasing the amount at stake accordingly.
+		Staked,
+		/// Pay into the stash account, not increasing the amount at stake.
+		Stash,
+		/// Pay into the controller account.
+		Controller,
+		/// Pay into a specified account.
+		Account(AccountId),
+		/// Receive no reward.
+		None,
+	}
+
+	impl<AccountId> Default for RewardDestination<AccountId> {
+		fn default() -> Self {
+			RewardDestination::Staked
+		}
+	}
+
 	#[derive(Clone, PartialEq, Copy, Encode, Decode, RuntimeDebug)]
 	pub enum StakerStatus {
 		/// Declared desire in validating or already participating in it.
@@ -464,9 +521,6 @@ pub mod pallet {
 		/// Any balance that is becoming free, which may eventually be transferred out
 		/// of the stash (assuming it doesn't get slashed first).
 		pub unbonding: Vec<UnBondChunk<Balance>>,
-		/// List of eras for which the stakers behind a validator have claimed rewards. Only updated
-		/// for validators.
-		pub claimed_rewards: Vec<RoundIndex>,
 	}
 
 	impl <AccountId, Balance> StakingNominators<AccountId, Balance>
@@ -478,7 +532,6 @@ pub mod pallet {
 				nominations,
 				total: amount,
 				unbonding: vec![],
-				claimed_rewards: vec![]
 			}
 		}
 		/// Add nomination
@@ -507,14 +560,14 @@ pub mod pallet {
 		}
 		/// Nominate less for exist nomination
 		/// The amount unbond will be locked due to `BondDuration`
-		pub fn nominate_less(&mut self, less: Bond<AccountId, Balance>, can_withdraw_round: RoundIndex) -> Option<Option<Balance>> {
+		pub fn nominate_less(&mut self, less: Bond<AccountId, Balance>, era: EraIndex) -> Option<Option<Balance>> {
 			for nominate in &mut self.nominations {
 				if nominate.owner == less.owner {
 					if nominate.amount > less.amount {
 						nominate.amount -= less.amount;
 						self.unbonding.push(UnBondChunk {
 							value: less.amount,
-							round: can_withdraw_round
+							era
 						});
 
 						return Some(Some(nominate.amount));
@@ -526,10 +579,10 @@ pub mod pallet {
 			None
 		}
 		/// Remove all locked bond after `BondDuration`
-		pub fn consolidate_unbonded(self, current_round: RoundIndex) -> Self {
+		pub fn consolidate_unbonded(self, active_era: EraIndex) -> Self {
 			let mut total = self.total;
 			let unbonding = self.unbonding.into_iter()
-				.filter(|chunk| if chunk.round > current_round {
+				.filter(|chunk| if chunk.era > active_era {
 					true
 				} else {
 					total -= chunk.value;
@@ -540,7 +593,6 @@ pub mod pallet {
 				nominations: self.nominations,
 				total,
 				unbonding,
-				claimed_rewards: self.claimed_rewards
 			}
 		}
 
@@ -562,7 +614,7 @@ pub mod pallet {
 				self.nominations = nominations;
 				self.unbonding.push(UnBondChunk {
 					value: less,
-					round: can_withdraw_round
+					era: can_withdraw_round
 				});
 				Some(self.total)
 			} else {
@@ -596,7 +648,6 @@ pub mod pallet {
 	impl<BlockNumber> RoundInfo<BlockNumber>
 	where BlockNumber: PartialOrd
 		+ Copy
-		+ Debug
 		+ From<u32>
 		+ Add<Output = BlockNumber>
 	 	+ Sub<Output = BlockNumber>
@@ -665,7 +716,7 @@ pub mod pallet {
 
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
-		pub stakers: Vec<(T::AccountId, BalanceOf<T>)>,
+		pub stakers: Vec<(T::AccountId, T::AccountId, BalanceOf<T>)>,
 	}
 
 	#[cfg(feature = "std")]
@@ -681,32 +732,34 @@ pub mod pallet {
 	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
 		fn build(&self) {
 			let mut total_staked: BalanceOf<T> = Zero::zero();
-			for &(ref staker, balance) in &self.stakers {
+			for &(ref stash, ref controller, balance) in &self.stakers {
 				assert!(
-					T::Currency::free_balance(&staker) >= balance,
+					T::Currency::free_balance(&stash) >= balance,
 					"Account does not have enough balance to bond."
 				);
 
 				total_staked += balance.clone();
-				Pallet::<T>::bond(
-					T::Origin::from(Some(staker.clone()).into()),
-					balance.clone(),
+				let _ = <Pallet<T>>::bond(
+					T::Origin::from(Some(stash.clone()).into()),
+					controller.clone(),
+					balance,
+					RewardDestination::Staked,
 				);
 			}
 			TotalStaked::<T>::put(total_staked);
 
 			// Start Round 1 at Block 0
-			let round: RoundInfo<T::BlockNumber> =
-				RoundInfo::new(1u32, 0u32.into(), T::BlocksPerRound::get());
-			CurrentRound::<T>::put(round);
-			TotalStakedAt::<T>::insert(1u32, TotalStaked::<T>::get());
-			TotalIssuanceAt::<T>::insert(1u32, T::Currency::total_issuance());
-			Settings::<T>::put(SettingStruct {
-				bond_duration: T::BondDuration::get(),
-				blocks_per_round: T::BlocksPerRound::get(),
-				desired_target: T::DesiredTarget::get()
-			});
-			<Pallet<T>>::deposit_event(Event::NewRoundStart(1u32, 1u32 + T::BlocksPerRound::get() as u32));
+			// let round: RoundInfo<T::BlockNumber> =
+			// 	RoundInfo::new(1u32, 0u32.into(), T::BlocksPerRound::get());
+			// CurrentRound::<T>::put(round);
+			// TotalStakedAt::<T>::insert(1u32, TotalStaked::<T>::get());
+			// TotalIssuanceAt::<T>::insert(1u32, T::Currency::total_issuance());
+			// Settings::<T>::put(SettingStruct {
+			// 	bond_duration: T::BondDuration::get(),
+			// 	blocks_per_round: T::BlocksPerRound::get(),
+			// 	desired_target: T::DesiredTarget::get()
+			// });
+			// <Pallet<T>>::deposit_event(Event::NewRoundStart(1u32, 1u32 + T::BlocksPerRound::get() as u32));
 		}
 	}
 
@@ -729,55 +782,44 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn bond(
 			origin: OriginFor<T>,
-			amount: BalanceOf<T>
+			controller: T::AccountId,
+			amount: BalanceOf<T>,
+			payee: RewardDestination<T::AccountId>,
 		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
+			let stash = ensure_signed(origin)?;
 
-			ensure!(
-				Collators::<T>::get(&who).is_none(),
-				Error::<T>::AlreadyBonded
-			);
+			if <Bonded<T>>::contains_key(&stash) {
+				Err(Error::<T>::AlreadyBonded)?
+			}
+
+			if <Ledger<T>>::contains_key(&controller) {
+				Err(Error::<T>::AlreadyPaired)?
+			}
 
 			if amount < T::MinCollatorStake::get() {
 				Err(Error::<T>::BondBelowMin)?
 			}
 
-			let current_round = CurrentRound::<T>::get();
-			let staker = StakingCollators::new(amount, current_round.next_round_index());
+			frame_system::Pallet::<T>::inc_consumers(&stash).map_err(|_| Error::<T>::BadState)?;
+			// You're auto-bonded forever, here. We might improve this by only bonding when
+			// you actually validate/nominate and remove once you unbond __everything__.
+			<Bonded<T>>::insert(&stash, &controller);
+			<Payee<T>>::insert(&stash, payee);
 
-			Collators::<T>::insert(&who, staker);
+			let current_era = CurrentEra::<T>::get().unwrap_or(0);
+			let staker = StakingCollators::new(stash.clone(), amount, current_era + 1);
+
+			Ledger::<T>::insert(&controller, staker);
 			let current_staked = TotalStaked::<T>::get();
 			TotalStaked::<T>::put(current_staked + amount);
 
 			T::Currency::reserve(
-				&who,
+				&stash,
 				amount,
 			);
 			Self::deposit_event(Event::Bonded(
-				who,
+				stash,
 				amount,
-			));
-			Ok(Default::default())
-		}
-
-		#[pallet::weight(0)]
-		pub fn force_onboard(
-			origin: OriginFor<T>,
-			candidate: T::AccountId
-		) -> DispatchResultWithPostInfo {
-			ensure_root(origin)?;
-
-			let mut collator = Collators::<T>::get(&candidate).ok_or(Error::<T>::CandidateNotExist)?;
-
-			ensure!(
-				!collator.is_active(),
-				Error::<T>::CandidateNotActive
-			);
-			collator.force_bond();
-			Collators::<T>::insert(&candidate, collator);
-
-			Self::deposit_event(Event::CandidateOnboard(
-				candidate,
 			));
 			Ok(Default::default())
 		}
@@ -787,26 +829,23 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			extra: BalanceOf<T>
 		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
-			let mut collator = Collators::<T>::get(&who).ok_or(Error::<T>::BondNotExist)?;
-			ensure!(
-				collator.is_active(),
-				Error::<T>::CandidateNotActive
-			);
-			let current_round = CurrentRound::<T>::get();
+			let stash = ensure_signed(origin)?;
+			let controller = Bonded::<T>::get(&stash).ok_or(Error::<T>::NotStash)?;
+			let mut ledger = Ledger::<T>::get(&controller).ok_or(Error::<T>::NotController)?;
 
-			collator.bond_extra(extra, current_round.next_round_index());
-			Collators::<T>::insert(&who, collator);
+			ledger.bond_extra(extra);
+			Ledger::<T>::insert(&controller, ledger);
+
 			let current_staked = TotalStaked::<T>::get();
 			TotalStaked::<T>::put(current_staked + extra);
 
 			T::Currency::reserve(
-				&who,
+				&stash,
 				extra,
 			);
 
 			Self::deposit_event(Event::BondExtra(
-				who,
+				stash,
 				extra,
 			));
 
@@ -818,24 +857,22 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			less: BalanceOf<T>
 		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
-			let mut collator = Collators::<T>::get(&who).ok_or(Error::<T>::BondNotExist)?;
-			ensure!(
-				collator.is_active(),
-				Error::<T>::CandidateNotActive
-			);
-			let current_round = CurrentRound::<T>::get();
-			let after = collator.bond_less(less, current_round.index + Settings::<T>::get().bond_duration).ok_or(Error::<T>::Underflow)?;
+			let stash = ensure_signed(origin)?;
+			let controller = Bonded::<T>::get(&stash).ok_or(Error::<T>::NotStash)?;
+			let mut ledger = Ledger::<T>::get(&controller).ok_or(Error::<T>::NotController)?;
+
+			let era = CurrentEra::<T>::get().unwrap_or(0) + T::BondingDuration::get();
+			let after = ledger.bond_less(less, era).ok_or(Error::<T>::Underflow)?;
 
 			ensure!(
 					after >= T::MinCollatorStake::get(),
 					Error::<T>::BondBelowMin
 			);
 
-			Collators::<T>::insert(&who, collator);
+			Ledger::<T>::insert(&controller, ledger);
 
 			Self::deposit_event(Event::BondLess(
-				who,
+				stash,
 				less,
 			));
 
@@ -846,24 +883,25 @@ pub mod pallet {
 		pub fn collator_unbond(
 			origin: OriginFor<T>,
 		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
-			let collator = Collators::<T>::get(&who).ok_or(Error::<T>::BondNotExist)?;
+			let stash = ensure_signed(origin)?;
+			let controller = Bonded::<T>::get(&stash).ok_or(Error::<T>::NotStash)?;
+			let mut ledger = Ledger::<T>::get(&controller).ok_or(Error::<T>::NotController)?;
 
-			let current_round = CurrentRound::<T>::get();
-			let when = current_round.index + Settings::<T>::get().bond_duration;
+			let current_era = CurrentEra::<T>::get().unwrap_or(0);
+			let when = current_era + T::BondingDuration::get();
 
 			// leave all nominations
-			for nomination in collator.nominations {
+			for nomination in ledger.nominations {
 				T::Currency::unreserve(&nomination.owner, nomination.amount);
 			}
 
-			let exit = Leaving::new(collator.active, collator.unbonding, when);
+			let exit = Leaving::new(ledger.active, ledger.unbonding, when);
 
-			ExitQueue::<T>::insert(&who, exit);
-			Collators::<T>::remove(&who);
+			ExitQueue::<T>::insert(&stash, exit);
+			Ledger::<T>::remove(&controller);
 
 			Self::deposit_event(Event::CandidateLeaving(
-				who,
+				stash,
 				when,
 			));
 			Ok(Default::default())
@@ -880,14 +918,10 @@ pub mod pallet {
 				amount >= T::MinNominatorStake::get(),
 				Error::<T>::NominateBelowMin
 			);
-			let mut collator = Collators::<T>::get(&candidate).ok_or(Error::<T>::CandidateNotExist)?;
-			ensure!(
-				collator.is_active(),
-				Error::<T>::CandidateNotActive
-			);
+			let mut ledger = Self::ledger(&candidate).ok_or(Error::<T>::NotController)?;
 
 			ensure!(
-					collator.nominations.len() < T::MaxNominationsPerCollator::get() as usize,
+					ledger.nominations.len() < T::MaxNominationsPerCollator::get() as usize,
 					Error::<T>::TooManyNominations
 			);
 
@@ -908,14 +942,14 @@ pub mod pallet {
 				Nominators::<T>::insert(&who, nominator)
 			}
 			ensure!(
-					collator.add_nomination(Bond {
-						owner: who.clone(),
-						amount
-					}),
-					Error::<T>::NominationNotExist
+				ledger.add_nomination(Bond {
+					owner: who.clone(),
+					amount
+				}),
+				Error::<T>::NominationNotExist
 			);
 
-			Collators::<T>::insert(&candidate, collator);
+			Ledger::<T>::insert(&candidate, ledger);
 			T::Currency::reserve(&who, amount);
 
 			let current_staked = TotalStaked::<T>::get();
@@ -933,23 +967,21 @@ pub mod pallet {
 			extra: BalanceOf<T>
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			let mut collator = Collators::<T>::get(&candidate).ok_or(Error::<T>::CandidateNotExist)?;
-			ensure!(
-				collator.is_active(),
-				Error::<T>::CandidateNotActive
-			);
+			let mut ledger = Self::ledger(&candidate).ok_or(Error::<T>::NotController)?;
+
 			let mut nominator = Nominators::<T>::get(&who).ok_or(Error::<T>::NominationNotExist)?;
+
 			nominator.nominate_extra(Bond {
 				owner: candidate.clone(),
 				amount: extra
 			}).ok_or(Error::<T>::CandidateNotExist)?;
 
-			collator.nominate_extra(Bond {
+			ledger.nominate_extra(Bond {
 				owner: who.clone(),
 				amount: extra
 			}).ok_or(Error::<T>::NominationNotExist)?;
 
-			Collators::<T>::insert(&candidate, collator);
+			Ledger::<T>::insert(&candidate, ledger);
 			Nominators::<T>::insert(&who, nominator);
 			T::Currency::reserve(&who, extra);
 
@@ -971,18 +1003,15 @@ pub mod pallet {
 			less: BalanceOf<T>
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			let mut collator = Collators::<T>::get(&candidate).ok_or(Error::<T>::CandidateNotExist)?;
-			ensure!(
-				collator.is_active(),
-				Error::<T>::CandidateNotActive
-			);
+			let mut ledger = Self::ledger(&candidate).ok_or(Error::<T>::NotController)?;
+
 			let mut nominator = Nominators::<T>::get(&who).ok_or(Error::<T>::NominationNotExist)?;
-			let current_round = CurrentRound::<T>::get();
+			let current_era = CurrentEra::<T>::get().unwrap_or(0);
 
 			let after = nominator.nominate_less(Bond {
 				owner: candidate.clone(),
 				amount: less
-			}, current_round.index + Settings::<T>::get().bond_duration)
+			}, current_era + T::BondingDuration::get())
 				.ok_or(Error::<T>::CandidateNotExist)?
 				.ok_or(Error::<T>::Underflow)?;
 
@@ -991,7 +1020,7 @@ pub mod pallet {
 				Error::<T>::NominateBelowMin
 			);
 
-			let after = collator.nominate_less(Bond {
+			let after = ledger.nominate_less(Bond {
 				owner: who.clone(),
 				amount: less
 			})
@@ -1003,7 +1032,7 @@ pub mod pallet {
 				Error::<T>::NominateBelowMin
 			);
 
-			Collators::<T>::insert(&candidate, collator);
+			Collators::<T>::insert(&candidate, ledger);
 			Nominators::<T>::insert(&who, nominator);
 			Self::deposit_event(Event::NominateLess(
 				candidate,
@@ -1040,6 +1069,161 @@ pub mod pallet {
 	}
 
 	impl <T: Config> Pallet<T> {
+		fn new_session(session_index: SessionIndex) -> Option<Vec<T::AccountId>> {
+			if let Some(current_era) = CurrentEra::<T>::get() {
+				// Initial era has been set.
+				let current_era_start_session_index = Self::eras_start_session_index(current_era)
+					.unwrap_or_else(|| {
+						frame_support::print("Error: start_session_index must be set for current_era");
+						0u32
+					});
+
+				let era_length = session_index.checked_sub(current_era_start_session_index)
+					.unwrap_or(0); // Must never happen.
+
+				match ForceEra::<T>::get() {
+					// Will set to default again, which is `NotForcing`.
+					Forcing::ForceNew => ForceEra::<T>::kill(),
+					// Short circuit to `new_era`.
+					Forcing::ForceAlways => (),
+					// Only go to `new_era` if deadline reached.
+					Forcing::NotForcing if era_length >= T::SessionsPerEra::get() => (),
+					_ => {
+						// either `Forcing::ForceNone`,
+						// or `Forcing::NotForcing if era_length >= T::SessionsPerEra::get()`.
+						return None
+					},
+				}
+
+				CurrentSession::<T>::put(&session_index);
+				// new era.
+				Self::new_era(session_index)
+			} else {
+				log!(debug, "Starting the first era.");
+
+				CurrentSession::<T>::put(&session_index);
+				Self::new_era(session_index)
+			}
+		}
+
+		/// Start a session potentially starting an era.
+		fn start_session(start_session: SessionIndex) {
+			let next_active_era = Self::active_era().map(|e| e.index + 1).unwrap_or(0);
+			// This is only `Some` when current era has already progressed to the next era, while the
+			// active era is one behind (i.e. in the *last session of the active era*, or *first session
+			// of the new current era*, depending on how you look at it).
+			if let Some(next_active_era_start_session_index) =
+			Self::eras_start_session_index(next_active_era)
+			{
+				if next_active_era_start_session_index == start_session {
+					Self::start_era(start_session);
+				} else if next_active_era_start_session_index < start_session {
+					// This arm should never happen, but better handle it than to stall the staking
+					// pallet.
+					frame_support::print("Warning: A session appears to have been skipped.");
+					Self::start_era(start_session);
+				}
+			}
+		}
+
+		/// End a session potentially ending an era.
+		fn end_session(session_index: SessionIndex) {
+			if let Some(active_era) = Self::active_era() {
+				if let Some(next_active_era_start_session_index) =
+				Self::eras_start_session_index(active_era.index + 1)
+				{
+					if next_active_era_start_session_index == session_index + 1 {
+						Self::end_era(active_era, session_index);
+					}
+				}
+			}
+		}
+
+		/// Plan a new era. Return the potential new staking set.
+		fn new_era(start_session_index: SessionIndex) -> Option<Vec<T::AccountId>> {
+			// Increment or set current era.
+			let current_era = CurrentEra::<T>::mutate(|s| {
+				*s = Some(s.map(|s| s + 1).unwrap_or(0));
+				s.unwrap()
+			});
+			ErasStartSessionIndex::<T>::insert(&current_era, &start_session_index);
+
+			// Clean old era information.
+			if let Some(old_era) = current_era.checked_sub(Self::history_depth() + 1) {
+				Self::clear_era_information(old_era);
+			}
+
+			// Set staking information for new era.
+			let maybe_new_validators = Self::enact_election(current_era);
+
+			maybe_new_validators
+		}
+
+		/// * Increment `active_era.index`,
+		/// * reset `active_era.start`,
+		fn start_era(start_session: SessionIndex) {
+			let active_era = ActiveEra::<T>::mutate(|active_era| {
+				let new_index = active_era.as_ref().map(|info| info.index + 1).unwrap_or(0);
+				*active_era = Some(ActiveEraInfo {
+					index: new_index,
+					// Set new active era start in next `on_finalize`. To guarantee usage of `Time`
+					start: None,
+				});
+				new_index
+			});
+			let bonding_duration = T::BondingDuration::get();
+
+			BondedEras::<T>::mutate(|bonded| {
+				bonded.push((active_era, start_session));
+
+				if active_era > bonding_duration {
+					let first_kept = active_era - bonding_duration;
+
+					// prune out everything that's from before the first-kept index.
+					let n_to_prune = bonded.iter()
+						.take_while(|&&(era_idx, _)| era_idx < first_kept)
+						.count();
+
+					// kill slashing metadata.
+					for (pruned_era, _) in bonded.drain(..n_to_prune) {
+						// slashing::clear_era_metadata::<T>(pruned_era);
+					}
+
+					if let Some(&(_, first_session)) = bonded.first() {
+						T::SessionInterface::prune_historical_up_to(first_session);
+					}
+				}
+			});
+
+			Self::update_collators(active_era);
+			Self::update_nominators(active_era);
+			Self::execute_exit_queue(active_era);
+		}
+
+		/// Clear all era information for given era.
+		fn clear_era_information(era_index: EraIndex) {
+			ErasStartSessionIndex::<T>::remove(era_index);
+		}
+
+		/// Compute payout for era.
+		fn end_era(active_era: ActiveEraInfo, _session_index: SessionIndex) {
+			// Note: active_era_start can be None if end era is called during genesis config.
+			if let Some(active_era_start) = active_era.start {
+				let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
+
+				let era_duration = (now_as_millis_u64 - active_era_start).saturated_into::<u64>();
+				// let staked = Self::eras_total_stake(&active_era.index);
+				// let issuance = T::Currency::total_issuance();
+				// let (validator_payout, rest) = T::EraPayout::era_payout(staked, issuance, era_duration);
+				//
+				// Self::deposit_event(RawEvent::EraPayout(active_era.index, validator_payout, rest));
+				//
+				// // Set ending era reward.
+				// <ErasValidatorReward<T>>::insert(&active_era.index, validator_payout);
+				// T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
+			}
+		}
+
 		fn payout_stakers(current_round: RoundIndex) {
 			let mint = |amount: BalanceOf<T>, to: T::AccountId| {
 				if amount > T::Currency::minimum_balance() {
@@ -1103,7 +1287,7 @@ pub mod pallet {
 			}
 		}
 
-		pub fn enact_election(current_round: RoundIndex) -> Option<Vec<T::AccountId>> {
+		pub fn enact_election(current_era: EraIndex) -> Option<Vec<T::AccountId>> {
 			T::ElectionProvider::elect()
 				.map_err(|e| {
 					log!(warn, "election provider failed due to {:?}", e)
@@ -1113,21 +1297,21 @@ pub mod pallet {
 						weight,
 						frame_support::weights::DispatchClass::Mandatory,
 					);
-					Self::process_election(res, current_round)
+					Self::process_election(res, current_era)
 				})
 				.ok()
 		}
 
 		pub fn process_election(
 			flat_supports: frame_election_provider_support::Supports<T::AccountId>,
-			current_round: RoundIndex,
+			current_era: EraIndex,
 		) -> Result<Vec<T::AccountId>, ()> {
 			let exposures = Self::collect_exposures(flat_supports);
 			let elected_stashes = exposures.iter().cloned().map(|(x, _)| x).collect::<Vec<_>>();
 
 			exposures.into_iter().for_each(|(stash, exposure)| {
-				RoundStakerClipped::<T>::insert(current_round, stash.clone(), exposure.clone());
-				Self::deposit_event(Event::CollatorChoosen(current_round, stash, exposure.total));
+				ErasStakersClipped::<T>::insert(current_era, stash.clone(), exposure.clone());
+				Self::deposit_event(Event::CollatorChoosen(current_era, stash, exposure.total));
 			});
 
 			Ok(elected_stashes)
@@ -1169,27 +1353,27 @@ pub mod pallet {
 				.collect::<Vec<(T::AccountId, Exposure<_, _>)>>()
 		}
 
-		fn update_collators(current_round: RoundIndex) {
-			for (acc, mut collator) in  Collators::<T>::iter() {
+		fn update_collators(active_era: EraIndex) {
+			for (acc, mut collator) in  Ledger::<T>::iter() {
 				// active onboarding collator
-				collator.active_onboard();
+				// collator.active_onboard();
 				// locked bond become active bond
-				collator = collator.consolidate_active(current_round.clone());
+				// collator = collator.consolidate_active(current_session.clone());
 
 				let before_total = collator.total;
 				// executed unbonding after delay BondDuration
-				collator = collator.consolidate_unbonded(current_round.clone());
+				collator = collator.consolidate_unbonded(active_era.clone());
 
 				T::Currency::unreserve(&acc, before_total - collator.total);
-				Collators::<T>::insert(&acc, collator)
+				Ledger::<T>::insert(&acc, collator)
 			}
 		}
 
-		fn update_nominators(current_round: RoundIndex) {
+		fn update_nominators(active_era: EraIndex) {
 			for (acc, mut nominations) in Nominators::<T>::iter() {
 				let before_total = nominations.total;
 				// executed unbonding after delay BondDuration
-				nominations = nominations.consolidate_unbonded(current_round.clone());
+				nominations = nominations.consolidate_unbonded(active_era.clone());
 				let current_staked = TotalStaked::<T>::get();
 				let unbonded = before_total - nominations.total;
 				TotalStaked::<T>::put(current_staked - unbonded);
@@ -1200,13 +1384,13 @@ pub mod pallet {
 			}
 		}
 
-		fn execute_exit_queue(current_round: RoundIndex) {
+		fn execute_exit_queue(active_era: EraIndex) {
 			for (acc, mut exit) in ExitQueue::<T>::iter() {
 				let current_staked = TotalStaked::<T>::get();
-
-				if exit.when > current_round {
+				// if now > active era unreserve the balance and remove collator
+				if exit.when > active_era {
 					let unbonding = exit.unbonding.into_iter()
-						.filter(|chunk| if chunk.round > current_round {
+						.filter(|chunk| if chunk.era > active_era {
 							true
 						} else {
 							T::Currency::unreserve(&acc, chunk.value);
@@ -1218,6 +1402,7 @@ pub mod pallet {
 					exit.unbonding = unbonding;
 					ExitQueue::<T>::insert(&acc, exit);
 				} else {
+					// unbond all remaining balance and unbond balance then remove to queue
 					T::Currency::unreserve(&acc, exit.remaining);
 					TotalStaked::<T>::put(current_staked - exit.remaining);
 
@@ -1234,7 +1419,7 @@ pub mod pallet {
 		pub fn slashable_balance_of(stash: &T::AccountId, status: StakerStatus) -> BalanceOf<T> {
 			// Weight note: consider making the stake accessible through stash.
 			match status {
-				StakerStatus::Validator => Self::collators(stash).filter(|c| c.is_active()).map(|c| c.active).unwrap_or_default(),
+				StakerStatus::Validator => Self::ledger(stash).map(|c| c.active).unwrap_or_default(),
 				StakerStatus::Nominator => Self::nominators(stash).map(|l| l.total).unwrap_or_default(),
 				_ => Default::default(),
 			}
@@ -1277,7 +1462,7 @@ pub mod pallet {
 			let weight_of_nominator = Self::slashable_balance_of_fn(StakerStatus::Nominator);
 			let mut all_voters = Vec::new();
 
-			for (validator, _) in <Collators<T>>::iter() {
+			for (validator, _) in <Ledger<T>>::iter() {
 				// append self vote
 				let self_vote = (validator.clone(), weight_of_validator(&validator), vec![validator.clone()]);
 				all_voters.push(self_vote);
@@ -1298,7 +1483,8 @@ pub mod pallet {
 		}
 
 		pub fn get_npos_targets() -> Vec<T::AccountId> {
-			<Collators<T>>::iter().map(|(v, _)| v).collect::<Vec<_>>()
+			let t = <Ledger<T>>::iter().map(|(v, _)| v).collect::<Vec<_>>();
+			<Ledger<T>>::iter().map(|(v, _)| v).collect::<Vec<_>>()
 		}
 
 		pub fn can_author(account: &T::AccountId) -> bool {
@@ -1312,7 +1498,7 @@ pub mod pallet {
 		const MAXIMUM_VOTES_PER_VOTER: u32 = T::MAX_COLLATORS_PER_NOMINATOR;
 
 		fn targets(maybe_max_len: Option<usize>) -> data_provider::Result<(Vec<T::AccountId>, Weight)> {
-			let target_count = <Collators<T>>::iter().filter(|c| c.1.is_active()).count();
+			let target_count = <Ledger<T>>::iter().count();
 
 			if maybe_max_len.map_or(false, |max_len| target_count > max_len) {
 				return Err("Target snapshot too big");
@@ -1324,7 +1510,7 @@ pub mod pallet {
 
 		fn voters(maybe_max_len: Option<usize>) -> data_provider::Result<(Vec<(T::AccountId, VoteWeight, Vec<T::AccountId>)>, Weight)> {
 			let nominator_count = Nominators::<T>::iter().count();
-			let validator_count = <Collators<T>>::iter().filter(|c| c.1.is_active()).count();
+			let validator_count = <Ledger<T>>::iter().count();
 			let voter_count = nominator_count.saturating_add(validator_count);
 
 			if maybe_max_len.map_or(false, |max_len| voter_count > max_len) {
@@ -1336,12 +1522,34 @@ pub mod pallet {
 		}
 
 		fn desired_targets() -> data_provider::Result<(u32, Weight)> {
-			Ok((Settings::<T>::get().desired_target, <T as frame_system::Config>::DbWeight::get().reads(1)))
+			Ok((10u32, <T as frame_system::Config>::DbWeight::get().reads(1)))
 		}
 
-		fn next_election_prediction(_: T::BlockNumber) -> T::BlockNumber {
-			let current_round = Self::current_round();
-			current_round.next_election_prediction()
+		fn next_election_prediction(now: T::BlockNumber) -> T::BlockNumber {
+			let current_era = Self::current_era().unwrap_or(0);
+			let current_session = Self::current_planned_session();
+			let current_era_start_session_index =
+				Self::eras_start_session_index(current_era).unwrap_or(0);
+			let era_length = current_session
+				.saturating_sub(current_era_start_session_index)
+				.min(T::SessionsPerEra::get());
+
+			let session_length = T::NextNewSession::average_session_length();
+
+			let until_this_session_end = T::NextNewSession::estimate_next_new_session(now)
+				.0
+				.unwrap_or_default()
+				.saturating_sub(now);
+
+			let sessions_left: T::BlockNumber = T::SessionsPerEra::get()
+				.saturating_sub(era_length)
+				// one session is computed in this_session_end.
+				.saturating_sub(1)
+				.into();
+
+			now.saturating_add(
+				until_this_session_end.saturating_add(sessions_left.saturating_mul(session_length)),
+			)
 		}
 	}
 
@@ -1354,9 +1562,27 @@ pub mod pallet {
 	/// This is the latest planned era, depending on how the Session pallet queues the validator
 	/// set, it might be active or not.
 	#[pallet::storage]
-	#[pallet::getter(fn current_round)]
+	#[pallet::getter(fn current_era)]
 	pub type CurrentEra<T: Config> =
 	StorageValue<_, Option<EraIndex>, ValueQuery>;
+
+	/// The current session index.
+	#[pallet::storage]
+	#[pallet::getter(fn current_session)]
+	pub type CurrentSession<T: Config> =
+	StorageValue<_, SessionIndex, ValueQuery>;
+
+	/// Mode of era forcing.
+	#[pallet::storage]
+	#[pallet::getter(fn force_era)]
+	pub type ForceEra<T: Config> =
+	StorageValue<_, Forcing, ValueQuery>;
+
+	/// Mode of era forcing.
+	#[pallet::storage]
+	#[pallet::getter(fn history_depth)]
+	pub type HistoryDepth<T: Config> =
+	StorageValue<_, u32, ValueQuery>;
 
 	/// The active era information, it holds index and start.
 	///
@@ -1367,15 +1593,46 @@ pub mod pallet {
 	pub type ActiveEra<T: Config> =
 	StorageValue<_, Option<ActiveEraInfo>, ValueQuery>;
 
+	/// A mapping from still-bonded eras to the first session index of that era.
+	///
+	/// Must contains information for eras for the range:
+	/// `[active_era - bounding_duration; active_era]`
 	#[pallet::storage]
 	#[pallet::getter(fn bonded_eras)]
 	pub type BondedEras<T: Config> =
 	StorageValue<_, Vec<(EraIndex, SessionIndex)>, ValueQuery>;
 
+	/// Map from all locked "stash" accounts to the controller account.
+	#[pallet::storage]
+	#[pallet::getter(fn bonded)]
+	pub type Bonded<T: Config> =
+	StorageMap<_, Twox64Concat, T::AccountId, T::AccountId>;
+
+	/// Where the reward payment should be made. Keyed by stash.
+	#[pallet::storage]
+	#[pallet::getter(fn payee)]
+	pub type Payee<T: Config> =
+	StorageMap<_, Twox64Concat, T::AccountId, RewardDestination<T::AccountId>>;
+
+	/// Map from all (unlocked) "controller" accounts to the info regarding the staking.
+	#[pallet::storage]
+	#[pallet::getter(fn ledger)]
+	pub type Ledger<T: Config> =
+	StorageMap<_, Twox64Concat, T::AccountId, StakingCollators<T::AccountId, BalanceOf<T>>>;
+
 	#[pallet::storage]
 	#[pallet::getter(fn collators)]
 	pub type Collators<T: Config> =
 	StorageMap<_, Twox64Concat, T::AccountId, StakingCollators<T::AccountId, BalanceOf<T>>>;
+
+	/// The session index at which the era start for the last `HISTORY_DEPTH` eras.
+	///
+	/// Note: This tracks the starting session (i.e. session index when era start being active)
+	/// for the eras in `[CurrentEra - HISTORY_DEPTH, CurrentEra]`.
+	#[pallet::storage]
+	#[pallet::getter(fn eras_start_session_index)]
+	pub type ErasStartSessionIndex<T: Config> =
+	StorageMap<_, Twox64Concat, EraIndex, SessionIndex>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn exit_queue)]
@@ -1392,6 +1649,14 @@ pub mod pallet {
 	pub type Settings<T: Config> =
 	StorageValue<_, SettingStruct, ValueQuery>;
 
+	/// The last planned session scheduled by the session pallet.
+	///
+	/// This is basically in sync with the call to [`SessionManager::new_session`].
+	#[pallet::storage]
+	#[pallet::getter(fn current_planned_session)]
+	pub type CurrentPlannedSession<T: Config> =
+	StorageValue<_, SessionIndex, ValueQuery>;
+
 	#[pallet::storage]
 	#[pallet::getter(fn total_staked_at)]
 	pub type TotalStakedAt<T: Config> =
@@ -1406,6 +1671,29 @@ pub mod pallet {
 	#[pallet::getter(fn nominators)]
 	pub type Nominators<T: Config> =
 	StorageMap<_, Twox64Concat, T::AccountId, StakingNominators<T::AccountId, BalanceOf<T>>>;
+
+	/// Clipped Exposure of validator at era.
+	///
+	/// This is similar to [`ErasStakers`] but number of nominators exposed is reduced to the
+	/// `T::MaxNominatorRewardedPerValidator` biggest stakers.
+	/// (Note: the field `total` and `own` of the exposure remains unchanged).
+	/// This is used to limit the i/o cost for the nominator payout.
+	///
+	/// This is keyed fist by the era index to allow bulk deletion and then the stash account.
+	///
+	/// Is it removed after `HISTORY_DEPTH` eras.
+	/// If stakers hasn't been set or has been removed then empty exposure is returned.
+	#[pallet::storage]
+	#[pallet::getter(fn eras_stakers_clipped)]
+	pub type ErasStakersClipped<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		EraIndex,
+		Twox64Concat,
+		T::AccountId,
+		Exposure<T::AccountId, BalanceOf<T>>,
+		ValueQuery,
+	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn round_staker_clipped)]
@@ -1440,6 +1728,18 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn eras_stakers)]
+	pub type ErasStakers<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		EraIndex,
+		Twox64Concat,
+		T::AccountId,
+		Exposure<T::AccountId, BalanceOf<T>>,
+		ValueQuery,
+	>;
+
 	#[pallet::error]
 	pub enum Error<T> {
 		/// Candidate already bonded
@@ -1468,6 +1768,14 @@ pub mod pallet {
 		CandidateNotActive,
 		/// Candidate is leaving
 		AlreadyLeaving,
+		/// Controller is already paired.
+		AlreadyPaired,
+		/// Internal state has become somehow corrupted and the operation cannot continue.
+		BadState,
+		/// Not a controller account.
+		NotController,
+		/// Not a stash account.
+		NotStash,
 	}
 
 	#[pallet::event]
@@ -1486,6 +1794,52 @@ pub mod pallet {
 		Rewarded(T::AccountId, BalanceOf<T>),
 		SettingChanged(SettingStruct),
 		NewRoundStart(RoundIndex, RoundIndex)
+	}
+
+	/// In this implementation `new_session(session)` must be called before `end_session(session-1)`
+	/// i.e. the new session must be planned before the ending of the previous session.
+	///
+	/// Once the first new_session is planned, all session must start and then end in order, though
+	/// some session can lag in between the newest session planned and the latest session started.
+	impl<T: Config> pallet_session::SessionManager<T::AccountId> for Pallet<T> {
+		fn new_session(new_index: SessionIndex) -> Option<Vec<T::AccountId>> {
+			log!(trace, "planning new_session({})", new_index);
+			CurrentPlannedSession::<T>::put(new_index);
+			Self::new_session(new_index)
+		}
+		fn start_session(start_index: SessionIndex) {
+			log!(trace, "starting start_session({})", start_index);
+			Self::start_session(start_index)
+		}
+		fn end_session(end_index: SessionIndex) {
+			log!(trace, "ending end_session({})", end_index);
+			Self::end_session(end_index)
+		}
+	}
+
+	impl<T: Config> historical::SessionManager<T::AccountId, Exposure<T::AccountId, BalanceOf<T>>>
+	for Pallet<T>
+	{
+		fn new_session(
+			new_index: SessionIndex,
+		) -> Option<Vec<(T::AccountId, Exposure<T::AccountId, BalanceOf<T>>)>> {
+			<Self as pallet_session::SessionManager<_>>::new_session(new_index).map(|validators| {
+				let current_era = Self::current_era()
+					// Must be some as a new era has been created.
+					.unwrap_or(0);
+
+				validators.into_iter().map(|v| {
+					let exposure = Self::eras_stakers(current_era, &v);
+					(v, exposure)
+				}).collect()
+			})
+		}
+		fn start_session(start_index: SessionIndex) {
+			<Self as pallet_session::SessionManager<_>>::start_session(start_index)
+		}
+		fn end_session(end_index: SessionIndex) {
+			<Self as pallet_session::SessionManager<_>>::end_session(end_index)
+		}
 	}
 
 	/// Add reward points to block authors:
@@ -1507,6 +1861,15 @@ pub mod pallet {
 		}
 	}
 
+	/// A `Convert` implementation that finds the stash of the given controller account,
+	/// if any.
+	pub struct StashOf<T>(sp_std::marker::PhantomData<T>);
+
+	impl<T: Config> Convert<T::AccountId, Option<T::AccountId>> for StashOf<T> {
+		fn convert(controller: T::AccountId) -> Option<T::AccountId> {
+			<Pallet<T>>::ledger(&controller).map(|l| l.stash)
+		}
+	}
 
 	/// A typed conversion from stash account ID to the active exposure of nominators
 	/// on that account.
@@ -1514,4 +1877,13 @@ pub mod pallet {
 	/// Active exposure is the exposure of the validator set currently validating, i.e. in
 	/// `active_era`. It can differ from the latest planned exposure in `current_era`.
 	pub struct ExposureOf<T>(sp_std::marker::PhantomData<T>);
+
+	impl<T: Config> Convert<T::AccountId, Option<Exposure<T::AccountId, BalanceOf<T>>>>
+	for ExposureOf<T>
+	{
+		fn convert(validator: T::AccountId) -> Option<Exposure<T::AccountId, BalanceOf<T>>> {
+			<Pallet<T>>::active_era()
+				.map(|active_era| <Pallet<T>>::eras_stakers(active_era.index, &validator))
+		}
+	}
 }
