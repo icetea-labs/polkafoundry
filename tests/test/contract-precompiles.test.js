@@ -56,4 +56,38 @@ describeWithPolkafoundry('Polkafoundry Precompiles', 'polka-spec.json', (context
         );
     });
 
+    it('Sha3FIPS256 should be valid', async () => {
+        const tx = await customRequest(context.web3, 'eth_call', [
+            {
+                from: GENESIS_ACCOUNT,
+                value: '0x00',
+                gasPrice: '0x01',
+                gas: '0x100000',
+                to: '0x0000000000000000000000000000000000000007',
+                data: `0x${Buffer.from('hello').toString('hex')}`,
+            },
+        ]);
+
+        expect(tx.result).equals(
+            '0x3338be694f50c5f338814986cdf0686453a888b84f424d792af4b9202398f392'
+        );
+    });
+
+    it('Sha3FIPS512 should be valid', async () => {
+        const tx = await customRequest(context.web3, 'eth_call', [
+            {
+                from: GENESIS_ACCOUNT,
+                value: '0x00',
+                gasPrice: '0x01',
+                gas: '0x100000',
+                to: '0x0000000000000000000000000000000000000008',
+                data: `0x${Buffer.from('hello').toString('hex')}`,
+            },
+        ]);
+
+        expect(tx.result).equals(
+            '0x75d527c368f2efe848ecf6b073a36767800805e9eef2b1857d5f984f036eb6df891d75f72d9b154518c1cd58835286d1da9a38deba3de98b5a53e5ed78a84976'
+        );
+    });
+
 })
