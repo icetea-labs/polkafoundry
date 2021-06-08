@@ -281,8 +281,6 @@ pub fn run() -> Result<()> {
 		None => {
 			let runner = cli.create_runner(&cli.run.normalize())?;
 			runner.run_node_until_exit(|config| async move {
-				let key = sp_core::Pair::generate().0;
-
 				if cli.run.start_dev {
 					// If no author id was supplied, use the one that is staked at genesis
 					// in the default development spec.
@@ -344,7 +342,7 @@ pub fn run() -> Result<()> {
 						#[cfg(feature = "polkafoundry")]
 							{
 								return service::start_node::<service::polkafoundry_runtime::RuntimeApi, service::PolkaFoundryExecutor>(
-									config, key, polkadot_config, id,cli.run.force_chain
+									config, polkadot_config, id,cli.run.force_chain
 								)
 									.await
 									.map(|r| r.0)
@@ -357,7 +355,7 @@ pub fn run() -> Result<()> {
 						#[cfg(feature = "polkasmith")]
 							{
 								return service::start_node::<service::polkasmith_runtime::RuntimeApi, service::PolkaSmithExecutor>(
-									config, key, polkadot_config, id,cli.run.force_chain
+									config, polkadot_config, id,cli.run.force_chain
 								)
 									.await
 									.map(|r| r.0)
@@ -371,7 +369,7 @@ pub fn run() -> Result<()> {
 						#[cfg(feature = "halongbay")]
 							{
 								return service::start_node::<service::halongbay_runtime::RuntimeApi, service::HalongbayExecutor>(
-									config, key, polkadot_config, id,cli.run.force_chain
+									config, polkadot_config, id,cli.run.force_chain
 								)
 									.await
 									.map(|r| r.0)

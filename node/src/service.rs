@@ -38,7 +38,6 @@ use fc_rpc_core::types::{FilterPool, PendingTransactions};
 use fc_consensus::FrontierBlockImport;
 use runtime_primitives::{Block, Hash};
 use halongbay_runtime::{SLOT_DURATION};
-use polkadot_primitives::v0::CollatorPair;
 use cumulus_client_consensus_aura::{build_aura_consensus, BuildAuraConsensusParams, SlotProportion};
 use cumulus_client_consensus_common::ParachainConsensus;
 use cumulus_primitives_core::ParaId;
@@ -285,7 +284,6 @@ pub fn new_partial<RuntimeApi, Executor>(
 #[sc_tracing::logging::prefix_logs_with("Parachain")]
 async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 	parachain_config: Configuration,
-	collator_key: CollatorPair,
 	polkadot_config: Configuration,
 	id: ParaId,
 	_rpc_ext_builder: RB,
@@ -333,7 +331,6 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 	let polkadot_full_node =
 		cumulus_client_service::build_polkadot_full_node(
 			polkadot_config,
-			collator_key.clone(),
 			telemetry_worker_handle,
 		)
 			.map_err(
@@ -359,7 +356,7 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 	let import_queue = cumulus_client_service::SharedImportQueue::new(params.import_queue);
 
 
-	let (network, network_status_sinks, system_rpc_tx, start_network) =
+	let (network, system_rpc_tx, start_network) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &parachain_config,
 			client: client.clone(),
@@ -406,7 +403,6 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 		keystore: params.keystore_container.sync_keystore(),
 		backend: backend.clone(),
 		network: network.clone(),
-		network_status_sinks,
 		system_rpc_tx,
 		telemetry: telemetry.as_mut(),
 	})?;
@@ -498,7 +494,6 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 			announce_block,
 			client: client.clone(),
 			task_manager: &mut task_manager,
-			collator_key,
 			relay_chain_full_node: polkadot_full_node,
 			spawner,
 			parachain_consensus,
@@ -526,7 +521,6 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 /// Start a normal parachain node.
 pub async fn start_node<RuntimeApi, Executor>(
 	parachain_config: Configuration,
-	collator_key: CollatorPair,
 	polkadot_config: Configuration,
 	id: ParaId,
 	runtime: cli::ForceChain
@@ -539,7 +533,6 @@ pub async fn start_node<RuntimeApi, Executor>(
 {
 	start_node_impl(
 		parachain_config,
-		collator_key,
 		polkadot_config,
 		id,
 		|_| Default::default(),
@@ -632,7 +625,7 @@ pub fn start_dev(
 	} = new_partial::<halongbay_runtime::RuntimeApi, HalongbayExecutor>(&config, true)?;
 	let import_queue = cumulus_client_service::SharedImportQueue::new(import_queue);
 
-	let (network, network_status_sinks, system_rpc_tx, network_starter) =
+	let (network, system_rpc_tx, network_starter) =
 		sc_service::build_network(sc_service::BuildNetworkParams {
 			config: &config,
 			client: client.clone(),
@@ -736,7 +729,10 @@ pub fn start_dev(
 		rpc_extensions_builder,
 		on_demand: None,
 		remote_blockchain: None,
-		backend, network_status_sinks, system_rpc_tx, config, telemetry: None,
+		backend,
+		system_rpc_tx,
+		config, 
+		telemetry: None,
 	})?;
 
 	// Spawn Frontier EthFilterApi maintenance task.
