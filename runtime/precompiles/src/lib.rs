@@ -5,6 +5,8 @@ use pallet_evm_precompile_dispatch::Dispatch;
 use pallet_evm_precompile_modexp::Modexp;
 use pallet_evm_precompile_sha3fips::Sha3FIPS256;
 use pallet_evm_precompile_sha3fips::Sha3FIPS512;
+use pallet_evm_precompile_curve25519::Curve25519Add;
+use pallet_evm_precompile_curve25519::Curve25519ScalarMul;
 // TODO: Make other precompiles work ...
 // https://ethereum.stackexchange.com/questions/15479/list-of-pre-compiled-contracts
 
@@ -17,4 +19,6 @@ pub type PolkafoundryPrecompiles<Runtime> = (
 	Dispatch<Runtime>,
 	Sha3FIPS256,
 	Sha3FIPS512,
+	Curve25519Add,
+	Curve25519ScalarMul,
 );

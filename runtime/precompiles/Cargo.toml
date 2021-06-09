@@ -18,6 +18,7 @@ pallet-evm-precompile-dispatch = { default-features = false, git = 'https://gith
 pallet-evm-precompile-modexp = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
 pallet-evm-precompile-simple = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
 pallet-evm-precompile-sha3fips = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
+pallet-evm-precompile-curve25519 = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
 
 [features]
 default = [ "std" ]
@@ -28,4 +29,5 @@ std = [
     'pallet-evm-precompile-modexp/std',
     'pallet-evm-precompile-simple/std',
     'pallet-evm-precompile-sha3fips/std',
+    'pallet-evm-precompile-curve25519/std',
 ]
