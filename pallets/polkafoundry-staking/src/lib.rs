@@ -360,7 +360,7 @@ pub mod pallet {
 		}
 		/// Remove all the locked bond after `BondDuration`
 		/// Update `total` `active` updated immediately when call `bond_less`
-		pub fn consolidate_unbonded(self, active_era: EraIndex) -> Self {
+		pub fn remove_unbond(self, active_era: EraIndex) -> Self {
 			let mut total = self.total;
 			let unbonding = self.unbonding.into_iter()
 				.filter(|chunk| if chunk.era > active_era  {
@@ -569,7 +569,7 @@ pub mod pallet {
 							value: less.amount,
 							era
 						});
-
+						self.total -= less.amount;
 						return Some(Some(nominate.amount));
 					} else {
 						return Some(None);
@@ -579,24 +579,22 @@ pub mod pallet {
 			None
 		}
 		/// Remove all locked bond after `BondDuration`
-		pub fn consolidate_unbonded(self, active_era: EraIndex) -> Self {
-			let mut total = self.total;
-			let unbonding = self.unbonding.into_iter()
+		pub fn remove_unbond(&mut self, active_era: EraIndex) -> Balance {
+			let mut unbonded = Zero::zero();
+			let unbonding = self.unbonding.clone().into_iter()
 				.filter(|chunk| if chunk.era > active_era {
 					true
 				} else {
-					total -= chunk.value;
+					unbonded += chunk.value;
 					false
 				}).collect();
 
-			Self {
-				nominations: self.nominations,
-				total,
-				unbonding,
-			}
+			self.unbonding = unbonding;
+
+			unbonded
 		}
 
-		pub fn rm_nomination(&mut self, candidate: AccountId, can_withdraw_round: RoundIndex) -> Option<Balance> {
+		pub fn rm_nomination(&mut self, candidate: AccountId, era: EraIndex) -> Option<Balance> {
 			let mut less: Option<Balance> = None;
 			let nominations = self.nominations
 				.clone()
@@ -614,8 +612,9 @@ pub mod pallet {
 				self.nominations = nominations;
 				self.unbonding.push(UnBondChunk {
 					value: less,
-					era: can_withdraw_round
+					era
 				});
+				self.total -= less;
 				Some(self.total)
 			} else {
 				None
@@ -1032,7 +1031,7 @@ pub mod pallet {
 				Error::<T>::NominateBelowMin
 			);
 
-			Collators::<T>::insert(&candidate, ledger);
+			Ledger::<T>::insert(&candidate, ledger);
 			Nominators::<T>::insert(&who, nominator);
 			Self::deposit_event(Event::NominateLess(
 				candidate,
@@ -1048,18 +1047,18 @@ pub mod pallet {
 			candidate: T::AccountId,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			let mut nomination = Nominators::<T>::get(&who).ok_or(Error::<T>::NominationNotExist)?;
-			let mut collator = Collators::<T>::get(&candidate).ok_or(Error::<T>::CandidateNotExist)?;
-			let current_round = CurrentRound::<T>::get();
+			let mut ledger = Self::ledger(&candidate).ok_or(Error::<T>::NotController)?;
+			let mut nominator = Nominators::<T>::get(&who).ok_or(Error::<T>::NominationNotExist)?;
+			let current_era = CurrentEra::<T>::get().unwrap_or(0);
 
-			nomination.rm_nomination(candidate.clone(), current_round.index + Settings::<T>::get().bond_duration)
+			nominator.rm_nomination(candidate.clone(), current_era + T::BondingDuration::get())
 				.ok_or(Error::<T>::CandidateNotExist)?;
 
-			collator.rm_nomination(who.clone())
+			ledger.rm_nomination(who.clone())
 				.ok_or(Error::<T>::NominationNotExist)?;
 
-			Collators::<T>::insert(&candidate, collator);
-			Nominators::<T>::insert(&who, nomination);
+			Ledger::<T>::insert(&candidate, ledger);
+			Nominators::<T>::insert(&who, nominator);
 			Self::deposit_event(Event::NominatorLeaveCollator(
 				who,
 				candidate,
@@ -1355,14 +1354,9 @@ pub mod pallet {
 
 		fn update_collators(active_era: EraIndex) {
 			for (acc, mut collator) in  Ledger::<T>::iter() {
-				// active onboarding collator
-				// collator.active_onboard();
-				// locked bond become active bond
-				// collator = collator.consolidate_active(current_session.clone());
-
 				let before_total = collator.total;
 				// executed unbonding after delay BondDuration
-				collator = collator.consolidate_unbonded(active_era.clone());
+				collator = collator.remove_unbond(active_era.clone());
 
 				T::Currency::unreserve(&acc, before_total - collator.total);
 				Ledger::<T>::insert(&acc, collator)
@@ -1371,11 +1365,9 @@ pub mod pallet {
 
 		fn update_nominators(active_era: EraIndex) {
 			for (acc, mut nominations) in Nominators::<T>::iter() {
-				let before_total = nominations.total;
 				// executed unbonding after delay BondDuration
-				nominations = nominations.consolidate_unbonded(active_era.clone());
+				let unbonded = nominations.remove_unbond(active_era.clone());
 				let current_staked = TotalStaked::<T>::get();
-				let unbonded = before_total - nominations.total;
 				TotalStaked::<T>::put(current_staked - unbonded);
 
 				T::Currency::unreserve(&acc, unbonded);

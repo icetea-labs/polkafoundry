@@ -173,6 +173,17 @@ pub fn nominate_work() {
 				1000
 			),
 		);
+		let ledger = Staking::ledger(&101).unwrap();
+		assert_eq!(
+			ledger.nominations,
+			vec![Bond {
+				owner: 1,
+				amount: 1000
+			}, Bond {
+				owner: 2,
+				amount: 1000
+			}]
+		);
 		// cannot nominate full nomination collator
 		assert_noop!(
 			Staking::nominate(
@@ -191,7 +202,6 @@ pub fn nominate_work() {
 pub fn nominate_extra_work() {
 	mock_test().execute_with(|| {
 		give_money(&1, 2000);
-
 		// nominate extra not work when not nominate before
 		assert_noop!(
 			Staking::nominate_extra(
@@ -215,6 +225,14 @@ pub fn nominate_extra_work() {
 			),
 		);
 		assert_eq!(Balances::reserved_balance(&1), 800);
+		let ledger = Staking::ledger(&101).unwrap();
+		assert_eq!(
+			ledger.nominations,
+			vec![Bond {
+				owner: 1,
+				amount: 800
+			}]
+		);
 	})
 }
 
@@ -267,7 +285,7 @@ pub fn nominate_less_work() {
 		let nomination = Staking::nominators(&1).unwrap();
 		assert_eq!(
 			nomination.total,
-			500
+			200
 		);
 		assert_eq!(
 			nomination.unbonding,
@@ -289,14 +307,20 @@ pub fn nominate_less_work() {
 			nomination.total,
 			200
 		);
-
+		let ledger = Staking::ledger(&101).unwrap();
+		assert_eq!(
+			ledger.nominations,
+			vec![Bond {
+				owner: 1,
+				amount: 200
+			}]
+		);
 	})
 }
 #[test]
 fn collator_unbond_work() {
 	mock_test().execute_with(|| {
 		give_money(&1, 2000);
-
 		assert_ok!(
 			Staking::nominate(
 				Origin::signed(1),
@@ -342,6 +366,13 @@ fn collator_unbond_work() {
 fn collator_bond_less_then_unbond_work() {
 	mock_test().execute_with(|| {
 		give_money(&1, 2000);
+		assert_ok!(
+			Staking::nominate(
+				Origin::signed(1),
+				101,
+				200
+			),
+		);
 		// using stash account to bond less
 		assert_ok!(
 			Staking::bond_less(
@@ -349,6 +380,7 @@ fn collator_bond_less_then_unbond_work() {
 				150
 			),
 		);
+		assert_eq!(Balances::reserved_balance(&1), 200);
 		mock::start_active_era(2);
 		// using stash account to unbond
 		assert_ok!(
@@ -356,6 +388,15 @@ fn collator_bond_less_then_unbond_work() {
 				Origin::signed(100),
 			),
 		);
+		// double unbond fail
+		assert_noop!(
+			Staking::collator_unbond(
+				Origin::signed(100),
+			),
+			Error::<Test>::NotController
+		);
+		// nominator balance unlocked immediately
+		assert_eq!(Balances::reserved_balance(&1), 0);
 		let exit = Staking::exit_queue(&100).unwrap();
 		// the active balance before unbond is correct
 		assert_eq!(
@@ -375,6 +416,7 @@ fn collator_bond_less_then_unbond_work() {
 			5
 		);
 		assert_eq!(Balances::reserved_balance(&100), 1000);
+		// after bonding duration `bond_less` balances will be unlocked
 		mock::start_active_era(3);
 		let exit = Staking::exit_queue(&100).unwrap();
 		assert_eq!(
@@ -385,119 +427,142 @@ fn collator_bond_less_then_unbond_work() {
 			exit.unbonding,
 			vec![]
 		);
-		assert_eq!(Balances::reserved_balance(&1), 850);
+		assert_eq!(Balances::reserved_balance(&100), 850);
+		// after bonding duration `collator_unbond` balances will be unlocked
 		mock::start_active_era(5);
+		let exit = Staking::exit_queue(&100);
+		// acc will be removed from exit queue
+		assert!(exit.is_none());
+		assert_eq!(Balances::reserved_balance(&100), 0);
+	})
+}
+
+#[test]
+fn collator_bond_less_and_unbond_same_time() {
+	mock_test().execute_with(|| {
+		give_money(&1, 2000);
+		assert_ok!(
+			Staking::nominate(
+				Origin::signed(1),
+				101,
+				200
+			),
+		);
+
+		// using stash account to bond less
+		assert_ok!(
+			Staking::bond_less(
+				Origin::signed(100),
+				150
+			),
+		);
+		// using stash account to unbond
+		assert_ok!(
+			Staking::collator_unbond(
+				Origin::signed(100),
+			),
+		);
+
+		assert_eq!(Balances::reserved_balance(&1), 0);
+		let exit = Staking::exit_queue(&100).unwrap();
+		assert_eq!(
+			exit.remaining,
+			850
+		);
+		assert_eq!(
+			exit.unbonding,
+			vec![UnBondChunk {
+				value: 150,
+				era: 3
+			}]
+		);
+		assert_eq!(
+			exit.when,
+			3
+		);
+		assert_eq!(Balances::reserved_balance(&100), 1000);
+		mock::start_active_era(3);
+		assert_eq!(Balances::reserved_balance(&100), 0);
+	})
+}
+
+#[test]
+fn nominator_leave_collator_work() {
+	mock_test().execute_with(|| {
+		give_money(&1, 2000);
+		give_money(&2, 2000);
+		// 2 nominator nominate
+		assert_ok!(
+			Staking::nominate(
+				Origin::signed(1),
+				101,
+				500
+			),
+		);
+		assert_ok!(
+			Staking::nominate(
+				Origin::signed(2),
+				101,
+				1500
+			),
+		);
+		// try to leave not controller account fail
+		assert_noop!(
+			Staking::nominator_leave_collator(
+				Origin::signed(1),
+				100
+			),
+			Error::<Test>::NotController
+		);
+		assert_ok!(
+			Staking::nominator_leave_collator(
+				Origin::signed(1),
+				101
+			),
+		);
+		let nominator = Staking::nominators(&1).unwrap();
+		assert_eq!(
+			nominator.unbonding,
+			vec![UnBondChunk {
+				value: 500,
+				era: 3
+			}]
+		);
+		assert_eq!(
+			nominator.nominations,
+			vec![]
+		);
+		// the weight to count as vote be 0 after leave collator
+		assert_eq!(
+			nominator.total,
+			0
+		);
+		// the balance still reserve until `BondingDuration`
+		assert_eq!(Balances::reserved_balance(&1), 500);
+		// One nomination remain after leave
+		let ledger = Staking::ledger(&101).unwrap();
+		assert_eq!(
+			ledger.nominations,
+			vec![Bond {
+				owner: 2,
+				amount: 1500
+			}]
+		);
+
+		mock::start_active_era(3);
+		// the balance unlock after `BondingDuration`
+		let nomination = Staking::nominators(&1).unwrap();
+		assert_eq!(
+			nomination.unbonding,
+			vec![]
+		);
+		assert_eq!(
+			nomination.total,
+			0
+		);
 		assert_eq!(Balances::reserved_balance(&1), 0);
 	})
 }
-//
-// #[test]
-// fn collator_bond_less_and_unbond_same_time() {
-// 	mock_test().execute_with(|| {
-// 		Staking::bond(
-// 			Origin::signed(1),
-// 			1000
-// 		).unwrap();
-//
-// 		run_to_block(11);
-// 		assert_ok!(
-// 			Staking::bond_less(
-// 				Origin::signed(1),
-// 				150
-// 			),
-// 		);
-// 		assert_ok!(
-// 			Staking::collator_unbond(
-// 				Origin::signed(1),
-// 			),
-// 		);
-// 		let exit = Staking::exit_queue(&1).unwrap();
-// 		assert_eq!(
-// 			exit.remaining,
-// 			850
-// 		);
-// 		assert_eq!(
-// 			exit.unbonding,
-// 			vec![UnBondChunk {
-// 				value: 150,
-// 				round: 4
-// 			}]
-// 		);
-// 		assert_eq!(
-// 			exit.when,
-// 			4
-// 		);
-// 		assert_eq!(Balances::reserved_balance(&1), 1000);
-// 		run_to_block(31);
-// 		assert_eq!(Balances::reserved_balance(&1), 0);
-// 	})
-// }
-//
-// #[test]
-// fn nominator_leave_collator_work() {
-// 	mock_test().execute_with(|| {
-// 		run_to_block(11);
-// 		assert_ok!(
-// 			Staking::nominate(
-// 				Origin::signed(10),
-// 				100,
-// 				500
-// 			),
-// 		);
-// 		assert_ok!(
-// 			Staking::nominate(
-// 				Origin::signed(10),
-// 				200,
-// 				500
-// 			),
-// 		);
-// 		assert_noop!(
-// 			Staking::nominator_leave_collator(
-// 				Origin::signed(10),
-// 				1000
-// 			),
-// 			Error::<Test>::CandidateNotExist
-// 		);
-// 		assert_ok!(
-// 			Staking::nominator_leave_collator(
-// 				Origin::signed(10),
-// 				100
-// 			),
-// 		);
-// 		let nomination = Staking::nominators(&10).unwrap();
-// 		assert_eq!(
-// 			nomination.unbonding,
-// 			vec![UnBondChunk {
-// 				value: 500,
-// 				round: 4
-// 			}]
-// 		);
-// 		assert_eq!(
-// 			nomination.nominations,
-// 			vec![Bond {
-// 				owner: 200,
-// 				amount: 500
-// 			}]
-// 		);
-// 		assert_eq!(
-// 			nomination.total,
-// 			1000
-// 		);
-//
-// 		assert_eq!(Balances::reserved_balance(&10), 1000);
-// 		run_to_block(31);
-// 		let nomination = Staking::nominators(&10).unwrap();
-// 		assert_eq!(
-// 			nomination.unbonding,
-// 			vec![]
-// 		);
-// 		assert_eq!(
-// 			nomination.total,
-// 			500
-// 		);
-// 		assert_eq!(Balances::reserved_balance(&10), 500);
-// 	})
-// }
 //
 // #[test]
 // fn payout_stakers_work() {
