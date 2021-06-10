@@ -112,6 +112,7 @@ services:
       --unsafe-ws-external
       --rpc-methods=Unsafe
       --parachain-id=2009
+      --force-chain=polkasmith
       --chain /spec/polkasmith.json
       --
       --chain /spec/rococo-local.json
@@ -138,6 +139,7 @@ services:
       --unsafe-ws-external
       --rpc-methods=Unsafe
       --parachain-id=2009
+      --force-chain=polkasmith
       --chain /spec/polkasmith.json
       --
       --chain /spec/rococo-local.json
