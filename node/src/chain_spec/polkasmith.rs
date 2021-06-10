@@ -41,9 +41,9 @@ fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::
 		pallet_ethereum: polkasmith::EthereumConfig {},
 		pallet_aura: polkasmith::AuraConfig {
 			authorities: vec![
-				hex!["d03ccd7399930a85aa99eacf62332488bc3fd78e2bf5e063e2b8197814334a0b"]
-				.unchecked_into(),
 				hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"]
+				.unchecked_into(),
+				hex!["2a1438986909decb0433086d450e0628f69578ed1db53b63bf7169da6744892b"]
 				.unchecked_into(),
 			]
 		},
