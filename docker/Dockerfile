@@ -1,12 +1,13 @@
 FROM paritytech/ci-linux:production as builder
 LABEL description="This is the build stage for PolkaFoundry. Here we create the binary."
 
+ARG RUNTIME
 ARG PROFILE=release
 WORKDIR /polkafoundry
 
 COPY . /polkafoundry
 
-RUN cargo build --$PROFILE
+RUN cargo build --$PROFILE --features=$RUNTIME
 
 # ===== Build image state ======
 FROM debian:bullseye-slim
