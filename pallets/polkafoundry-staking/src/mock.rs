@@ -2,7 +2,7 @@ use crate::*;
 use crate as staking;
 use frame_support::{
 	construct_runtime, parameter_types,
-	traits::{GenesisBuild, Currency, OnFinalize, OnInitialize, OneSessionHandler, Get},
+	traits::{GenesisBuild, Currency, OnFinalize, OnInitialize, Imbalance, OnUnbalanced, OneSessionHandler, Get},
 };
 use sp_io;
 use sp_runtime::{
@@ -99,6 +99,20 @@ parameter_types! {
 thread_local! {
 	static SESSION: RefCell<(Vec<AccountId>, HashSet<AccountId>)> = RefCell::new(Default::default());
 }
+thread_local! {
+	pub static REWARD_REMAINDER_UNBALANCED: RefCell<u128> = RefCell::new(0);
+}
+
+pub struct RewardRemainderMock;
+
+impl OnUnbalanced<NegativeImbalanceOf<Test>> for RewardRemainderMock {
+	fn on_nonzero_unbalanced(amount: NegativeImbalanceOf<Test>) {
+		REWARD_REMAINDER_UNBALANCED.with(|v| {
+			*v.borrow_mut() += amount.peek();
+		});
+		drop(amount);
+	}
+}
 
 /// Another session handler struct to test on_disabled.
 pub struct OtherSessionHandler;
@@ -164,9 +178,7 @@ impl Config for Test {
 	type Event = Event;
 	type UnixTime = Timestamp;
 	type Currency = Balances;
-	type BlocksPerRound = BlocksPerRound;
 	type MaxNominationsPerCollator = MaxNominationsPerCollator;
-	type BondDuration = BondDuration;
 	type MinCollatorStake = MinCollatorStake;
 	type MinNominatorStake = MinNominatorStake;
 	type PayoutDuration = PayoutDuration;
@@ -177,7 +189,7 @@ impl Config for Test {
 	type SessionInterface = Self;
 	type BondingDuration = BondingDuration;
 	type NextNewSession = Session;
-
+	type RewardRemainder = RewardRemainderMock;
 }
 
 parameter_types! {

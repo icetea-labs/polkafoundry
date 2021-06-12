@@ -26,14 +26,14 @@ macro_rules! log {
 pub mod pallet {
 	use frame_support::{
 		pallet_prelude::*,
-		traits::{Currency, ReservableCurrency, CurrencyToVote, Imbalance, UnixTime, EstimateNextNewSession}
+		traits::{Currency, ReservableCurrency, CurrencyToVote, Imbalance, OnUnbalanced, UnixTime, EstimateNextNewSession}
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::{Saturating, Zero, AtLeast32BitUnsigned, Convert, SaturatedConversion};
 	use sp_runtime::{Perbill};
 	use sp_std::{convert::{From}, vec::Vec};
 	use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
-	use crate::inflation::compute_total_payout;
+	use crate::inflation::{compute_total_payout, INposInput};
 	use sp_std::{cmp::Ordering, prelude::*, ops::{Mul, AddAssign, Add, Sub}};
 	use log::info;
 	use pallet_session::historical;
@@ -51,6 +51,14 @@ pub mod pallet {
 		<T as frame_system::Config>::AccountId,
 	>>::Balance;
 
+	type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
+		<T as frame_system::Config>::AccountId,
+	>>::PositiveImbalance;
+
+	pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<
+		<T as frame_system::Config>::AccountId,
+	>>::NegativeImbalance;
+
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Overarching event type
@@ -62,20 +70,19 @@ pub mod pallet {
 		type UnixTime: UnixTime;
 		/// The staking balance
 		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
-		/// Number of block per round
-		type BlocksPerRound: Get<u32>;
 		/// Number of collators that nominators can be nominated for
 		const MAX_COLLATORS_PER_NOMINATOR: u32;
 		/// Maximum number of nominations per collator
 		type MaxNominationsPerCollator: Get<u32>;
-		/// Number of round that staked funds must remain bonded for
-		type BondDuration: Get<RoundIndex>;
 		/// Minimum stake required to be reserved to be a collator
 		type MinCollatorStake: Get<BalanceOf<Self>>;
 		/// Minimum stake required to be reserved to be a nominator
 		type MinNominatorStake: Get<BalanceOf<Self>>;
-		/// Number of round per payout
-		type PayoutDuration: Get<RoundIndex>;
+		/// Number of era per payout
+		type PayoutDuration: Get<EraIndex>;
+		/// Tokens have been minted and are unused for validator-reward.
+		type RewardRemainder: OnUnbalanced<NegativeImbalanceOf<Self>>;
+
 		/// Something that provides the election functionality.
 		type ElectionProvider: frame_election_provider_support::ElectionProvider<
 			Self::AccountId,
@@ -120,30 +127,6 @@ pub mod pallet {
 					ActiveEra::<T>::put(Some(active_era));
 				}
 			}
-			//
-			// let mut current_round = CurrentRound::<T>::get();
-			// if current_round.should_goto_next_round(now) {
-			// 	let block_per_round = Settings::<T>::get().blocks_per_round;
-			// 	current_round.update(now, block_per_round);
-			// 	let round_index = current_round.index;
-			// 	// start a new round
-			// 	CurrentRound::<T>::put(current_round);
-			// 	// pay for stakers
-			// 	Self::payout_stakers(round_index);
-			// 	// // onboard, unlock bond, unbond collators
-			// 	// Self::update_collators(round_index);
-			// 	// unbond all nominators
-			// 	Self::update_nominators(round_index);
-			// 	// execute all delayed collator exits
-			// 	Self::execute_exit_queue(round_index);
-			// 	// select winner candidates in this round
-			// 	Self::enact_election(round_index);
-			// 	// update total stake of next round
-			// 	TotalStakedAt::<T>::insert(round_index, TotalStaked::<T>::get());
-			// 	TotalIssuanceAt::<T>::insert(round_index, T::Currency::total_issuance());
-			//
-			// 	Self::deposit_event(Event::NewRoundStart(round_index, round_index * block_per_round));
-			// }
 		}
 	}
 
@@ -730,14 +713,12 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
 		fn build(&self) {
-			let mut total_staked: BalanceOf<T> = Zero::zero();
 			for &(ref stash, ref controller, balance) in &self.stakers {
 				assert!(
 					T::Currency::free_balance(&stash) >= balance,
 					"Account does not have enough balance to bond."
 				);
 
-				total_staked += balance.clone();
 				let _ = <Pallet<T>>::bond(
 					T::Origin::from(Some(stash.clone()).into()),
 					controller.clone(),
@@ -745,39 +726,11 @@ pub mod pallet {
 					RewardDestination::Staked,
 				);
 			}
-			TotalStaked::<T>::put(total_staked);
-
-			// Start Round 1 at Block 0
-			// let round: RoundInfo<T::BlockNumber> =
-			// 	RoundInfo::new(1u32, 0u32.into(), T::BlocksPerRound::get());
-			// CurrentRound::<T>::put(round);
-			// TotalStakedAt::<T>::insert(1u32, TotalStaked::<T>::get());
-			// TotalIssuanceAt::<T>::insert(1u32, T::Currency::total_issuance());
-			// Settings::<T>::put(SettingStruct {
-			// 	bond_duration: T::BondDuration::get(),
-			// 	blocks_per_round: T::BlocksPerRound::get(),
-			// 	desired_target: T::DesiredTarget::get()
-			// });
-			// <Pallet<T>>::deposit_event(Event::NewRoundStart(1u32, 1u32 + T::BlocksPerRound::get() as u32));
 		}
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		#[pallet::weight(0)]
-		pub fn config(
-			origin: OriginFor<T>,
-			settings: SettingStruct
-		) -> DispatchResultWithPostInfo {
-			ensure_root(origin)?;
-			Settings::<T>::put(settings.clone());
-
-			Self::deposit_event(Event::SettingChanged(
-				settings,
-			));
-			Ok(Default::default())
-		}
-
 		#[pallet::weight(0)]
 		pub fn bond(
 			origin: OriginFor<T>,
@@ -809,8 +762,6 @@ pub mod pallet {
 			let staker = StakingCollators::new(stash.clone(), amount, current_era + 1);
 
 			Ledger::<T>::insert(&controller, staker);
-			let current_staked = TotalStaked::<T>::get();
-			TotalStaked::<T>::put(current_staked + amount);
 
 			T::Currency::reserve(
 				&stash,
@@ -834,9 +785,6 @@ pub mod pallet {
 
 			ledger.bond_extra(extra);
 			Ledger::<T>::insert(&controller, ledger);
-
-			let current_staked = TotalStaked::<T>::get();
-			TotalStaked::<T>::put(current_staked + extra);
 
 			T::Currency::reserve(
 				&stash,
@@ -951,9 +899,6 @@ pub mod pallet {
 			Ledger::<T>::insert(&candidate, ledger);
 			T::Currency::reserve(&who, amount);
 
-			let current_staked = TotalStaked::<T>::get();
-			TotalStaked::<T>::put(current_staked + amount);
-
 			Self::deposit_event(Event::Nominate(candidate, amount));
 
 			Ok(Default::default())
@@ -983,9 +928,6 @@ pub mod pallet {
 			Ledger::<T>::insert(&candidate, ledger);
 			Nominators::<T>::insert(&who, nominator);
 			T::Currency::reserve(&who, extra);
-
-			let current_staked = TotalStaked::<T>::get();
-			TotalStaked::<T>::put(current_staked + extra);
 
 			Self::deposit_event(Event::NominateExtra(
 				candidate,
@@ -1211,41 +1153,50 @@ pub mod pallet {
 				let now_as_millis_u64 = T::UnixTime::now().as_millis().saturated_into::<u64>();
 
 				let era_duration = (now_as_millis_u64 - active_era_start).saturated_into::<u64>();
-				// let staked = Self::eras_total_stake(&active_era.index);
-				// let issuance = T::Currency::total_issuance();
-				// let (validator_payout, rest) = T::EraPayout::era_payout(staked, issuance, era_duration);
-				//
-				// Self::deposit_event(RawEvent::EraPayout(active_era.index, validator_payout, rest));
-				//
-				// // Set ending era reward.
-				// <ErasValidatorReward<T>>::insert(&active_era.index, validator_payout);
-				// T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
+				let staked = Self::eras_total_stake(&active_era.index);
+				let issuance = T::Currency::total_issuance();
+				let validator_payout = Self::era_payout(staked, issuance, era_duration);
+
+				Self::deposit_event(Event::EraPayout(active_era.index, validator_payout));
+
+				// Set ending era reward.
+				<ErasValidatorReward<T>>::insert(&active_era.index, validator_payout);
+
+				Self::payout_stakers(active_era.index)
 			}
 		}
 
-		fn payout_stakers(current_round: RoundIndex) {
+		fn era_payout(staked: BalanceOf<T>, issuance: BalanceOf<T>, era_duration: u64) -> BalanceOf<T> {
+			let payout = compute_total_payout(
+				INposInput {
+					i_0: 25u32,
+					i_ideal: 20u32,
+					x_ideal: 50u32,
+					d: 5u32
+				},
+				staked,
+				 issuance,
+				era_duration);
+
+			payout
+		}
+
+		fn payout_stakers(current_era: EraIndex) {
 			let mint = |amount: BalanceOf<T>, to: T::AccountId| {
 				if amount > T::Currency::minimum_balance() {
-					if let Ok(imb) = T::Currency::deposit_into_existing(&to, amount) {
+					if let Some(imb) = Self::make_payout(&to, amount) {
 						Self::deposit_event(Event::Rewarded(to.clone(), imb.peek()));
 					}
 				}
 			};
 
 			let duration = T::PayoutDuration::get();
-			if current_round > duration {
-				let payout_round = current_round - duration;
-				let total_stake = TotalStakedAt::<T>::get(payout_round);
-				let total_issuance = TotalIssuanceAt::<T>::get(payout_round);
+			if current_era > duration {
+				let payout_era = current_era - duration;
+				let total_stake = ErasTotalStake::<T>::take(&payout_era);
 
-				let payout = compute_total_payout(
-					total_stake,
-					total_issuance,
-					25u32,
-					20u32,
-					50u32,
-					5u32,
-					(T::BlocksPerRound::get() * 6000) as u64);
+				let payout = ErasValidatorReward::<T>::get(&payout_era);
+				let mut rest = payout.clone();
 
 				let commission_point = Perbill::from_rational(
 					50u32,
@@ -1255,9 +1206,9 @@ pub mod pallet {
 					50u32,
 					100
 				);
-				let total_points = TotalPoints::<T>::get(payout_round);
-				for (acc, exposure) in RoundStakerClipped::<T>::drain_prefix(payout_round) {
-					let point = CollatorPoints::<T>::get(&payout_round, &acc);
+				let total_points = TotalPoints::<T>::take(&payout_era);
+				for (acc, exposure) in ErasStakersClipped::<T>::drain_prefix(payout_era) {
+					let point = CollatorPoints::<T>::take(&payout_era, &acc);
 					let collator_exposure_part = stake_point * Perbill::from_rational(
 						exposure.own,
 						total_stake,
@@ -1266,8 +1217,11 @@ pub mod pallet {
 						point,
 						total_points
 					);
+					let collator_part = collator_exposure_part.mul(payout) + collator_commission_part.mul(payout);
+					rest -= collator_part;
+
 					mint(
-						collator_exposure_part.mul(payout) + collator_commission_part.mul(payout),
+						collator_part,
 						acc.clone()
 					);
 
@@ -1276,13 +1230,43 @@ pub mod pallet {
 							nominator.value,
 							total_stake,
 						);
+						let nominator_part = nominator_exposure_part.mul(payout);
+						rest -= nominator_part;
+
 						mint(
-							nominator_exposure_part.mul(payout),
+							nominator_part,
 							nominator.who.clone()
 						);
 					}
 				}
+				T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
+			}
+		}
 
+		/// Actually make a payment to a staker. This uses the currency's reward function
+		/// to pay the right payee for the given staker account.
+		fn make_payout(stash: &T::AccountId, amount: BalanceOf<T>) -> Option<PositiveImbalanceOf<T>> {
+			let dest = Self::payee(stash);
+			match dest {
+				RewardDestination::Controller => Self::bonded(stash)
+					.and_then(|controller|
+						Some(T::Currency::deposit_creating(&controller, amount))
+					),
+				RewardDestination::Stash =>
+					T::Currency::deposit_into_existing(stash, amount).ok(),
+				RewardDestination::Staked => Self::bonded(stash)
+					.and_then(|c| Self::ledger(&c).map(|l| (c, l)))
+					.and_then(|(controller, mut l)| {
+						l.active += amount;
+						l.total += amount;
+						let r = T::Currency::deposit_into_existing(stash, amount).ok();
+						T::Currency::reserve(&controller, l.total);
+						r
+					}),
+				RewardDestination::Account(dest_account) => {
+					Some(T::Currency::deposit_creating(&dest_account, amount))
+				},
+				RewardDestination::None => None,
 			}
 		}
 
@@ -1308,10 +1292,15 @@ pub mod pallet {
 			let exposures = Self::collect_exposures(flat_supports);
 			let elected_stashes = exposures.iter().cloned().map(|(x, _)| x).collect::<Vec<_>>();
 
+			// Populate stakers, exposures, and the snapshot of validator prefs.
+			let mut total_stake: BalanceOf<T> = Zero::zero();
 			exposures.into_iter().for_each(|(stash, exposure)| {
+				total_stake = total_stake.saturating_add(exposure.total);
+
 				ErasStakersClipped::<T>::insert(current_era, stash.clone(), exposure.clone());
 				Self::deposit_event(Event::CollatorChoosen(current_era, stash, exposure.total));
 			});
+			<ErasTotalStake<T>>::insert(&current_era, total_stake);
 
 			Ok(elected_stashes)
 		}
@@ -1367,8 +1356,6 @@ pub mod pallet {
 			for (acc, mut nominations) in Nominators::<T>::iter() {
 				// executed unbonding after delay BondDuration
 				let unbonded = nominations.remove_unbond(active_era.clone());
-				let current_staked = TotalStaked::<T>::get();
-				TotalStaked::<T>::put(current_staked - unbonded);
 
 				T::Currency::unreserve(&acc, unbonded);
 
@@ -1378,7 +1365,6 @@ pub mod pallet {
 
 		fn execute_exit_queue(active_era: EraIndex) {
 			for (acc, mut exit) in ExitQueue::<T>::iter() {
-				let current_staked = TotalStaked::<T>::get();
 				// if now > active era unreserve the balance and remove collator
 				if exit.when > active_era {
 					let unbonding = exit.unbonding.into_iter()
@@ -1386,7 +1372,6 @@ pub mod pallet {
 							true
 						} else {
 							T::Currency::unreserve(&acc, chunk.value);
-							TotalStaked::<T>::put(current_staked - chunk.value);
 
 							false
 						}).collect();
@@ -1396,11 +1381,9 @@ pub mod pallet {
 				} else {
 					// unbond all remaining balance and unbond balance then remove to queue
 					T::Currency::unreserve(&acc, exit.remaining);
-					TotalStaked::<T>::put(current_staked - exit.remaining);
 
 					for unbond in exit.unbonding {
 						T::Currency::unreserve(&acc, unbond.value);
-						TotalStaked::<T>::put(current_staked - unbond.value);
 					}
 					ExitQueue::<T>::remove(&acc);
 				}
@@ -1604,7 +1587,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn payee)]
 	pub type Payee<T: Config> =
-	StorageMap<_, Twox64Concat, T::AccountId, RewardDestination<T::AccountId>>;
+	StorageMap<_, Twox64Concat, T::AccountId, RewardDestination<T::AccountId>, ValueQuery>;
 
 	/// Map from all (unlocked) "controller" accounts to the info regarding the staking.
 	#[pallet::storage]
@@ -1625,22 +1608,19 @@ pub mod pallet {
 	#[pallet::getter(fn eras_start_session_index)]
 	pub type ErasStartSessionIndex<T: Config> =
 	StorageMap<_, Twox64Concat, EraIndex, SessionIndex>;
+	/// The session index at which the era start for the last `HISTORY_DEPTH` eras.
+	///
+	/// Note: This tracks the starting session (i.e. session index when era start being active)
+	/// for the eras in `[CurrentEra - HISTORY_DEPTH, CurrentEra]`.
+	#[pallet::storage]
+	#[pallet::getter(fn eras_total_stake)]
+	pub type ErasTotalStake<T: Config> =
+	StorageMap<_, Twox64Concat, EraIndex, BalanceOf<T>, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn exit_queue)]
 	pub type ExitQueue<T: Config> =
 	StorageMap<_, Twox64Concat, T::AccountId, Leaving<BalanceOf<T>>>;
-
-	#[pallet::storage]
-	#[pallet::getter(fn total_staked)]
-	pub type TotalStaked<T: Config> =
-	StorageValue<_, BalanceOf<T>, ValueQuery>;
-
-	#[pallet::storage]
-	#[pallet::getter(fn settings)]
-	pub type Settings<T: Config> =
-	StorageValue<_, SettingStruct, ValueQuery>;
-
 	/// The last planned session scheduled by the session pallet.
 	///
 	/// This is basically in sync with the call to [`SessionManager::new_session`].
@@ -1648,22 +1628,17 @@ pub mod pallet {
 	#[pallet::getter(fn current_planned_session)]
 	pub type CurrentPlannedSession<T: Config> =
 	StorageValue<_, SessionIndex, ValueQuery>;
-
+	/// The total validator era payout for the last `HISTORY_DEPTH` eras.
+	///
+	/// Eras that haven't finished yet or has been removed doesn't have reward.
 	#[pallet::storage]
-	#[pallet::getter(fn total_staked_at)]
-	pub type TotalStakedAt<T: Config> =
-	StorageMap<_, Twox64Concat, RoundIndex, BalanceOf<T>, ValueQuery>;
-
-	#[pallet::storage]
-	#[pallet::getter(fn total_issuance_at)]
-	pub type TotalIssuanceAt<T: Config> =
-	StorageMap<_, Twox64Concat, RoundIndex, BalanceOf<T>, ValueQuery>;
-
+	#[pallet::getter(fn eras_validator_reward)]
+	pub type ErasValidatorReward<T: Config> =
+	StorageMap<_, Twox64Concat, EraIndex, BalanceOf<T>, ValueQuery>;
 	#[pallet::storage]
 	#[pallet::getter(fn nominators)]
 	pub type Nominators<T: Config> =
 	StorageMap<_, Twox64Concat, T::AccountId, StakingNominators<T::AccountId, BalanceOf<T>>>;
-
 	/// Clipped Exposure of validator at era.
 	///
 	/// This is similar to [`ErasStakers`] but number of nominators exposed is reduced to the
@@ -1688,32 +1663,20 @@ pub mod pallet {
 	>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn round_staker_clipped)]
-	pub type RoundStakerClipped<T: Config> = StorageDoubleMap<
-		_,
-		Twox64Concat,
-		RoundIndex,
-		Twox64Concat,
-		T::AccountId,
-		Exposure<T::AccountId, BalanceOf<T>>,
-		ValueQuery,
-	>;
-
-	#[pallet::storage]
 	#[pallet::getter(fn storage_version)]
 	pub type StorageVersion<T: Config> =
 	StorageValue<_, Releases, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn total_points)]
-	pub type TotalPoints<T: Config> = StorageMap<_, Twox64Concat, RoundIndex, RewardPoint, ValueQuery>;
+	pub type TotalPoints<T: Config> = StorageMap<_, Twox64Concat, EraIndex, RewardPoint, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn awarded_pts)]
 	pub type CollatorPoints<T: Config> = StorageDoubleMap<
 		_,
 		Twox64Concat,
-		RoundIndex,
+		EraIndex,
 		Twox64Concat,
 		T::AccountId,
 		RewardPoint,
@@ -1785,8 +1748,9 @@ pub mod pallet {
 		CollatorChoosen(RoundIndex, T::AccountId, BalanceOf<T>),
 		Rewarded(T::AccountId, BalanceOf<T>),
 		SettingChanged(SettingStruct),
-		NewRoundStart(RoundIndex, RoundIndex)
-	}
+		NewRoundStart(RoundIndex, RoundIndex),
+		EraPayout(EraIndex, BalanceOf<T>),
+}
 
 	/// In this implementation `new_session(session)` must be called before `end_session(session-1)`
 	/// i.e. the new session must be planned before the ending of the previous session.
@@ -1841,7 +1805,7 @@ pub mod pallet {
 			T: Config + pallet_authorship::Config + pallet_session::Config,
 	{
 		fn note_author(author: T::AccountId) {
-			let now = <CurrentRound<T>>::get().index;
+			let now = <CurrentEra<T>>::get().unwrap_or(0);
 			let score_plus_20 = <CollatorPoints<T>>::get(now, &author) + 20;
 			<CollatorPoints<T>>::insert(now, author, score_plus_20);
 			<TotalPoints<T>>::mutate(now, |x| *x += 20);

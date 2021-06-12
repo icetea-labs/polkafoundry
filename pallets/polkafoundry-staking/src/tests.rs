@@ -563,48 +563,8 @@ fn nominator_leave_collator_work() {
 		assert_eq!(Balances::reserved_balance(&1), 0);
 	})
 }
-//
-// #[test]
-// fn payout_stakers_work() {
-// 	mock_test().execute_with(|| {
-// 		run_to_block(11);
-// 		assert_ok!(
-// 			Staking::nominate(
-// 				Origin::signed(20),
-// 				100,
-// 				400
-// 			),
-// 		);
-// 		assert_ok!(
-// 			Staking::nominate(
-// 				Origin::signed(3),
-// 				300,
-// 				800
-// 			),
-// 		);
-//
-// 		set_author(2, 100, 3000);
-// 		set_author(2, 200, 2000);
-// 		set_author(2, 300, 5000);
-//
-// 		run_to_block(31);
-// 		// total stake = 2000
-// 		// 200 earn = 500/2000 * 50% + 2000/10000 * 50% = 22.5%
-// 		// 300 earn = 600/1600 * 50% + 5000/10000 * 50% = 40%
-// 		// the rest for nominator but not display because of minimum balance
-// 		// TODO: Make test more clear
-// 		let expected = vec![
-// 			crate::Event::CollatorChoosen(2, 200, 500),
-// 			crate::Event::CollatorChoosen(2, 300, 600),
-// 			crate::Event::Nominate(100,400),
-// 			crate::Event::Nominate(300,800),
-// 			crate::Event::CollatorChoosen(3, 100, 900),
-// 			crate::Event::CollatorChoosen(3, 300, 1400),
-// 			crate::Event::Rewarded(300, 3),
-// 			crate::Event::Rewarded(200, 2),
-// 			crate::Event::CollatorChoosen(4, 100, 900),
-// 			crate::Event::CollatorChoosen(4, 300, 1400),
-// 		];
-// 		assert_eq!(events(), expected);
-// 	})
-// }
+
+#[test]
+fn rewards_should_work() {
+
+}
