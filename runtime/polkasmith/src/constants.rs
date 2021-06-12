@@ -40,7 +40,7 @@ pub mod version {
 		spec_name: create_runtime_str!("polkasmith"),
 		impl_name: create_runtime_str!("polkasmith"),
 		authoring_version: 1,
-		spec_version: 1,
+		spec_version: 1000,
 		impl_version: 1,
 		apis: crate::RUNTIME_API_VERSIONS,
 		transaction_version: 1,

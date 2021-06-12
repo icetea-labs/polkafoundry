@@ -15,10 +15,10 @@ pub fn polkasmith_config() -> Result<PolkaSmithChainSpec, String> {
 }
 
 fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::GenesisConfig {
-	const ENDOWMENT: polkasmith::Balance = 200_000_000 * polkasmith::PKS;
+	const ENDOWMENT: polkasmith::Balance = 70_000_000 * polkasmith::PKS;
 	let endowed_accounts = vec![
-		// 5HNFRkCYoriHQwuJbt5YgSwegRTxmSQRe51UKEEBWnUZuHf5
-		hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(),
+		// 5GmjsxF8L3fhSNyS4nVRHQ5NzLAtZkKUARuWKJEVE88RdoMt
+		hex!["d03ccd7399930a85aa99eacf62332488bc3fd78e2bf5e063e2b8197814334a0b"].into(),
 	];
 
 	polkasmith::GenesisConfig {
@@ -34,14 +34,18 @@ fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::
 				.collect(),
 		},
 		pallet_sudo: polkasmith::SudoConfig { key: endowed_accounts[0].clone() },
-		parachain_info: polkasmith::ParachainInfoConfig { parachain_id: 1111.into() },
+		parachain_info: polkasmith::ParachainInfoConfig { parachain_id: 2009.into() },
 		pallet_evm: polkasmith::EVMConfig {
 			accounts: BTreeMap::new(),
 		},
 		pallet_ethereum: polkasmith::EthereumConfig {},
-		pallet_aura: halongbay::AuraConfig {
-			authorities: vec![hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"]
-				.unchecked_into()]
+		pallet_aura: polkasmith::AuraConfig {
+			authorities: vec![
+				hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"]
+				.unchecked_into(),
+				hex!["2a1438986909decb0433086d450e0628f69578ed1db53b63bf7169da6744892b"]
+				.unchecked_into(),
+			]
 		},
 		cumulus_pallet_aura_ext: Default::default(),
 	}
@@ -61,8 +65,8 @@ pub fn polkasmith_staging_testnet_config() ->  Result<PolkaSmithChainSpec, Strin
 		None,
 		chain_properties(),
 		Extensions {
-			relay_chain: "rococo-local".into(),
-			para_id: 1111_u32.into(),
+			relay_chain: "kusama-local".into(),
+			para_id: 2009u32.into(),
 		},
 	))
 }
