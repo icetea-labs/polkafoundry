@@ -26,6 +26,7 @@ parameter_types! {
 	pub const BlockHashCount: u64 = 250;
 	pub BlockWeights: frame_system::limits::BlockWeights =
 		frame_system::limits::BlockWeights::simple_max(1024);
+	pub const MaxLocks: u32 = 1024;
 	pub static Period: BlockNumber = 5;
 	pub static SessionsPerEra: SessionIndex = 3;
 	pub static Offset: BlockNumber = 0;
@@ -62,7 +63,9 @@ parameter_types! {
 }
 
 impl pallet_balances::Config for Test {
-	type MaxLocks = ();
+	type MaxLocks = MaxLocks;
+	type MaxReserves = ();
+	type ReserveIdentifier = [u8; 8];
 	type Balance = Balance;
 	type Event = Event;
 	type DustRemoval = ();
@@ -83,17 +86,6 @@ impl onchain::Config for Test {
 	type BlockWeights = BlockWeights;
 	type Accuracy = Perbill;
 	type DataProvider = Staking;
-}
-
-parameter_types! {
-	pub const BlocksPerRound: u32 = 10;
-	pub const MaxCollatorsPerNominator: u32 = 5;
-	pub const MaxNominationsPerCollator: u32 = 2;
-	pub const BondDuration: u32 = 2;
-	pub const MinCollatorStake: u32 = 500;
-	pub const MinNominatorStake: u32 = 100;
-	pub const PayoutDuration: u32 = 2;
-	pub const DesiredTarget: u32 = 2;
 }
 
 thread_local! {
@@ -173,6 +165,16 @@ impl pallet_session::historical::Config for Test {
 	type FullIdentificationOf = crate::ExposureOf<Test>;
 }
 
+
+parameter_types! {
+	pub const MaxCollatorsPerNominator: u32 = 5;
+	pub const MaxNominationsPerCollator: u32 = 2;
+	pub const MinCollatorStake: u32 = 500;
+	pub const MinNominatorStake: u32 = 100;
+	pub const PayoutDuration: u32 = 2;
+	pub const DesiredTarget: u32 = 3;
+}
+
 impl Config for Test {
 	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
 	type Event = Event;
@@ -201,6 +203,16 @@ impl pallet_timestamp::Config for Test {
 	type MinimumPeriod = MinimumPeriod;
 	type WeightInfo = ();
 }
+parameter_types! {
+	pub const UncleGenerations: u64 = 0;
+}
+
+impl pallet_authorship::Config for Test {
+	type FindAuthor = ();
+	type UncleGenerations = UncleGenerations;
+	type FilterUncle = ();
+	type EventHandler = Pallet<Test>;
+}
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -212,6 +224,7 @@ construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+		Authorship: pallet_authorship::{Pallet, Call, Storage, Inherent},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Staking: staking::{Pallet, Call, Config<T>, Storage, Event<T>},
@@ -220,10 +233,26 @@ construct_runtime!(
 	}
 );
 
-pub struct ExtBuilder;
+pub struct ExtBuilder {
+	collator_count: u32,
+}
+
+impl Default for ExtBuilder {
+	fn default() -> Self {
+		Self {
+			collator_count: 2,
+		}
+	}
+}
 
 impl ExtBuilder {
+	pub fn collator_count(mut self, count: u32) -> Self {
+		self.collator_count = count;
+		self
+	}
+
 	pub fn build(
+		self,
 		balances: Vec<(AccountId, Balance)>,
 		stakers: Vec<(AccountId, AccountId, Balance)>,
 	) -> sp_io::TestExternalities {
@@ -234,6 +263,7 @@ impl ExtBuilder {
 
 		staking::GenesisConfig::<Test> {
 			stakers,
+			collator_count: self.collator_count
 		}.assimilate_storage(&mut storage)
 			.unwrap();
 
@@ -262,11 +292,57 @@ impl ExtBuilder {
 }
 
 pub(crate) fn mock_test() -> sp_io::TestExternalities {
-	ExtBuilder::build(vec![
-		(100, 2000),
-	], vec![
-		(100, 101, 1000),
-	])
+	ExtBuilder::default()
+		.build(vec![
+			(100, 2000),
+
+			// This allows us to have a total_payout different from 0.
+			(999, 1_000_000_000_000),
+		], vec![
+			(100, 101, 1000),
+		])
+}
+
+pub(crate) fn three_collators_three_collators_count() -> sp_io::TestExternalities {
+	ExtBuilder::default()
+		.collator_count(3)
+		.build(
+			vec![
+				(10, 2000),
+				(20, 2000),
+				(100, 2000),
+
+				// This allows us to have a total_payout different from 0.
+				(999, 1_000_000_000_000),
+			],
+			vec![
+				(10, 11, 800),
+				(20, 21, 900),
+				(100, 101, 1000),
+			]
+		)
+}
+
+pub(crate) fn four_collators_two_collators_count() -> sp_io::TestExternalities {
+	ExtBuilder::default()
+		.collator_count(2)
+		.build(
+			vec![
+				(10, 2000),
+				(20, 2000),
+				(30, 2000),
+				(40, 2000),
+
+				// This allows us to have a total_payout different from 0.
+				(999, 1_000_000_000_000),
+			],
+			vec![
+				(10, 11, 800),
+				(20, 21, 900),
+				(30, 31, 1000),
+				(40, 41, 1100),
+			]
+		)
 }
 
 pub(crate) fn events() -> Vec<super::Event<Test>> {
@@ -274,7 +350,7 @@ pub(crate) fn events() -> Vec<super::Event<Test>> {
 		.into_iter()
 		.map(|r| r.event)
 		.filter_map(|e| {
-			if let Event::staking(inner) = e {
+			if let Event::Staking(inner) = e {
 				Some(inner)
 			} else {
 				None
@@ -301,10 +377,25 @@ pub(crate) fn run_to_block(n: BlockNumber) {
 	}
 }
 
-pub(crate) fn set_author(round: u32, acc: u64, pts: u32) {
-	<TotalPoints<Test>>::mutate(round, |p| *p += pts);
-	<CollatorPoints<Test>>::mutate(round, acc, |p| *p += pts);
-	println!("total point ne {:?}", <TotalPoints<Test>>::get(round));
+/// Time it takes to finish a session.
+///
+/// Note, if you see `time_per_session() - BLOCK_TIME`, it is fine. This is because we set the
+/// timestamp after on_initialize, so the timestamp is always one block old.
+pub(crate) fn time_per_session() -> u64 {
+	Period::get() * BLOCK_TIME
+}
+
+/// Time it takes to finish an era.
+///
+/// Note, if you see `time_per_era() - BLOCK_TIME`, it is fine. This is because we set the
+/// timestamp after on_initialize, so the timestamp is always one block old.
+pub(crate) fn time_per_era() -> u64 {
+	time_per_session() * SessionsPerEra::get() as u64
+}
+
+/// Time that will be calculated for the reward per era.
+pub(crate) fn reward_time_per_era() -> u64 {
+	time_per_era() - BLOCK_TIME
 }
 
 pub(crate) fn active_era() -> EraIndex {
@@ -339,6 +430,24 @@ pub(crate) fn start_session(session_index: SessionIndex) {
 		Session::current_index(),
 		session_index,
 	);
+}
+
+pub(crate) fn validator_controllers() -> Vec<AccountId> {
+	Session::validators()
+		.into_iter()
+		.map(|s| Staking::bonded(&s).expect("no controller for validator"))
+		.collect()
+}
+
+pub(crate) fn current_total_payout_for_duration(duration: u64) -> Balance {
+	let payout = Staking::era_payout(
+		Staking::eras_total_stake(active_era()),
+		Balances::total_issuance(),
+		duration,
+	);
+
+	assert!(payout > 0);
+	payout
 }
 
 /// Progress until the given era.

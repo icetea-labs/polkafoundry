@@ -33,6 +33,7 @@ pallet-session = { git = "https://github.com/paritytech/substrate", features = [
 pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
 pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
 pallet-timestamp = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
+substrate-test-utils = { git = "https://github.com/paritytech/substrate", branch = "master", default-features = false }
 
 [features]
 default = ['std']

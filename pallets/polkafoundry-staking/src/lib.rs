@@ -188,12 +188,6 @@ pub mod pallet {
 		fn default() -> Self { Forcing::NotForcing }
 	}
 
-	#[derive(Default, PartialEq, Clone, Encode, Decode, RuntimeDebug)]
-	pub struct SettingStruct {
-		pub bond_duration: u32,
-		pub blocks_per_round: u32,
-		pub desired_target: u32,
-	}
 	/// Just a Balance/BlockNumber tuple to encode when a chunk of funds will be unlocked.
 	#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 	pub struct UnlockChunk<Balance> {
@@ -617,50 +611,6 @@ pub mod pallet {
 		start: Option<u64>,
 	}
 
-	#[derive(Default, Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug)]
-	pub struct RoundInfo<BlockNumber> {
-		/// Index of current round
-		index: RoundIndex,
-		/// Block where round to be started
-		start_in: BlockNumber,
-		/// Length of current round
-		length: u32
-	}
-
-	impl<BlockNumber> RoundInfo<BlockNumber>
-	where BlockNumber: PartialOrd
-		+ Copy
-		+ From<u32>
-		+ Add<Output = BlockNumber>
-	 	+ Sub<Output = BlockNumber>
-	{
-		pub fn new(index: u32, start_in: BlockNumber, length: u32) -> Self {
-			RoundInfo {
-				index,
-				start_in,
-				length
-			}
-		}
-		pub fn next_round_index(&self) -> u32 {
-			&self.index + 1u32
-		}
-
-		/// New round
-		pub fn update(&mut self, now: BlockNumber, length: u32) {
-			self.index += 1u32;
-			self.start_in = now;
-			self.length = length;
-		}
-
-		pub fn should_goto_next_round (&self, now: BlockNumber) -> bool {
-			now - self.start_in >= self.length.into()
-		}
-
-		pub fn next_election_prediction (&self) -> BlockNumber {
-			self.start_in + self.length.into()
-		}
-	}
-
 	// A value placed in storage that represents the current version of the Staking storage. This value
 	// is used by the `on_runtime_upgrade` logic to determine whether we run storage migration logic.
 	// This should match directly with the semantic versions of the Rust crate.
@@ -699,6 +649,7 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
 		pub stakers: Vec<(T::AccountId, T::AccountId, BalanceOf<T>)>,
+		pub collator_count: u32,
 	}
 
 	#[cfg(feature = "std")]
@@ -706,6 +657,7 @@ pub mod pallet {
 		fn default() -> Self {
 			Self {
 				stakers: vec![],
+				collator_count: 3u32,
 			}
 		}
 	}
@@ -726,6 +678,7 @@ pub mod pallet {
 					RewardDestination::Staked,
 				);
 			}
+			CollatorCount::<T>::put(self.collator_count);
 		}
 	}
 
@@ -1139,6 +1092,8 @@ pub mod pallet {
 			Self::update_collators(active_era);
 			Self::update_nominators(active_era);
 			Self::execute_exit_queue(active_era);
+
+			Self::payout_stakers(active_era)
 		}
 
 		/// Clear all era information for given era.
@@ -1161,12 +1116,10 @@ pub mod pallet {
 
 				// Set ending era reward.
 				<ErasValidatorReward<T>>::insert(&active_era.index, validator_payout);
-
-				Self::payout_stakers(active_era.index)
 			}
 		}
 
-		fn era_payout(staked: BalanceOf<T>, issuance: BalanceOf<T>, era_duration: u64) -> BalanceOf<T> {
+		pub fn era_payout(staked: BalanceOf<T>, issuance: BalanceOf<T>, era_duration: u64) -> BalanceOf<T> {
 			let payout = compute_total_payout(
 				INposInput {
 					i_0: 25u32,
@@ -1191,13 +1144,12 @@ pub mod pallet {
 			};
 
 			let duration = T::PayoutDuration::get();
-			if current_era > duration {
+			if current_era >= duration {
 				let payout_era = current_era - duration;
 				let total_stake = ErasTotalStake::<T>::take(&payout_era);
 
-				let payout = ErasValidatorReward::<T>::get(&payout_era);
+				let payout = ErasValidatorReward::<T>::take(&payout_era);
 				let mut rest = payout.clone();
-
 				let commission_point = Perbill::from_rational(
 					50u32,
 					100
@@ -1206,9 +1158,9 @@ pub mod pallet {
 					50u32,
 					100
 				);
-				let total_points = TotalPoints::<T>::take(&payout_era);
+				let total_points = ErasRewardPoints::<T>::take(&payout_era);
 				for (acc, exposure) in ErasStakersClipped::<T>::drain_prefix(payout_era) {
-					let point = CollatorPoints::<T>::take(&payout_era, &acc);
+					let point = EraCollatorsRewardPoints::<T>::take(&payout_era, &acc);
 					let collator_exposure_part = stake_point * Perbill::from_rational(
 						exposure.own,
 						total_stake,
@@ -1219,7 +1171,6 @@ pub mod pallet {
 					);
 					let collator_part = collator_exposure_part.mul(payout) + collator_commission_part.mul(payout);
 					rest -= collator_part;
-
 					mint(
 						collator_part,
 						acc.clone()
@@ -1239,6 +1190,7 @@ pub mod pallet {
 						);
 					}
 				}
+
 				T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
 			}
 		}
@@ -1247,6 +1199,7 @@ pub mod pallet {
 		/// to pay the right payee for the given staker account.
 		fn make_payout(stash: &T::AccountId, amount: BalanceOf<T>) -> Option<PositiveImbalanceOf<T>> {
 			let dest = Self::payee(stash);
+
 			match dest {
 				RewardDestination::Controller => Self::bonded(stash)
 					.and_then(|controller|
@@ -1280,6 +1233,7 @@ pub mod pallet {
 						weight,
 						frame_support::weights::DispatchClass::Mandatory,
 					);
+					println!("res ne {:?}", res);
 					Self::process_election(res, current_era)
 				})
 				.ok()
@@ -1296,7 +1250,7 @@ pub mod pallet {
 			let mut total_stake: BalanceOf<T> = Zero::zero();
 			exposures.into_iter().for_each(|(stash, exposure)| {
 				total_stake = total_stake.saturating_add(exposure.total);
-
+				// println!("stash ne {:?}", stash);
 				ErasStakersClipped::<T>::insert(current_era, stash.clone(), exposure.clone());
 				Self::deposit_event(Event::CollatorChoosen(current_era, stash, exposure.total));
 			});
@@ -1394,7 +1348,7 @@ pub mod pallet {
 		pub fn slashable_balance_of(stash: &T::AccountId, status: StakerStatus) -> BalanceOf<T> {
 			// Weight note: consider making the stake accessible through stash.
 			match status {
-				StakerStatus::Validator => Self::ledger(stash).map(|c| c.active).unwrap_or_default(),
+				StakerStatus::Validator => Self::bonded(stash).and_then(Self::ledger).map(|l| l.active).unwrap_or_default(),
 				StakerStatus::Nominator => Self::nominators(stash).map(|l| l.total).unwrap_or_default(),
 				_ => Default::default(),
 			}
@@ -1437,9 +1391,10 @@ pub mod pallet {
 			let weight_of_nominator = Self::slashable_balance_of_fn(StakerStatus::Nominator);
 			let mut all_voters = Vec::new();
 
-			for (validator, _) in <Ledger<T>>::iter() {
+			for (stash, _) in <Bonded<T>>::iter() {
 				// append self vote
-				let self_vote = (validator.clone(), weight_of_validator(&validator), vec![validator.clone()]);
+
+				let self_vote = (stash.clone(), weight_of_validator(&stash), vec![stash.clone()]);
 				all_voters.push(self_vote);
 			}
 
@@ -1458,13 +1413,31 @@ pub mod pallet {
 		}
 
 		pub fn get_npos_targets() -> Vec<T::AccountId> {
-			let t = <Ledger<T>>::iter().map(|(v, _)| v).collect::<Vec<_>>();
-			<Ledger<T>>::iter().map(|(v, _)| v).collect::<Vec<_>>()
+			<Bonded<T>>::iter().map(|(v, _)| v).collect::<Vec<_>>()
 		}
 
-		pub fn can_author(account: &T::AccountId) -> bool {
-			Collators::<T>::get(&account).is_some()
+
+		/// Add reward points to validators using their stash account ID.
+		///
+		/// Validators are keyed by stash account ID and must be in the current elected set.
+		///
+		/// For each element in the iterator the given number of points in u32 is added to the
+		/// validator, thus duplicates are handled.
+		///
+		/// At the end of the era each the total payout will be distributed among validator
+		/// relatively to their points.
+		///
+		/// COMPLEXITY: Complexity is `number_of_validator_to_reward x current_elected_len`.
+		pub fn reward_by_ids(
+			author: T::AccountId,
+			points: u32
+		) {
+			if let Some(active_era) = Self::active_era() {
+				let score_plus_20 = <EraCollatorsRewardPoints<T>>::get(active_era.index, &author) + points;
+				<EraCollatorsRewardPoints<T>>::insert(active_era.index, author, score_plus_20);
+			}
 		}
+
 	}
 
 	impl<T: Config> frame_election_provider_support::ElectionDataProvider<T::AccountId, T::BlockNumber>
@@ -1497,7 +1470,7 @@ pub mod pallet {
 		}
 
 		fn desired_targets() -> data_provider::Result<(u32, Weight)> {
-			Ok((10u32, <T as frame_system::Config>::DbWeight::get().reads(1)))
+			Ok((Self::collator_count(), <T as frame_system::Config>::DbWeight::get().reads(1)))
 		}
 
 		fn next_election_prediction(now: T::BlockNumber) -> T::BlockNumber {
@@ -1528,10 +1501,11 @@ pub mod pallet {
 		}
 	}
 
+	/// The ideal number of staking participants.
 	#[pallet::storage]
-	#[pallet::getter(fn current_round)]
-	pub type CurrentRound<T: Config> =
-	StorageValue<_, RoundInfo<T::BlockNumber>, ValueQuery>;
+	#[pallet::getter(fn collator_count)]
+	pub type CollatorCount<T: Config> =
+	StorageValue<_, u32, ValueQuery>;
 	/// The current era index.
 	///
 	/// This is the latest planned era, depending on how the Session pallet queues the validator
@@ -1594,12 +1568,6 @@ pub mod pallet {
 	#[pallet::getter(fn ledger)]
 	pub type Ledger<T: Config> =
 	StorageMap<_, Twox64Concat, T::AccountId, StakingCollators<T::AccountId, BalanceOf<T>>>;
-
-	#[pallet::storage]
-	#[pallet::getter(fn collators)]
-	pub type Collators<T: Config> =
-	StorageMap<_, Twox64Concat, T::AccountId, StakingCollators<T::AccountId, BalanceOf<T>>>;
-
 	/// The session index at which the era start for the last `HISTORY_DEPTH` eras.
 	///
 	/// Note: This tracks the starting session (i.e. session index when era start being active)
@@ -1669,11 +1637,11 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn total_points)]
-	pub type TotalPoints<T: Config> = StorageMap<_, Twox64Concat, EraIndex, RewardPoint, ValueQuery>;
+	pub type ErasRewardPoints<T: Config> = StorageMap<_, Twox64Concat, EraIndex, RewardPoint, ValueQuery>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn awarded_pts)]
-	pub type CollatorPoints<T: Config> = StorageDoubleMap<
+	#[pallet::getter(fn era_collators_reward_points)]
+	pub type EraCollatorsRewardPoints<T: Config> = StorageDoubleMap<
 		_,
 		Twox64Concat,
 		EraIndex,
@@ -1747,8 +1715,6 @@ pub mod pallet {
 		NominatorLeaveCollator(T::AccountId, T::AccountId),
 		CollatorChoosen(RoundIndex, T::AccountId, BalanceOf<T>),
 		Rewarded(T::AccountId, BalanceOf<T>),
-		SettingChanged(SettingStruct),
-		NewRoundStart(RoundIndex, RoundIndex),
 		EraPayout(EraIndex, BalanceOf<T>),
 }
 
@@ -1805,10 +1771,10 @@ pub mod pallet {
 			T: Config + pallet_authorship::Config + pallet_session::Config,
 	{
 		fn note_author(author: T::AccountId) {
+			println!("author ne {:?}", author);
 			let now = <CurrentEra<T>>::get().unwrap_or(0);
-			let score_plus_20 = <CollatorPoints<T>>::get(now, &author) + 20;
-			<CollatorPoints<T>>::insert(now, author, score_plus_20);
-			<TotalPoints<T>>::mutate(now, |x| *x += 20);
+			Self::reward_by_ids(author, 20);
+			<ErasRewardPoints<T>>::mutate(now, |x| *x += 20);
 		}
 
 		// just ignore it

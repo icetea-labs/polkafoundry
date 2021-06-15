@@ -20,21 +20,20 @@ pub fn compute_total_payout<N>(
 	let x_ideal = Perbill::from_rational(x_ideal, 100);
 	let d = Perbill::from_rational(d, 100);
 
-	let portion = Perbill::from_rational(era_duration,MILLISECONDS_PER_YEAR);
+	let portion = Perbill::from_rational(era_duration as u64,MILLISECONDS_PER_YEAR);
 
-	let payout = portion * (compute_i_npos(i_0, i_ideal, x, x_ideal, d)).mul(total_tokens);
+	let payout =  portion * (compute_i_npos(i_0, i_ideal, x, x_ideal, d)).mul(total_tokens);
 
 	payout
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct INposInput {
 	pub i_0: u32,
 	pub i_ideal: u32,
 	pub x_ideal: u32,
 	pub d: u32,
 }
-
 
 pub fn compute_i_npos<P: PerThing> (
 	i_0: P,
@@ -167,6 +166,5 @@ mod test {
 
 		const HOUR: u64 = 60 * 60 * 1000;
 		assert_eq!(super::compute_total_payout(i_npos.clone(),2_500_000_000_000_000_000_000_000_000u128, 5_000_000_000_000_000_000_000_000_000u128, HOUR), 57_038_500_000_000_000_000_000);
-
 	}
 }

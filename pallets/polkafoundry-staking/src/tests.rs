@@ -1,6 +1,10 @@
 use crate::*;
-use frame_support::{assert_noop, assert_ok};
+use frame_support::{
+	assert_noop, assert_ok,
+	traits::{Currency},
+};
 use mock::*;
+use substrate_test_utils::assert_eq_uvec;
 
 #[test]
 pub fn bond_work () {
@@ -566,5 +570,81 @@ fn nominator_leave_collator_work() {
 
 #[test]
 fn rewards_should_work() {
+	three_collators_three_collators_count().execute_with(|| {
+		let init_balance_10 = Balances::total_balance(&10);
+		let init_balance_11 = Balances::total_balance(&11);
+		let init_balance_20 = Balances::total_balance(&20);
+		let init_balance_21 = Balances::total_balance(&21);
+		let init_balance_100 = Balances::total_balance(&100);
+		let init_balance_101 = Balances::total_balance(&101);
 
+		// Set payees
+		Payee::<Test>::insert(10, RewardDestination::Controller);
+		Payee::<Test>::insert(20, RewardDestination::Controller);
+		Payee::<Test>::insert(100, RewardDestination::Controller);
+
+		let total_payout_0 = current_total_payout_for_duration(reward_time_per_era());
+
+		start_active_era(1);
+		assert_eq!(
+			*events().last().unwrap(),
+			crate::Event::EraPayout(0, total_payout_0)
+		);
+
+		assert_eq!(Balances::total_balance(&10), init_balance_10);
+		assert_eq!(Balances::total_balance(&11), init_balance_11);
+		assert_eq!(Balances::total_balance(&20), init_balance_20);
+		assert_eq!(Balances::total_balance(&21), init_balance_21);
+		assert_eq!(Balances::total_balance(&100), init_balance_100);
+		assert_eq!(Balances::total_balance(&101), init_balance_101);
+
+		assert_eq_uvec!(Session::validators(), vec![10, 20, 100]);
+
+		start_active_era(2);
+
+		assert_eq!(Balances::total_balance(&10), init_balance_10);
+		assert_eq!(Balances::total_balance(&11), 1641);
+		assert_eq!(Balances::total_balance(&20), init_balance_20);
+		assert_eq!(Balances::total_balance(&21), 1846);
+		assert_eq!(Balances::total_balance(&100), init_balance_100);
+		assert_eq!(Balances::total_balance(&101), 2051);
+		assert_eq!(
+			mock::REWARD_REMAINDER_UNBALANCED.with(|v| *v.borrow()),
+			total_payout_0 - 1641 - 1846 - 2051,
+		);
+	})
+}
+
+#[test]
+fn nominating_and_rewards_should_work() {
+	four_collators_two_collators_count().execute_with(|| {
+		// initial validators -- everyone is actually even.
+		assert_eq_uvec!(validator_controllers(), vec![31, 41]);
+		// Set payee to controller
+		Payee::<Test>::insert(10, RewardDestination::Controller);
+		Payee::<Test>::insert(20, RewardDestination::Controller);
+		Payee::<Test>::insert(30, RewardDestination::Controller);
+
+		// give the man some money
+		let initial_balance = 5000;
+		for i in [1, 2, 3, 4].iter() {
+			let _ = Balances::make_free_balance_be(i, initial_balance);
+		}
+		// bond two account pairs and state interest in nomination.
+		// 2 will nominate for 10, 20
+		assert_ok!(Staking::bond(Origin::signed(1), 2, 1000, RewardDestination::Controller));
+		assert_ok!(Staking::nominate(Origin::signed(2), 11, 500));
+		assert_ok!(Staking::nominate(Origin::signed(2), 21, 500));
+		// 4 will nominate for 10, 20, 100
+		assert_ok!(Staking::bond(Origin::signed(3), 4, 1000, RewardDestination::Controller));
+		assert_ok!(Staking::nominate(Origin::signed(4), 11, 500));
+		assert_ok!(Staking::nominate(Origin::signed(4), 21, 500));
+		assert_ok!(Staking::nominate(Origin::signed(4), 31, 500));
+		// the total reward for era 0
+		let total_payout_0 = current_total_payout_for_duration(reward_time_per_era());
+		mock::start_active_era(1);
+
+		// 4 and 41 have more votes, they will be chosen.
+		assert_eq_uvec!(validator_controllers(), vec![4, 41]);
+	})
 }
