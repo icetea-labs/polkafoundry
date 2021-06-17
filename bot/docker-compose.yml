@@ -1,8 +1,8 @@
 version: "3.2"
 
 services:
-  bot:
-    container_name: node-bot
+  faucet-bot:
+    container_name: faucet-bot
     build:
       context: .
       dockerfile: Dockerfile
@@ -17,7 +17,7 @@ services:
       botlink:
         ipv4_address: 192.168.11.10
 
-  redis:
+  faucet-redis:
     image: redis:6.2.1-alpine
     container_name: redis
     hostname: redis
