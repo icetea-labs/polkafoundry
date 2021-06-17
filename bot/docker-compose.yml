@@ -11,7 +11,7 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - redis
+      - faucet-redis
     command: sh start.sh
     networks:
       botlink:
@@ -19,8 +19,8 @@ services:
 
   faucet-redis:
     image: redis:6.2.1-alpine
-    container_name: redis
-    hostname: redis
+    container_name: faucet-redis
+    hostname: faucet-redis
     tty: true
     volumes:
       - redis_data:/data
