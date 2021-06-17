@@ -29,7 +29,7 @@ pub mod pallet {
 		traits::{Currency, ReservableCurrency, CurrencyToVote, Imbalance, OnUnbalanced, UnixTime, EstimateNextNewSession}
 	};
 	use frame_system::pallet_prelude::*;
-	use sp_runtime::traits::{Saturating, Zero, AtLeast32BitUnsigned, Convert, SaturatedConversion};
+	use sp_runtime::traits::{Saturating, Zero, AtLeast32BitUnsigned, Convert, SaturatedConversion, CheckedSub};
 	use sp_runtime::{Perbill};
 	use sp_std::{convert::{From}, vec::Vec};
 	use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
@@ -203,6 +203,28 @@ pub mod pallet {
 		pub value: Balance,
 		/// era number at which point it'll be unbonded.
 		pub era: EraIndex,
+	}
+
+	/// Preference of what happens regarding validation.
+	#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
+	pub struct CollatorPrefs {
+		/// Reward that validator takes up-front; only the rest is split between themselves and
+		/// nominators.
+		#[codec(compact)]
+		pub commission: Perbill,
+		/// Whether or not this validator is accepting more nominations. If `true`, then no nominator
+		/// who is not already nominating this validator may nominate them. By default, validators
+		/// are accepting nominations.
+		pub blocked: bool,
+	}
+
+	impl Default for CollatorPrefs {
+		fn default() -> Self {
+			CollatorPrefs {
+				commission: Perbill::from_rational(50u32, 100u32),
+				blocked: false,
+			}
+		}
 	}
 
 	#[derive(Default, Clone, Encode, Decode, RuntimeDebug)]
@@ -464,7 +486,7 @@ pub mod pallet {
 
 	impl<AccountId> Default for RewardDestination<AccountId> {
 		fn default() -> Self {
-			RewardDestination::Staked
+			RewardDestination::Stash
 		}
 	}
 
@@ -808,6 +830,33 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(0)]
+		pub fn validate(
+			origin: OriginFor<T>,
+			prefs: CollatorPrefs
+		) -> DispatchResultWithPostInfo {
+			let controller = ensure_signed(origin)?;
+			let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+			let stash = &ledger.stash;
+
+			<Collators<T>>::insert(stash, prefs);
+
+			Ok(Default::default())
+		}
+
+		#[pallet::weight(0)]
+		pub fn set_payee(
+			origin: OriginFor<T>,
+			payee: RewardDestination<T::AccountId>
+		) -> DispatchResultWithPostInfo {
+			let controller = ensure_signed(origin)?;
+			let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+			let stash = &ledger.stash;
+			<Payee<T>>::insert(stash, payee);
+
+			Ok(Default::default())
+		}
+
+		#[pallet::weight(0)]
 		pub fn nominate(
 			origin: OriginFor<T>,
 			candidate: T::AccountId,
@@ -819,6 +868,7 @@ pub mod pallet {
 				Error::<T>::NominateBelowMin
 			);
 			let mut ledger = Self::ledger(&candidate).ok_or(Error::<T>::NotController)?;
+			let stash = &ledger.stash;
 
 			ensure!(
 					ledger.nominations.len() < T::MaxNominationsPerCollator::get() as usize,
@@ -828,7 +878,7 @@ pub mod pallet {
 			if let Some(mut nominator) = Nominators::<T>::get(&who) {
 				ensure!(
 					nominator.add_nomination(Bond {
-						owner: candidate.clone(),
+						owner: stash.clone(),
 						amount,
 					}),
 					Error::<T>::AlreadyNominatedCollator
@@ -836,7 +886,7 @@ pub mod pallet {
 				Nominators::<T>::insert(&who, nominator)
 			} else {
 				let nominator = StakingNominators::new(vec![Bond {
-					owner: candidate.clone(), amount
+					owner: stash.clone(), amount
 				}], amount);
 
 				Nominators::<T>::insert(&who, nominator)
@@ -865,11 +915,12 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			let mut ledger = Self::ledger(&candidate).ok_or(Error::<T>::NotController)?;
+			let stash = &ledger.stash;
 
 			let mut nominator = Nominators::<T>::get(&who).ok_or(Error::<T>::NominationNotExist)?;
 
 			nominator.nominate_extra(Bond {
-				owner: candidate.clone(),
+				owner: stash.clone(),
 				amount: extra
 			}).ok_or(Error::<T>::CandidateNotExist)?;
 
@@ -898,12 +949,13 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			let mut ledger = Self::ledger(&candidate).ok_or(Error::<T>::NotController)?;
+			let stash = &ledger.stash;
 
 			let mut nominator = Nominators::<T>::get(&who).ok_or(Error::<T>::NominationNotExist)?;
 			let current_era = CurrentEra::<T>::get().unwrap_or(0);
 
 			let after = nominator.nominate_less(Bond {
-				owner: candidate.clone(),
+				owner: stash.clone(),
 				amount: less
 			}, current_era + T::BondingDuration::get())
 				.ok_or(Error::<T>::CandidateNotExist)?
@@ -943,10 +995,12 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			let mut ledger = Self::ledger(&candidate).ok_or(Error::<T>::NotController)?;
+			let stash = &ledger.stash;
+
 			let mut nominator = Nominators::<T>::get(&who).ok_or(Error::<T>::NominationNotExist)?;
 			let current_era = CurrentEra::<T>::get().unwrap_or(0);
 
-			nominator.rm_nomination(candidate.clone(), current_era + T::BondingDuration::get())
+			nominator.rm_nomination(stash.clone(), current_era + T::BondingDuration::get())
 				.ok_or(Error::<T>::CandidateNotExist)?;
 
 			ledger.rm_nomination(who.clone())
@@ -1150,27 +1204,45 @@ pub mod pallet {
 
 				let payout = ErasValidatorReward::<T>::take(&payout_era);
 				let mut rest = payout.clone();
-				let commission_point = Perbill::from_rational(
-					50u32,
+				let reward_point = Perbill::from_rational(
+					20u32,
 					100
 				);
 				let stake_point = Perbill::from_rational(
-					50u32,
+					80u32,
 					100
 				);
 				let total_points = ErasRewardPoints::<T>::take(&payout_era);
 				for (acc, exposure) in ErasStakersClipped::<T>::drain_prefix(payout_era) {
-					let point = EraCollatorsRewardPoints::<T>::take(&payout_era, &acc);
-					let collator_exposure_part = stake_point * Perbill::from_rational(
-						exposure.own,
-						total_stake,
-					);
-					let collator_commission_part = commission_point * Perbill::from_rational(
-						point,
-						total_points
-					);
-					let collator_part = collator_exposure_part.mul(payout) + collator_commission_part.mul(payout);
-					rest -= collator_part;
+					let mut collator_total_part = if let Some(controller) = <Bonded<T>>::get(&acc) {
+						let point = EraCollatorsRewardPoints::<T>::take(&payout_era, &controller);
+
+						let collator_exposure_part = stake_point * Perbill::from_rational(
+							exposure.total,
+							total_stake,
+						);
+						let collator_reward_part = reward_point * Perbill::from_rational(
+							point,
+							total_points
+						);
+
+						collator_exposure_part.mul(payout) + collator_reward_part.mul(payout)
+					} else {
+						let collator_exposure_part = stake_point * Perbill::from_rational(
+							exposure.total,
+							total_stake,
+						);
+
+						collator_exposure_part.mul(payout)
+					};
+					let collator_prefs = ErasCollatorPrefs::<T>::get(payout_era, &acc);
+					let commission = collator_prefs.commission;
+
+					let collator_part = commission.mul(collator_total_part);
+					let nominator_total_part = collator_total_part - collator_part;
+
+					rest = rest.checked_sub(&collator_part).unwrap_or(0u32.into());
+
 					mint(
 						collator_part,
 						acc.clone()
@@ -1179,10 +1251,10 @@ pub mod pallet {
 					for nominator in exposure.others.iter() {
 						let nominator_exposure_part = Perbill::from_rational(
 							nominator.value,
-							total_stake,
+							exposure.total,
 						);
-						let nominator_part = nominator_exposure_part.mul(payout);
-						rest -= nominator_part;
+						let nominator_part = nominator_exposure_part.mul(nominator_total_part);
+						rest = rest.checked_sub(&nominator_part).unwrap_or(0u32.into());
 
 						mint(
 							nominator_part,
@@ -1190,8 +1262,9 @@ pub mod pallet {
 						);
 					}
 				}
-
-				T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
+				if rest > 0u32.into() {
+					T::RewardRemainder::on_unbalanced(T::Currency::issue(rest));
+				}
 			}
 		}
 
@@ -1219,7 +1292,10 @@ pub mod pallet {
 				RewardDestination::Account(dest_account) => {
 					Some(T::Currency::deposit_creating(&dest_account, amount))
 				},
-				RewardDestination::None => None,
+				// it's cannot happen but just to make sure
+				RewardDestination::None => {
+					Some(T::Currency::deposit_creating(&stash, amount))
+				},
 			}
 		}
 
@@ -1233,7 +1309,7 @@ pub mod pallet {
 						weight,
 						frame_support::weights::DispatchClass::Mandatory,
 					);
-					println!("res ne {:?}", res);
+					// println!("res ne {:?}", res);
 					Self::process_election(res, current_era)
 				})
 				.ok()
@@ -1245,16 +1321,20 @@ pub mod pallet {
 		) -> Result<Vec<T::AccountId>, ()> {
 			let exposures = Self::collect_exposures(flat_supports);
 			let elected_stashes = exposures.iter().cloned().map(|(x, _)| x).collect::<Vec<_>>();
-
 			// Populate stakers, exposures, and the snapshot of validator prefs.
 			let mut total_stake: BalanceOf<T> = Zero::zero();
 			exposures.into_iter().for_each(|(stash, exposure)| {
 				total_stake = total_stake.saturating_add(exposure.total);
-				// println!("stash ne {:?}", stash);
 				ErasStakersClipped::<T>::insert(current_era, stash.clone(), exposure.clone());
 				Self::deposit_event(Event::CollatorChoosen(current_era, stash, exposure.total));
 			});
 			<ErasTotalStake<T>>::insert(&current_era, total_stake);
+
+			// collect the pref of all winners
+			for stash in &elected_stashes {
+				let pref = Self::collators(stash);
+				<ErasCollatorPrefs<T>>::insert(&current_era, stash, pref);
+			}
 
 			Ok(elected_stashes)
 		}
@@ -1408,7 +1488,7 @@ pub mod pallet {
 				let vote_weight = weight_of_nominator(&nominator);
 				all_voters.push((nominator, vote_weight, targets))
 			}
-
+			// println!("all_voters ne {:?}", all_voters);
 			all_voters
 		}
 
@@ -1435,6 +1515,7 @@ pub mod pallet {
 			if let Some(active_era) = Self::active_era() {
 				let score_plus_20 = <EraCollatorsRewardPoints<T>>::get(active_era.index, &author) + points;
 				<EraCollatorsRewardPoints<T>>::insert(active_era.index, author, score_plus_20);
+				<ErasRewardPoints<T>>::mutate(active_era.index, |x| *x += 20);
 			}
 		}
 
@@ -1562,6 +1643,12 @@ pub mod pallet {
 	#[pallet::getter(fn payee)]
 	pub type Payee<T: Config> =
 	StorageMap<_, Twox64Concat, T::AccountId, RewardDestination<T::AccountId>, ValueQuery>;
+	/// The map from (wannabe) validator stash key to the preferences of that collator.
+	///
+	#[pallet::storage]
+	#[pallet::getter(fn collators)]
+	pub type Collators<T: Config> =
+	StorageMap<_, Twox64Concat, T::AccountId, CollatorPrefs, ValueQuery>;
 
 	/// Map from all (unlocked) "controller" accounts to the info regarding the staking.
 	#[pallet::storage]
@@ -1629,6 +1716,23 @@ pub mod pallet {
 		Exposure<T::AccountId, BalanceOf<T>>,
 		ValueQuery,
 	>;
+	/// This holds the preferences of validators.
+	///
+	/// This is keyed first by the era index to allow bulk deletion and then the stash account.
+	///
+	/// Is it removed after `HISTORY_DEPTH` eras.
+	// If prefs hasn't been set or has been removed then 0 commission is returned.
+	#[pallet::storage]
+	#[pallet::getter(fn eras_collator_prefs)]
+	pub type ErasCollatorPrefs<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		EraIndex,
+		Twox64Concat,
+		T::AccountId,
+		CollatorPrefs,
+		ValueQuery,
+	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn storage_version)]
@@ -1648,18 +1752,6 @@ pub mod pallet {
 		Twox64Concat,
 		T::AccountId,
 		RewardPoint,
-		ValueQuery,
-	>;
-
-	#[pallet::storage]
-	#[pallet::getter(fn eras_stakers)]
-	pub type ErasStakers<T: Config> = StorageDoubleMap<
-		_,
-		Twox64Concat,
-		EraIndex,
-		Twox64Concat,
-		T::AccountId,
-		Exposure<T::AccountId, BalanceOf<T>>,
 		ValueQuery,
 	>;
 
@@ -1751,7 +1843,7 @@ pub mod pallet {
 					.unwrap_or(0);
 
 				validators.into_iter().map(|v| {
-					let exposure = Self::eras_stakers(current_era, &v);
+					let exposure = Self::eras_stakers_clipped(current_era, &v);
 					(v, exposure)
 				}).collect()
 			})
@@ -1772,9 +1864,7 @@ pub mod pallet {
 	{
 		fn note_author(author: T::AccountId) {
 			println!("author ne {:?}", author);
-			let now = <CurrentEra<T>>::get().unwrap_or(0);
 			Self::reward_by_ids(author, 20);
-			<ErasRewardPoints<T>>::mutate(now, |x| *x += 20);
 		}
 
 		// just ignore it
@@ -1805,7 +1895,7 @@ pub mod pallet {
 	{
 		fn convert(validator: T::AccountId) -> Option<Exposure<T::AccountId, BalanceOf<T>>> {
 			<Pallet<T>>::active_era()
-				.map(|active_era| <Pallet<T>>::eras_stakers(active_era.index, &validator))
+				.map(|active_era| <Pallet<T>>::eras_stakers_clipped(active_era.index, &validator))
 		}
 	}
 }

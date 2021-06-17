@@ -1,10 +1,13 @@
 use crate::*;
 use frame_support::{
 	assert_noop, assert_ok,
-	traits::{Currency},
+	traits::{Currency, ReservableCurrency},
 };
 use mock::*;
-use substrate_test_utils::assert_eq_uvec;
+use substrate_test_utils::{assert_eq_uvec};
+use sp_runtime::{assert_eq_error_rate, Perbill};
+use sp_std::{ops::{Mul}};
+use pallet_balances::Error as BalancesError;
 
 #[test]
 pub fn bond_work () {
@@ -585,7 +588,19 @@ fn rewards_should_work() {
 
 		let total_payout_0 = current_total_payout_for_duration(reward_time_per_era());
 
+		<Pallet<Test>>::reward_by_ids(11, 20);
+		<Pallet<Test>>::reward_by_ids(21, 20);
+		<Pallet<Test>>::reward_by_ids(101, 20);
+
 		start_active_era(1);
+
+		<Pallet<Test>>::reward_by_ids(11, 20);
+		<Pallet<Test>>::reward_by_ids(11, 20);
+		<Pallet<Test>>::reward_by_ids(21, 20);
+		<Pallet<Test>>::reward_by_ids(101, 20);
+		<Pallet<Test>>::reward_by_ids(101, 20);
+		<Pallet<Test>>::reward_by_ids(101, 20);
+
 		assert_eq!(
 			*events().last().unwrap(),
 			crate::Event::EraPayout(0, total_payout_0)
@@ -602,15 +617,53 @@ fn rewards_should_work() {
 
 		start_active_era(2);
 
-		assert_eq!(Balances::total_balance(&10), init_balance_10);
-		assert_eq!(Balances::total_balance(&11), 1641);
-		assert_eq!(Balances::total_balance(&20), init_balance_20);
-		assert_eq!(Balances::total_balance(&21), 1846);
-		assert_eq!(Balances::total_balance(&100), init_balance_100);
-		assert_eq!(Balances::total_balance(&101), 2051);
-		assert_eq!(
+		// if you not set pref, the payout will be 50:50 between collator and nominator
+		// that why the remain balance is /2 because we not test with nominator
+		assert_eq_error_rate!(
 			mock::REWARD_REMAINDER_UNBALANCED.with(|v| *v.borrow()),
-			total_payout_0 - 1641 - 1846 - 2051,
+			total_payout_0 / 2,
+			5
+		);
+
+		let collator_payout_0 = total_payout_0 / 2;
+		// its 80% stake part * 800/2700 % staking + 20% point part * % point
+		let part_for_11_0 = collator_payout_0 * 32 / 135 + collator_payout_0 * 1 / 15;
+		let part_for_21_0 = collator_payout_0 * 4 / 15 + collator_payout_0 * 1 / 15;
+		let part_for_101_0 = collator_payout_0 * 8 / 27 + collator_payout_0 * 1 / 15;
+
+		assert_eq!(Balances::total_balance(&10), init_balance_10);
+		assert_eq_error_rate!(Balances::total_balance(&11), part_for_11_0, 3);
+		assert_eq!(Balances::total_balance(&20), init_balance_20);
+		assert_eq_error_rate!(Balances::total_balance(&21), part_for_21_0, 3);
+		assert_eq!(Balances::total_balance(&100), init_balance_100);
+		assert_eq_error_rate!(Balances::total_balance(&101),part_for_101_0, 3);
+
+		let rest_0 = collator_payout_0 - part_for_11_0 - part_for_21_0 - part_for_101_0;
+		start_active_era(3);
+
+		// Compute total payout now for whole duration as other parameter won't change
+		let total_payout_1 = current_total_payout_for_duration(reward_time_per_era());
+
+		assert_eq_uvec!(Session::validators(), vec![10, 20, 100]);
+
+		let collator_payout_1 = total_payout_1 / 2;
+		let part_for_11_1 = collator_payout_1 * 32 / 135 + collator_payout_1 * 1 / 15;
+		let part_for_21_1 = collator_payout_1 * 4 / 15 + collator_payout_1 * 1 / 30;
+		let part_for_101_1 = collator_payout_1 * 8 / 27 + collator_payout_1 * 1 / 10;
+
+		let rest_1 = collator_payout_1 - part_for_11_1 - part_for_21_1 - part_for_101_1;
+
+		assert_eq!(Balances::total_balance(&10), init_balance_10);
+		assert_eq_error_rate!(Balances::total_balance(&11), part_for_11_0 + part_for_11_1, 3);
+		assert_eq!(Balances::total_balance(&20), init_balance_20);
+		assert_eq_error_rate!(Balances::total_balance(&21), part_for_21_0 + part_for_21_1, 3);
+		assert_eq!(Balances::total_balance(&100), init_balance_100);
+		assert_eq_error_rate!(Balances::total_balance(&101), part_for_101_0 + part_for_101_1, 3);
+
+		assert_eq_error_rate!(
+			mock::REWARD_REMAINDER_UNBALANCED.with(|v| *v.borrow()),
+			total_payout_0 / 2 + total_payout_1 / 2 + rest_0 + rest_1,
+			5
 		);
 	})
 }
@@ -625,26 +678,233 @@ fn nominating_and_rewards_should_work() {
 		Payee::<Test>::insert(20, RewardDestination::Controller);
 		Payee::<Test>::insert(30, RewardDestination::Controller);
 
+		// 10 take 80% rewards then 20% will share for nominator
+		assert_ok!(
+			Pallet::<Test>::validate(
+				Origin::signed(11),
+				CollatorPrefs {
+					commission: Perbill::from_rational(80u32, 100u32),
+					blocked: false
+				}
+			)
+		);
+		// 20 take all rewards and not share for nominator
+		assert_ok!(
+			Pallet::<Test>::validate(
+				Origin::signed(21),
+				CollatorPrefs {
+					commission: Perbill::from_rational(100u32, 100u32),
+					blocked: false
+				}
+			)
+		);
+
 		// give the man some money
 		let initial_balance = 5000;
 		for i in [1, 2, 3, 4].iter() {
 			let _ = Balances::make_free_balance_be(i, initial_balance);
 		}
+		let init_balance_11 = Balances::total_balance(&11);
+
 		// bond two account pairs and state interest in nomination.
 		// 2 will nominate for 10, 20
 		assert_ok!(Staking::bond(Origin::signed(1), 2, 1000, RewardDestination::Controller));
-		assert_ok!(Staking::nominate(Origin::signed(2), 11, 500));
-		assert_ok!(Staking::nominate(Origin::signed(2), 21, 500));
+		assert_ok!(Staking::nominate(Origin::signed(2), 11, 1000));
+		assert_ok!(Staking::nominate(Origin::signed(2), 21, 1000));
+		assert_ok!(Staking::nominate(Origin::signed(2), 31, 200));
 		// 4 will nominate for 10, 20, 100
 		assert_ok!(Staking::bond(Origin::signed(3), 4, 1000, RewardDestination::Controller));
-		assert_ok!(Staking::nominate(Origin::signed(4), 11, 500));
-		assert_ok!(Staking::nominate(Origin::signed(4), 21, 500));
-		assert_ok!(Staking::nominate(Origin::signed(4), 31, 500));
-		// the total reward for era 0
-		let total_payout_0 = current_total_payout_for_duration(reward_time_per_era());
-		mock::start_active_era(1);
+		assert_ok!(Staking::nominate(Origin::signed(4), 11, 1000));
+		assert_ok!(Staking::nominate(Origin::signed(4), 21, 1000));
+		assert_ok!(Staking::nominate(Origin::signed(4), 41, 300));
 
-		// 4 and 41 have more votes, they will be chosen.
-		assert_eq_uvec!(validator_controllers(), vec![4, 41]);
+		mock::start_active_era(1);
+		<Pallet<Test>>::reward_by_ids(11, 20);
+		<Pallet<Test>>::reward_by_ids(21, 20);
+		assert_eq!(
+			Staking::eras_stakers_clipped(Staking::active_era().unwrap().index, 10),
+			Exposure {
+				total: 2867,
+				own: 500,
+				others: vec![
+					IndividualExposure { who: 4, value: 1210 },
+					IndividualExposure { who: 2, value: 1157 },
+				]
+			},
+		);
+		assert_eq!(
+			Staking::eras_stakers_clipped(Staking::active_era().unwrap().index, 20),
+			Exposure {
+				total: 2633,
+				own: 500,
+				others: vec![
+					IndividualExposure { who: 4, value: 1090 },
+					IndividualExposure { who: 2, value: 1043 },
+				]
+			},
+		);
+
+		// 10 and 20 have more votes, they will be chosen.
+		assert_eq_uvec!(validator_controllers(), vec![11, 21]);
+
+		mock::start_active_era(2);
+
+		// we start test in era 3 because nominate affect in next era
+		mock::start_active_era(3);
+		let total_payout_1 = current_total_payout_for_duration(reward_time_per_era());
+
+		// just 80% * stake rate(2867/5500) + 20% point rate
+		let part_for_11_1 = total_payout_1 * 2867 / 6875 + total_payout_1 * 1 / 10;
+		// just 20% * stake rate(1210/2867) for nominate 11
+		// 21 take all reward so 4 dont receive anything
+		let part_for_4_1 = (part_for_11_1 * 2 / 10) * 1210 / 2867;
+		assert_eq_error_rate!(Balances::total_balance(&4), 5000 + part_for_4_1, 2);
+		let part_for_2_1 = (part_for_11_1 * 2 / 10) * 1157 / 2867;
+		assert_eq_error_rate!(Balances::total_balance(&2), 5000 + part_for_2_1, 2);
+
+		let part_for_21_1 = total_payout_1 * 2633 / 6875 + total_payout_1 * 1 / 10;
+		assert_eq_error_rate!(Balances::total_balance(&11), part_for_11_1 * 8 / 10, 2);
+		// 21 will take all reward
+		assert_eq_error_rate!(Balances::total_balance(&21), part_for_21_1, 2);
+
 	})
+}
+
+#[test]
+fn double_controlling_should_fail() {
+	// should test (in the same order):
+	// * an account already bonded as controller CANNOT be reused as the controller of another account.
+	mock_test().execute_with(|| {
+		give_money(&1, 2000);
+		give_money(&3, 2000);
+
+		let arbitrary_value = 500;
+		// 2 = controller, 1 stashed => ok
+		assert_ok!(Staking::bond(
+			Origin::signed(1),
+			2,
+			arbitrary_value,
+			RewardDestination::default(),
+		));
+		// 2 = controller, 3 stashed (Note that 2 is reused.) => no-op
+		assert_noop!(
+			Staking::bond(Origin::signed(3), 2, arbitrary_value, RewardDestination::default()),
+			Error::<Test>::AlreadyPaired,
+		);
+	});
+}
+
+#[test]
+fn session_and_eras_work_simple() {
+	mock_test().execute_with(|| {
+		assert_eq!(active_era(), 0);
+		assert_eq!(current_era(), 0);
+		assert_eq!(Session::current_index(), 0);
+		assert_eq!(System::block_number(), 1);
+
+		// Session 1: this is basically a noop. This has already been started.
+		start_session(1);
+		assert_eq!(Session::current_index(), 1);
+		assert_eq!(active_era(), 0);
+		assert_eq!(System::block_number(), 5);
+
+		// Session 2: No change.
+		start_session(2);
+		assert_eq!(Session::current_index(), 2);
+		assert_eq!(active_era(), 0);
+		assert_eq!(System::block_number(), 10);
+
+		// Session 3: Era increment.
+		start_session(3);
+		assert_eq!(Session::current_index(), 3);
+		assert_eq!(active_era(), 1);
+		assert_eq!(System::block_number(), 15);
+
+		// Session 4: No change.
+		start_session(4);
+		assert_eq!(Session::current_index(), 4);
+		assert_eq!(active_era(), 1);
+		assert_eq!(System::block_number(), 20);
+
+		// Session 5: No change.
+		start_session(5);
+		assert_eq!(Session::current_index(), 5);
+		assert_eq!(active_era(), 1);
+		assert_eq!(System::block_number(), 25);
+
+		// Session 6: Era increment.
+		start_session(6);
+		assert_eq!(Session::current_index(), 6);
+		assert_eq!(active_era(), 2);
+		assert_eq!(System::block_number(), 30);
+	});
+}
+
+#[test]
+fn forcing_new_era_works() {
+	mock_test().execute_with(|| {
+		// normal flow of session.
+		start_session(1);
+		assert_eq!(active_era(), 0);
+
+		start_session(2);
+		assert_eq!(active_era(), 0);
+
+		start_session(3);
+		assert_eq!(active_era(), 1);
+
+		// no era change.
+		ForceEra::<Test>::put(Forcing::ForceNone);
+
+		start_session(4);
+		assert_eq!(active_era(), 1);
+
+		start_session(5);
+		assert_eq!(active_era(), 1);
+
+		start_session(6);
+		assert_eq!(active_era(), 1);
+
+		start_session(7);
+		assert_eq!(active_era(), 1);
+
+		// back to normal.
+		// this immediately starts a new session.
+		ForceEra::<Test>::put(Forcing::NotForcing);
+
+		start_session(8);
+		assert_eq!(active_era(), 1);
+
+		start_session(9);
+		assert_eq!(active_era(), 2);
+		// forceful change
+		ForceEra::<Test>::put(Forcing::ForceAlways);
+
+		start_session(10);
+		assert_eq!(active_era(), 2);
+
+		start_session(11);
+		assert_eq!(active_era(), 3);
+
+		start_session(12);
+		assert_eq!(active_era(), 4);
+
+		// just one forceful change
+		ForceEra::<Test>::put(Forcing::ForceNew);
+		start_session(13);
+		assert_eq!(active_era(), 5);
+		assert_eq!(ForceEra::<Test>::get(), Forcing::NotForcing);
+
+		start_session(14);
+		assert_eq!(active_era(), 6);
+
+		start_session(15);
+		assert_eq!(active_era(), 6);
+
+		start_session(16);
+		assert_eq!(active_era(), 6);
+
+		start_session(17);
+		assert_eq!(active_era(), 7);
+	});
 }
