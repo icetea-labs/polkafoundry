@@ -40,8 +40,6 @@ pub mod pallet {
 	use serde::{Serialize, Deserialize};
 	use frame_support::sp_std::fmt::Debug;
 
-	/// Counter for the number of round that have passed
-	pub type RoundIndex = u32;
 	/// Counter for the number of "reward" points earned by a given collator
 	pub type RewardPoint = u32;
 	pub type EraIndex = u32;
@@ -104,8 +102,6 @@ pub mod pallet {
 		type SessionInterface: self::SessionInterface<Self::AccountId>;
 		/// Something that can estimate the next session change, accurately or as a best effort guess.
 		type NextNewSession: EstimateNextNewSession<Self::BlockNumber>;
-
-		type DesiredTarget: Get<u32>;
 	}
 
 	#[pallet::pallet]
@@ -188,14 +184,6 @@ pub mod pallet {
 		fn default() -> Self { Forcing::NotForcing }
 	}
 
-	/// Just a Balance/BlockNumber tuple to encode when a chunk of funds will be unlocked.
-	#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
-	pub struct UnlockChunk<Balance> {
-		/// Amount of funds to be unlocked.
-		pub value: Balance,
-		/// Round number at which point it'll be unlocked.
-		pub round: RoundIndex,
-	}
 	/// Just a Balance/BlockNumber tuple to encode when a chunk of funds will be unbonded.
 	#[derive(PartialEq, Eq, Clone, Encode, Decode, RuntimeDebug)]
 	pub struct UnBondChunk<Balance> {
@@ -277,12 +265,12 @@ pub mod pallet {
 		pub nominations: Vec<Bond<AccountId, Balance>>,
 		/// Any balance that is becoming free, which may eventually be transferred out
 		/// of the stash (assuming it doesn't get slashed first).
-		pub unlocking: Vec<UnlockChunk<Balance>>,
-		/// Any balance that is becoming free, which may eventually be transferred out
-		/// of the stash (assuming it doesn't get slashed first).
 		pub unbonding: Vec<UnBondChunk<Balance>>,
 		/// Status of staker
 		pub status: StakerStatus,
+		/// List of eras for which the stakers behind a validator have claimed rewards. Only updated
+		/// for validators.
+		pub claimed_rewards: Vec<EraIndex>,
 	}
 
 	impl <AccountId, Balance> StakingCollators<AccountId, Balance>
@@ -290,29 +278,20 @@ pub mod pallet {
 		AccountId: Ord + Clone,
 		Balance: Ord + Copy + Debug + Saturating + AtLeast32BitUnsigned + AddAssign + From<u32>
 	{
-		pub fn new (stash: AccountId, amount: Balance, next_era: EraIndex) -> Self {
+		pub fn new (stash: AccountId, amount: Balance, next_era: EraIndex, claimed_rewards: Vec<EraIndex>) -> Self {
 			StakingCollators {
 				stash,
 				total: amount,
 				active: amount,
 				nominations: vec![],
-				unlocking: vec![UnlockChunk {
-					value: amount,
-					round: next_era
-				}],
 				unbonding: vec![],
 				status: StakerStatus::default(),
+				claimed_rewards,
 			}
 		}
 
 		pub fn is_active(&self) -> bool { self.status == StakerStatus::Active }
 
-		/// Active the onboarding collator
-		pub fn active_onboard(&mut self) {
-			if self.status == StakerStatus::Onboarding {
-				self.status = StakerStatus::Active
-			}
-		}
 		/// Bond extra for collator
 		/// Active in next round
 		pub fn bond_extra (&mut self, extra: Balance) {
@@ -335,28 +314,6 @@ pub mod pallet {
 				None
 			}
 		}
-		/// Unlocking all the bond be locked in the previous round
-		fn consolidate_active(self, current_round: RoundIndex) -> Self {
-			let mut active = self.active;
-			let unlocking = self.unlocking.into_iter()
-				.filter(|chunk| if chunk.round > current_round {
-					true
-				} else {
-					active += chunk.value;
-					false
-				})
-				.collect();
-
-			Self {
-				stash: self.stash,
-				total: self.total,
-				active,
-				nominations: self.nominations,
-				unlocking,
-				unbonding: self.unbonding,
-				status: self.status,
-			}
-		}
 		/// Remove all the locked bond after `BondDuration`
 		/// Update `total` `active` updated immediately when call `bond_less`
 		pub fn remove_unbond(self, active_era: EraIndex) -> Self {
@@ -375,9 +332,9 @@ pub mod pallet {
 				total,
 				active: self.active,
 				nominations: self.nominations,
-				unlocking: self.unlocking,
 				unbonding,
 				status: self.status,
+				claimed_rewards: self.claimed_rewards
 			}
 		}
 
@@ -416,12 +373,6 @@ pub mod pallet {
 			}
 			None
 		}
-		/// Active the onboarding collator
-		pub fn force_bond(&mut self) {
-			self.active = self.total;
-			self.unlocking = vec![];
-			self.status = StakerStatus::Active
-		}
 
 		pub fn rm_nomination(&mut self, nominator: AccountId) -> Option<Balance> {
 			let mut less: Option<Balance> = None;
@@ -444,6 +395,14 @@ pub mod pallet {
 				None
 			}
 		}
+
+		pub fn go_to_chill(&mut self) {
+			self.status = StakerStatus::Idle;
+		}
+
+		pub fn back_to_work(&mut self) {
+			self.status = StakerStatus::Active;
+		}
 	}
 
 	#[derive(Clone, Encode, Decode, RuntimeDebug)]
@@ -454,13 +413,13 @@ pub mod pallet {
 		/// of the stash (assuming it doesn't get slashed first).
 		pub unbonding: Vec<UnBondChunk<Balance>>,
 		/// Leaving in
-		pub when: RoundIndex,
+		pub when: EraIndex,
 	}
 
 	impl <Balance>Leaving <Balance>
 		where Balance: Ord + Copy + Debug + Saturating + AtLeast32BitUnsigned + AddAssign + From<u32>
 	{
-		pub fn new(remaining: Balance, unbonding: Vec<UnBondChunk<Balance>>, when: RoundIndex) -> Self {
+		pub fn new(remaining: Balance, unbonding: Vec<UnBondChunk<Balance>>, when: EraIndex) -> Self {
 			Self {
 				remaining,
 				unbonding,
@@ -498,8 +457,6 @@ pub mod pallet {
 		Nominator,
 		/// Ready for produce blocks/nominate.
 		Active,
-		/// Onboarding to candidates pool in next round
-		Onboarding,
 		/// Chilling.
 		Idle,
 		/// Leaving.
@@ -508,7 +465,7 @@ pub mod pallet {
 
 	impl Default for StakerStatus {
 		fn default() -> Self {
-			StakerStatus::Onboarding
+			StakerStatus::Active
 		}
 	}
 
@@ -734,7 +691,15 @@ pub mod pallet {
 			<Payee<T>>::insert(&stash, payee);
 
 			let current_era = CurrentEra::<T>::get().unwrap_or(0);
-			let staker = StakingCollators::new(stash.clone(), amount, current_era + 1);
+			let history_depth = Self::history_depth();
+			let last_reward_era = current_era.saturating_sub(history_depth);
+
+			let staker = StakingCollators::new(
+				stash.clone(),
+				amount,
+				current_era + 1,
+				(last_reward_era..current_era).collect()
+			);
 
 			Ledger::<T>::insert(&controller, staker);
 
@@ -852,6 +817,116 @@ pub mod pallet {
 			let ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
 			let stash = &ledger.stash;
 			<Payee<T>>::insert(stash, payee);
+
+			Ok(Default::default())
+		}
+
+		#[pallet::weight(0)]
+		pub fn set_controller(
+			origin: OriginFor<T>,
+			controller: T::AccountId
+		) -> DispatchResultWithPostInfo {
+			let stash = ensure_signed(origin)?;
+			let old_controller = Self::bonded(&stash).ok_or(Error::<T>::NotStash)?;
+			if <Ledger<T>>::contains_key(&controller) {
+				Err(Error::<T>::AlreadyPaired)?
+			}
+			if controller != old_controller {
+				<Bonded<T>>::insert(&stash, &controller);
+				if let Some(l) = <Ledger<T>>::take(&old_controller) {
+					<Ledger<T>>::insert(&controller, l);
+				}
+			}
+
+			Ok(Default::default())
+		}
+
+		#[pallet::weight(0)]
+		pub fn set_collator_count(
+			origin: OriginFor<T>,
+			new: u32
+		) -> DispatchResultWithPostInfo {
+			ensure_root(origin)?;
+			CollatorCount::<T>::put(new);
+
+			Ok(Default::default())
+		}
+
+		#[pallet::weight(0)]
+		pub fn chill(
+			origin: OriginFor<T>,
+		) -> DispatchResultWithPostInfo {
+			let controller = ensure_signed(origin)?;
+			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+			ledger.go_to_chill();
+
+			Ok(Default::default())
+		}
+
+		#[pallet::weight(0)]
+		pub fn working(
+			origin: OriginFor<T>,
+		) -> DispatchResultWithPostInfo {
+			let controller = ensure_signed(origin)?;
+			let mut ledger = Self::ledger(&controller).ok_or(Error::<T>::NotController)?;
+			if ledger.status != StakerStatus::Idle {
+				Err(Error::<T>::NotChilling)?
+			}
+			ledger.back_to_work();
+
+			Ok(Default::default())
+		}
+
+		/// Force there to be no new eras indefinitely.
+		///
+		/// The dispatch origin must be Root.
+		///
+		#[pallet::weight(0)]
+		pub fn force_no_eras(
+			origin: OriginFor<T>,
+		) -> DispatchResultWithPostInfo {
+			ensure_root(origin)?;
+			ForceEra::<T>::put(Forcing::ForceNone);
+
+			Ok(Default::default())
+		}
+
+		/// Set the validators who cannot be slashed (if any).
+		///
+		/// The dispatch origin must be Root.
+		#[pallet::weight(0)]
+		pub fn set_invulnerables(
+			origin: OriginFor<T>,
+			invulnerables: Vec<T::AccountId>
+		) -> DispatchResultWithPostInfo {
+			ensure_root(origin)?;
+			<Invulnerables<T>>::put(invulnerables);
+
+			Ok(Default::default())
+		}
+		/// Force there to be a new era at the end of the next session. After this, it will be
+		/// reset to normal (non-forced) behaviour.
+		///
+		/// The dispatch origin must be Root.
+		#[pallet::weight(0)]
+		pub fn force_new_era(
+			origin: OriginFor<T>,
+		) -> DispatchResultWithPostInfo {
+			ensure_root(origin)?;
+			ForceEra::<T>::put(Forcing::ForceNew);
+
+			Ok(Default::default())
+		}
+		/// Force there to be a new era at the end of sessions indefinitely.
+		///
+		/// The dispatch origin must be Root.
+		///
+		#[pallet::weight(0)]
+		pub fn force_new_era_always(
+			origin: OriginFor<T>,
+		) -> DispatchResultWithPostInfo {
+			ensure_root(origin)?;
+			ForceEra::<T>::put(Forcing::ForceAlways);
 
 			Ok(Default::default())
 		}
@@ -1471,11 +1546,14 @@ pub mod pallet {
 			let weight_of_nominator = Self::slashable_balance_of_fn(StakerStatus::Nominator);
 			let mut all_voters = Vec::new();
 
-			for (stash, _) in <Bonded<T>>::iter() {
+			for (stash, controller) in <Bonded<T>>::iter() {
 				// append self vote
-
-				let self_vote = (stash.clone(), weight_of_validator(&stash), vec![stash.clone()]);
-				all_voters.push(self_vote);
+				if let Some(controller) = <Ledger<T>>::get(&controller) {
+					if controller.is_active() {
+						let self_vote = (stash.clone(), weight_of_validator(&stash), vec![stash.clone()]);
+						all_voters.push(self_vote);
+					}
+				}
 			}
 
 			for (nominator, nominations) in Nominators::<T>::iter() {
@@ -1539,7 +1617,7 @@ pub mod pallet {
 
 		fn voters(maybe_max_len: Option<usize>) -> data_provider::Result<(Vec<(T::AccountId, VoteWeight, Vec<T::AccountId>)>, Weight)> {
 			let nominator_count = Nominators::<T>::iter().count();
-			let validator_count = <Ledger<T>>::iter().count();
+			let validator_count = <Bonded<T>>::iter().count();
 			let voter_count = nominator_count.saturating_add(validator_count);
 
 			if maybe_max_len.map_or(false, |max_len| voter_count > max_len) {
@@ -1622,6 +1700,14 @@ pub mod pallet {
 	#[pallet::getter(fn active_era)]
 	pub type ActiveEra<T: Config> =
 	StorageValue<_, Option<ActiveEraInfo>, ValueQuery>;
+
+	/// Any validators that may never be slashed or forcibly kicked. It's a Vec since they're
+	/// easy to initialize and the performance hit is minimal (we expect no more than four
+	/// invulnerables) and restricted to testnets.
+	#[pallet::storage]
+	#[pallet::getter(fn invulnerables)]
+	pub type Invulnerables<T: Config> =
+	StorageValue<_, Vec<T::AccountId>, ValueQuery>;
 
 	/// A mapping from still-bonded eras to the first session index of that era.
 	///
@@ -1791,6 +1877,8 @@ pub mod pallet {
 		NotController,
 		/// Not a stash account.
 		NotStash,
+		/// Not a stash account.
+		NotChilling,
 	}
 
 	#[pallet::event]
@@ -1803,9 +1891,9 @@ pub mod pallet {
 		NominateExtra(T::AccountId, BalanceOf<T>),
 		NominateLess(T::AccountId, BalanceOf<T>),
 		CandidateOnboard(T::AccountId),
-		CandidateLeaving(T::AccountId, RoundIndex),
+		CandidateLeaving(T::AccountId, EraIndex),
 		NominatorLeaveCollator(T::AccountId, T::AccountId),
-		CollatorChoosen(RoundIndex, T::AccountId, BalanceOf<T>),
+		CollatorChoosen(EraIndex, T::AccountId, BalanceOf<T>),
 		Rewarded(T::AccountId, BalanceOf<T>),
 		EraPayout(EraIndex, BalanceOf<T>),
 }
