@@ -8,6 +8,7 @@ mod tests;
 
 pub mod taylor_series;
 pub mod inflation;
+pub mod slashing;
 
 pub(crate) const LOG_TARGET: &'static str = "runtime::staking";
 
@@ -39,13 +40,14 @@ pub mod pallet {
 	use pallet_session::historical;
 	use serde::{Serialize, Deserialize};
 	use frame_support::sp_std::fmt::Debug;
+	use crate::slashing;
 
 	/// Counter for the number of "reward" points earned by a given collator
 	pub type RewardPoint = u32;
 	pub type EraIndex = u32;
 	pub type SessionIndex = u32;
 
-	type BalanceOf<T> = <<T as Config>::Currency as Currency<
+	pub(crate) type BalanceOf<T> = <<T as Config>::Currency as Currency<
 		<T as frame_system::Config>::AccountId,
 	>>::Balance;
 
@@ -80,7 +82,6 @@ pub mod pallet {
 		type PayoutDuration: Get<EraIndex>;
 		/// Tokens have been minted and are unused for validator-reward.
 		type RewardRemainder: OnUnbalanced<NegativeImbalanceOf<Self>>;
-
 		/// Something that provides the election functionality.
 		type ElectionProvider: frame_election_provider_support::ElectionProvider<
 			Self::AccountId,
@@ -98,6 +99,8 @@ pub mod pallet {
 		type SessionsPerEra: Get<SessionIndex>;
 		/// Number of eras that staked funds must remain bonded for.
 		type BondingDuration: Get<EraIndex>;
+		/// Handler for the unbalanced reduction when slashing a staker.
+		type Slash: OnUnbalanced<NegativeImbalanceOf<Self>>;
 		/// Interface for interacting with a session module.
 		type SessionInterface: self::SessionInterface<Self::AccountId>;
 		/// Something that can estimate the next session change, accurately or as a best effort guess.
@@ -105,6 +108,7 @@ pub mod pallet {
 	}
 
 	#[pallet::pallet]
+	#[pallet::generate_store(pub (super) trait Store)]
 	pub struct Pallet<T>(PhantomData<T>);
 
 	#[pallet::hooks]
@@ -164,6 +168,22 @@ pub mod pallet {
 		fn prune_historical_up_to(up_to: SessionIndex) {
 			<pallet_session::historical::Pallet<T>>::prune_up_to(up_to);
 		}
+	}
+
+	/// A pending slash record. The value of the slash has been computed but not applied yet,
+	/// rather deferred for several eras.
+	#[derive(Encode, Decode, Default, RuntimeDebug)]
+	pub struct UnappliedSlash<AccountId, Balance> {
+		/// The stash ID of the offending validator.
+		pub validator: AccountId,
+		/// The validator's own slash.
+		pub own: Balance,
+		/// All other slashed stakers and amounts.
+		pub others: Vec<(AccountId, Balance)>,
+		/// Reporters of the offence; bounty payout recipients.
+		pub reporters: Vec<AccountId>,
+		/// The amount of payout.
+		pub payout: Balance,
 	}
 
 	/// Mode of era-forcing.
@@ -402,6 +422,57 @@ pub mod pallet {
 
 		pub fn back_to_work(&mut self) {
 			self.status = StakerStatus::Active;
+		}
+		/// Slash the validator for a given amount of balance. This can grow the value
+		/// of the slash in the case that the validator has less than `minimum_balance`
+		/// active funds. Returns the amount of funds actually slashed.
+		///
+		/// Slashes from `active` funds first, and then `unlocking`, starting with the
+		/// chunks that are closest to unlocking.
+		pub fn slash(
+			&mut self,
+			mut value: Balance,
+			minimum_balance: Balance,
+		) -> Balance {
+			let pre_total = self.total;
+			let total = &mut self.total;
+			let active = &mut self.active;
+
+			let slash_out_of = |
+				total_remaining: &mut Balance,
+				target: &mut Balance,
+				value: &mut Balance,
+			| {
+				let mut slash_from_target = (*value).min(*target);
+
+				if !slash_from_target.is_zero() {
+					*target -= slash_from_target;
+
+					// don't leave a dust balance in the staking system.
+					if *target <= minimum_balance {
+						slash_from_target += *target;
+						*value += sp_std::mem::replace(target, Zero::zero());
+					}
+
+					*total_remaining = total_remaining.saturating_sub(slash_from_target);
+					*value -= slash_from_target;
+				}
+			};
+
+			slash_out_of(total, active, &mut value);
+
+			let i = self.unbonding.iter_mut()
+				.map(|chunk| {
+					slash_out_of(total, &mut chunk.value, &mut value);
+					chunk.value
+				})
+				.take_while(|value| value.is_zero()) // take all fully-consumed chunks out.
+				.count();
+
+			// kill all drained chunks.
+			let _ = self.unbonding.drain(..i);
+
+			pre_total.saturating_sub(*total)
 		}
 	}
 
@@ -1244,7 +1315,7 @@ pub mod pallet {
 				Self::deposit_event(Event::EraPayout(active_era.index, validator_payout));
 
 				// Set ending era reward.
-				<ErasValidatorReward<T>>::insert(&active_era.index, validator_payout);
+				<ErasCollatorReward<T>>::insert(&active_era.index, validator_payout);
 			}
 		}
 
@@ -1277,7 +1348,7 @@ pub mod pallet {
 				let payout_era = current_era - duration;
 				let total_stake = ErasTotalStake::<T>::take(&payout_era);
 
-				let payout = ErasValidatorReward::<T>::take(&payout_era);
+				let payout = ErasCollatorReward::<T>::take(&payout_era);
 				let mut rest = payout.clone();
 				let reward_point = Perbill::from_rational(
 					20u32,
@@ -1316,7 +1387,7 @@ pub mod pallet {
 					let collator_part = commission.mul(collator_total_part);
 					let nominator_total_part = collator_total_part - collator_part;
 
-					rest = rest.checked_sub(&collator_part).unwrap_or(0u32.into());
+					rest = rest.saturating_sub(collator_part);
 
 					mint(
 						collator_part,
@@ -1329,7 +1400,7 @@ pub mod pallet {
 							exposure.total,
 						);
 						let nominator_part = nominator_exposure_part.mul(nominator_total_part);
-						rest = rest.checked_sub(&nominator_part).unwrap_or(0u32.into());
+						rest = rest.saturating_sub(nominator_part);
 
 						mint(
 							nominator_part,
@@ -1597,6 +1668,14 @@ pub mod pallet {
 			}
 		}
 
+		/// Ensures that at the end of the current session there will be a new era.
+		pub fn ensure_new_era() {
+			match ForceEra::<T>::get() {
+				Forcing::ForceAlways | Forcing::ForceNew => (),
+				_ => ForceEra::<T>::put(Forcing::ForceNew),
+			}
+		}
+
 	}
 
 	impl<T: Config> frame_election_provider_support::ElectionDataProvider<T::AccountId, T::BlockNumber>
@@ -1773,8 +1852,8 @@ pub mod pallet {
 	///
 	/// Eras that haven't finished yet or has been removed doesn't have reward.
 	#[pallet::storage]
-	#[pallet::getter(fn eras_validator_reward)]
-	pub type ErasValidatorReward<T: Config> =
+	#[pallet::getter(fn eras_collator_reward)]
+	pub type ErasCollatorReward<T: Config> =
 	StorageMap<_, Twox64Concat, EraIndex, BalanceOf<T>, ValueQuery>;
 	#[pallet::storage]
 	#[pallet::getter(fn nominators)]
@@ -1840,6 +1919,69 @@ pub mod pallet {
 		RewardPoint,
 		ValueQuery,
 	>;
+	/// The percentage of the slash that is distributed to reporters.
+	///
+	/// The rest of the slashed value is handled by the `Slash`.
+	#[pallet::storage]
+	#[pallet::getter(fn slash_reward_fraction)]
+	pub type SlashRewardFraction<T: Config> =
+	StorageValue<_, Perbill, ValueQuery>;
+
+	/// The amount of currency given to reporters of a slash event which was
+	/// canceled by extraordinary circumstances (e.g. governance).
+	#[pallet::storage]
+	#[pallet::getter(fn canceled_payouts)]
+	pub type CanceledSlashPayout<T: Config> =
+	StorageValue<_, BalanceOf<T>, ValueQuery>;
+
+	/// All unapplied slashes that are queued for later.
+	#[pallet::storage]
+	#[pallet::getter(fn unapplied_slashes)]
+	pub type UnappliedSlashes<T: Config> = StorageMap<_, Twox64Concat, EraIndex, Vec<UnappliedSlash<T::AccountId, BalanceOf<T>>>, ValueQuery>;
+
+	/// Slashing spans for stash accounts.
+	#[pallet::storage]
+	#[pallet::getter(fn slashing_spans)]
+	pub(crate) type SlashingSpans<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, Option<slashing::SlashingSpans>, ValueQuery>;
+
+	/// Records information about the maximum slash of a stash within a slashing span,
+	/// as well as how much reward has been paid out.
+	#[pallet::storage]
+	#[pallet::getter(fn span_slash)]
+	pub(crate) type SpanSlash<T: Config> = StorageMap<_, Twox64Concat, (T::AccountId, slashing::SpanIndex), slashing::SpanRecord<BalanceOf<T>>, ValueQuery>;
+
+	/// All slashing events on validators, mapped by era to the highest slash proportion
+	/// and slash value of the era.
+	#[pallet::storage]
+	#[pallet::getter(fn collator_slash_in_era)]
+	pub type CollatorSlashInEra<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		EraIndex,
+		Twox64Concat,
+		T::AccountId,
+		Option<(Perbill, BalanceOf<T>)>,
+		ValueQuery,
+	>;
+
+	/// All slashing events on nominators, mapped by era to the highest slash value of the era.
+	#[pallet::storage]
+	#[pallet::getter(fn nominator_slash_in_era)]
+	pub type NominatorSlashInEra<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		EraIndex,
+		Twox64Concat,
+		T::AccountId,
+		Option<BalanceOf<T>>,
+		ValueQuery,
+	>;
+
+	/// The earliest era for which we have a pending, unapplied slash.
+	#[pallet::storage]
+	#[pallet::getter(fn eraliest_unapplied_slash)]
+	pub type EarliestUnappliedSlash<T: Config> =
+	StorageValue<_, Option<EraIndex>, ValueQuery>;
 
 	#[pallet::error]
 	pub enum Error<T> {
@@ -1879,10 +2021,12 @@ pub mod pallet {
 		NotStash,
 		/// Not a stash account.
 		NotChilling,
+		/// Incorrect number of slashing spans provided.
+		IncorrectSlashingSpans,
 	}
 
 	#[pallet::event]
-	#[pallet::generate_deposit(fn deposit_event)]
+	#[pallet::generate_deposit(pub(crate) fn deposit_event)]
 	pub enum Event<T: Config> {
 		Bonded(T::AccountId, BalanceOf<T>),
 		BondExtra(T::AccountId, BalanceOf<T>),
@@ -1896,7 +2040,10 @@ pub mod pallet {
 		CollatorChoosen(EraIndex, T::AccountId, BalanceOf<T>),
 		Rewarded(T::AccountId, BalanceOf<T>),
 		EraPayout(EraIndex, BalanceOf<T>),
-}
+		/// One validator (and its nominators) has been slashed by the given amount.
+		/// \[validator, amount\]
+		Slash(T::AccountId, BalanceOf<T>),
+	}
 
 	/// In this implementation `new_session(session)` must be called before `end_session(session-1)`
 	/// i.e. the new session must be planned before the ending of the previous session.

@@ -190,6 +190,7 @@ impl Config for Test {
 	type BondingDuration = BondingDuration;
 	type NextNewSession = Session;
 	type RewardRemainder = RewardRemainderMock;
+	type Slash = ();
 }
 
 parameter_types! {
