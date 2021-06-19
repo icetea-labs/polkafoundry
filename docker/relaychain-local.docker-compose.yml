@@ -93,69 +93,12 @@ services:
     networks:
       testing_net:
         ipv4_address: 172.99.1.4
-  ################################################################
-  node_polkasmith_collator:
-    container_name: polkasmith_collator1
-    ports:
-      - "9988:9944"
-      - "9987:9933"
-      - "31200:30333"
-    image: icetealabs/polkasmith:1.0.0
-    volumes:
-      - "polkasmith-collator-data1:/data"
-      - ../node/res:/spec
-    # links:
-    #   - "node_alice:alice"
-    command: --collator
-      --unsafe-rpc-external
-      --rpc-cors all
-      --unsafe-ws-external
-      --rpc-methods=Unsafe
-      --parachain-id=2009
-      --force-chain=polkasmith
-      --chain /spec/polkasmith.json
-      --
-      --chain /spec/kusama-local.json
-      --execution wasm
-    networks:
-      testing_net:
-        ipv4_address: 172.99.1.5
-  ################################################################
-  node_polkasmith_collator2:
-    container_name: polkasmith_collator2
-    ports:
-      - "9989:9944"
-      - "9986:9933"
-      - "31201:30333"
-    image: icetealabs/polkasmith:1.0.0
-    volumes:
-      - "polkasmith-collator-data2:/data"
-      - ../node/res:/spec
-    # links:
-    #   - "node_alice:alice"
-    command: --collator
-      --unsafe-rpc-external
-      --rpc-cors all
-      --unsafe-ws-external
-      --rpc-methods=Unsafe
-      --parachain-id=2009
-      --force-chain=polkasmith
-      --chain /spec/polkasmith.json
-      --
-      --chain /spec/kusama-local.json
-      --execution wasm
-    networks:
-      testing_net:
-        ipv4_address: 172.99.1.6
 
 volumes:
   polkadot-data-alice:
   polkadot-data-bob:
   polkadot-data-charlie:
   polkadot-data-dave:
-
-  polkasmith-collator-data1:
-  polkasmith-collator-data2:
 
 networks:
   testing_net:

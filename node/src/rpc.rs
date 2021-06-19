@@ -1,6 +1,7 @@
 //! A collection of node-specific RPC methods.
 
 use std::{sync::Arc};
+use std::collections::BTreeMap;
 
 use sp_api::ProvideRuntimeApi;
 use sp_transaction_pool::TransactionPool;
@@ -16,7 +17,14 @@ use sc_client_api::{
 use sc_rpc::SubscriptionTaskExecutor;
 use sc_network::NetworkService;
 use sc_consensus_manual_seal::rpc::{ManualSeal, ManualSealApi};
+use substrate_frame_rpc_system::{FullSystem, SystemApi};
+use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApi};
+use pallet_ethereum::EthereumStorageSchema;
 
+use fc_rpc::{
+	EthApi, EthApiServer, EthFilterApi, EthFilterApiServer, EthPubSubApi, EthPubSubApiServer, HexEncodedIdProvider, NetApi, NetApiServer, OverrideHandle, RuntimeApiStorageOverride,
+	SchemaV1Override, StorageOverride, Web3Api, Web3ApiServer,
+};
 use fc_rpc_core::types::{PendingTransactions, FilterPool};
 use jsonrpc_pubsub::manager::SubscriptionManager;
 use runtime_primitives::{Hash, AccountId, Index, Block, Balance};
@@ -40,6 +48,10 @@ pub struct FullDeps<C, P> {
 	pub filter_pool: Option<FilterPool>,
 	/// Manual seal command sink
 	pub command_sink: Option<futures::channel::mpsc::Sender<sc_consensus_manual_seal::rpc::EngineCommand<Hash>>>,
+	/// Frontier Backend.
+	pub frontier_backend: Arc<fc_db::Backend<Block>>,
+	/// Maximum number of logs in a query.
+	pub max_past_logs: u32,
 }
 
 /// Instantiate all Full RPC extensions.
@@ -60,13 +72,6 @@ pub fn create_full<C, P, BE>(
 	C::Api: fp_rpc::EthereumRuntimeRPCApi<Block>,
 	P: TransactionPool<Block=Block> + 'static,
 {
-	use substrate_frame_rpc_system::{FullSystem, SystemApi};
-	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApi};
-	use fc_rpc::{
-		EthApi, EthApiServer, EthFilterApi, EthFilterApiServer, NetApi, NetApiServer,
-		EthPubSubApi, EthPubSubApiServer, Web3Api, Web3ApiServer,
-		HexEncodedIdProvider,
-	};
 
 	let mut io = jsonrpc_core::IoHandler::default();
 	let FullDeps {
@@ -78,7 +83,20 @@ pub fn create_full<C, P, BE>(
 		pending_transactions,
 		filter_pool,
 		command_sink,
+		frontier_backend,
+		max_past_logs,
 	} = deps;
+
+	let mut overrides_map = BTreeMap::new();
+	overrides_map.insert(
+		EthereumStorageSchema::V1,
+		Box::new(SchemaV1Override::new(client.clone())) as Box<dyn StorageOverride<_> + Send + Sync>
+	);
+
+	let overrides = Arc::new(OverrideHandle {
+		schemas: overrides_map,
+		fallback: Box::new(RuntimeApiStorageOverride::new(client.clone())),
+	});
 
 	io.extend_with(
 		SystemApi::to_delegate(FullSystem::new(client.clone(), pool.clone(), deny_unsafe))
@@ -93,36 +111,37 @@ pub fn create_full<C, P, BE>(
 		Some(cli::ForceChain::PolkaFoundry) => {
 			#[cfg(feature = "polkafoundry")]
 				{
-					io.extend_with(
-						EthApiServer::to_delegate(EthApi::new(
-							client.clone(),
-							pool.clone(),
-							polkafoundry_runtime::TransactionConverter,
-							network.clone(),
-							pending_transactions.clone(),
-							signers,
-							is_authority,
-						))
-					);
+					io.extend_with(EthApiServer::to_delegate(EthApi::new(
+						client.clone(),
+						pool.clone(),
+						polkafoundry_runtime::TransactionConverter,
+						network.clone(),
+						pending_transactions,
+						signers,
+						overrides.clone(),
+						frontier_backend,
+						is_authority,
+						max_past_logs,
+					)));
 				}
 			#[cfg(not(feature = "polkafoundry"))]
 			panic!("PolkaFoundry runtime is not available. Please compile the node with `--features polkafoundry` to enable it.");
 		}
 		Some(cli::ForceChain::PolkaSmith) => {
-			println!("smith ne");
 			#[cfg(feature = "polkasmith")]
 				{
-					io.extend_with(
-						EthApiServer::to_delegate(EthApi::new(
-							client.clone(),
-							pool.clone(),
-							polkasmith_runtime::TransactionConverter,
-							network.clone(),
-							pending_transactions.clone(),
-							signers,
-							is_authority,
-						))
-					);
+					io.extend_with(EthApiServer::to_delegate(EthApi::new(
+						client.clone(),
+						pool.clone(),
+						polkasmith_runtime::TransactionConverter,
+						network.clone(),
+						pending_transactions,
+						signers,
+						overrides.clone(),
+						frontier_backend,
+						is_authority,
+						max_past_logs,
+					)));
 				}
 			#[cfg(not(feature = "polkasmith"))]
 			panic!("PolkaSmith runtime is not available. Please compile the node with `--features polkasmith` to enable it.");
@@ -130,28 +149,32 @@ pub fn create_full<C, P, BE>(
 		_ => {
 			#[cfg(feature = "halongbay")]
 				{
-					io.extend_with(
-						EthApiServer::to_delegate(EthApi::new(
-							client.clone(),
-							pool.clone(),
-							halongbay_runtime::TransactionConverter,
-							network.clone(),
-							pending_transactions.clone(),
-							signers,
-							is_authority,
-						))
-					);
+					io.extend_with(EthApiServer::to_delegate(EthApi::new(
+						client.clone(),
+						pool.clone(),
+						halongbay_runtime::TransactionConverter,
+						network.clone(),
+						pending_transactions,
+						signers,
+						overrides.clone(),
+						frontier_backend,
+						is_authority,
+						max_past_logs,
+					)));
 				}
 			#[cfg(not(feature = "halongbay"))]
 			panic!("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.");
 		}
 	}
+
 	if let Some(filter_pool) = filter_pool {
 		io.extend_with(
 			EthFilterApiServer::to_delegate(EthFilterApi::new(
 				client.clone(),
 				filter_pool.clone(),
 				500 as usize, // max stored filters
+				overrides.clone(),
+				max_past_logs,
 			))
 		);
 	}
@@ -160,6 +183,8 @@ pub fn create_full<C, P, BE>(
 		NetApiServer::to_delegate(NetApi::new(
 			client.clone(),
 			network.clone(),
+			// Whether to format the `peer_count` response as Hex (default) or not.
+			true,
 		))
 	);
 
@@ -178,6 +203,7 @@ pub fn create_full<C, P, BE>(
 				HexEncodedIdProvider::default(),
 				Arc::new(subscription_task_executor)
 			),
+			overrides
 		))
 	);
 

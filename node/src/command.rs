@@ -287,7 +287,8 @@ pub fn run() -> Result<()> {
 							return service::start_dev(
 								config,
 								cli.run.sealing,
-								true
+								true,
+								&cli
 							);
 						}
 					#[cfg(not(feature = "halongbay"))]
@@ -338,7 +339,7 @@ pub fn run() -> Result<()> {
 						#[cfg(feature = "polkafoundry")]
 							{
 								return service::start_node::<service::polkafoundry_runtime::RuntimeApi, service::PolkaFoundryExecutor>(
-									config, polkadot_config, id,cli.run.force_chain
+									config, polkadot_config, id,cli.run.force_chain, &cli
 								)
 									.await
 									.map(|r| r.0)
@@ -351,7 +352,7 @@ pub fn run() -> Result<()> {
 						#[cfg(feature = "polkasmith")]
 							{
 								return service::start_node::<service::polkasmith_runtime::RuntimeApi, service::PolkaSmithExecutor>(
-									config, polkadot_config, id,cli.run.force_chain
+									config, polkadot_config, id,cli.run.force_chain, &cli
 								)
 									.await
 									.map(|r| r.0)
@@ -365,7 +366,7 @@ pub fn run() -> Result<()> {
 						#[cfg(feature = "halongbay")]
 							{
 								return service::start_node::<service::halongbay_runtime::RuntimeApi, service::HalongbayExecutor>(
-									config, polkadot_config, id,cli.run.force_chain
+									config, polkadot_config, id,cli.run.force_chain, &cli
 								)
 									.await
 									.map(|r| r.0)

@@ -6,7 +6,7 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-use sp_std::prelude::*;
+use sp_std::{prelude::*, marker::PhantomData};
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256, H160, H256};
 use sp_runtime::{
 	ApplyExtrinsicResult, generic, impl_opaque_keys,
@@ -21,6 +21,7 @@ use sp_version::RuntimeVersion;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_core::crypto::Public;
 
 use codec::{Encode, Decode};
 use fp_rpc::TransactionStatus;
@@ -50,11 +51,12 @@ pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{Permill, Perbill};
 pub use frame_support::{
 	construct_runtime, parameter_types, StorageValue, PalletId, match_type,
-	traits::{Randomness, IsInVec, All},
+	traits::{Randomness, IsInVec, All, FindAuthor},
 	weights::{
 		Weight, IdentityFee, DispatchClass,
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
 	},
+	ConsensusEngineId
 };
 pub use runtime_primitives::{
 	AccountId, AccountIndex, Balance, BlockNumber,
@@ -353,20 +355,39 @@ impl cumulus_ping::Config for Runtime {
 parameter_types! {
 	pub BlockGasLimit: U256 = U256::from(u32::max_value());
 }
+pub struct EthereumFindAuthor<F>(PhantomData<F>);
+impl<F: FindAuthor<u32>> FindAuthor<H160> for EthereumFindAuthor<F>
+{
+	fn find_author<'a, I>(digests: I) -> Option<H160> where
+		I: 'a + IntoIterator<Item=(ConsensusEngineId, &'a [u8])>
+	{
+		if let Some(author_index) = F::find_author(digests) {
+			let authority_id = Aura::authorities()[author_index as usize].clone();
+			return Some(H160::from_slice(&authority_id.to_raw_vec()[4..24]));
+		}
+		None
+	}
+}
 
 impl pallet_ethereum::Config for Runtime {
 	type Event = Event;
-	type FindAuthor = ();
+	type FindAuthor = EthereumFindAuthor<Aura>;
 	type StateRoot = pallet_ethereum::IntermediateStateRoot;
-	type BlockGasLimit = BlockGasLimit;
 }
 
 parameter_types! {
 	pub const ChainId: u64 = CHAIN_ID;
 }
 
+pub struct FixedGasPrice;
+impl FeeCalculator for FixedGasPrice {
+	fn min_gas_price() -> U256 {
+		1_000_000_000.into()
+	}
+}
+
 impl pallet_evm::Config for Runtime {
-	type FeeCalculator = ();
+	type FeeCalculator = FixedGasPrice;
 	type GasWeightMapping = ();
 	type CallOrigin = EnsureAddressTruncated;
 	type WithdrawOrigin = EnsureAddressTruncated;
@@ -374,7 +395,16 @@ impl pallet_evm::Config for Runtime {
 	type Currency = Balances;
 	type Event = Event;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
-	type Precompiles = precompiles::PolkafoundryPrecompiles<Self>;
+	type Precompiles = (
+		pallet_evm_precompile_simple::ECRecover,
+		pallet_evm_precompile_simple::Sha256,
+		pallet_evm_precompile_simple::Ripemd160,
+		pallet_evm_precompile_simple::Identity,
+		pallet_evm_precompile_modexp::Modexp,
+		pallet_evm_precompile_simple::ECRecoverPublicKey,
+		pallet_evm_precompile_sha3fips::Sha3FIPS256,
+		pallet_evm_precompile_sha3fips::Sha3FIPS512,
+	);
 	type ChainId = ChainId;
 	type BlockGasLimit = BlockGasLimit;
 	type OnChargeTransaction = ();
@@ -395,12 +425,14 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
 		ParachainInfo: parachain_info::{Pallet, Storage, Config},
 		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
+
+		Aura: pallet_aura::{Pallet, Config<T>},
+		AuraExt: cumulus_pallet_aura_ext::{Pallet, Config},
+
 		// Include the custom logic from the template pallet in the runtime.
 		// ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>, ValidateUnsigned},
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
-		Aura: pallet_aura::{Pallet, Config<T>},
-		AuraExt: cumulus_pallet_aura_ext::{Pallet, Config},
 
 		// XCM helpers.
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>},
@@ -658,10 +690,6 @@ impl_runtime_apis! {
 				Ethereum::current_receipts(),
 				Ethereum::current_transaction_statuses()
 			)
-		}
-
-		fn current_block_gas_limit() -> U256 {
-			<Runtime as pallet_ethereum::Config>::BlockGasLimit::get()
 		}
 	}
 

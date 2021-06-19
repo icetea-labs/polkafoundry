@@ -83,11 +83,14 @@ substrate-prometheus-endpoint = { git = 'https://github.com/paritytech/substrate
 
 substrate-frame-rpc-system = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4' }
 
-fc-consensus = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
-fp-consensus = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
-fp-rpc = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
-fc-rpc = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
-fc-rpc-core = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
+fc-consensus = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+fp-consensus = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+fp-rpc = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+fc-rpc = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+fc-rpc-core = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+fc-db = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+fc-mapping-sync = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+
 frame-system-rpc-runtime-api = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4' }
 pallet-transaction-payment-rpc-runtime-api = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4' }
 
@@ -108,7 +111,8 @@ polkadot-cli = { git = 'https://github.com/paritytech/polkadot', branch = 'relea
 polkadot-test-service = { git = 'https://github.com/paritytech/polkadot', branch = 'release-v0.9.4' }
 polkadot-parachain = { git = 'https://github.com/paritytech/polkadot', branch = 'release-v0.9.4' }
 
-pallet-evm = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
+pallet-evm = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+pallet-ethereum = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 runtime-primitives = { path = '../primitives' }
 
 [features]
