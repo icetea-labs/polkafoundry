@@ -114,6 +114,10 @@ pub struct RunCmd {
 	/// Options are "instant", "manual", or timer interval in milliseconds
 	#[structopt(long, default_value = "instant")]
 	pub sealing: Sealing,
+
+	/// Maximum number of logs in a query.
+	#[structopt(long, default_value = "10000")]
+	pub max_past_logs: u32,
 }
 
 impl std::ops::Deref for RunCmd {

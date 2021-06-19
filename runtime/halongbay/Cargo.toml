@@ -59,13 +59,16 @@ sp-transaction-pool = { default-features = false, git = 'https://github.com/pari
 sp-version = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4' }
 sp-npos-elections = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = 'polkadot-v0.9.4' }
 
-pallet-evm = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
-pallet-ethereum = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
+pallet-evm = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+pallet-ethereum = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+pallet-evm-precompile-simple = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+pallet-evm-precompile-sha3fips = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+pallet-evm-precompile-modexp = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-crowdloan-rewards = { default-features = false, path = '../../pallets/crowdloan-rewards' }
 polkafoundry-staking = { default-features = false, path = '../../pallets/polkafoundry-staking' }
 pallet-treasury = { default-features = false, path = "../../pallets/treasury" }
 
-fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'halongbay' }
+fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 
 cumulus-pallet-parachain-system = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.4' }
 cumulus-primitives-core = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.4' }
@@ -118,6 +121,8 @@ std = [
     'pallet-transaction-payment/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
     'pallet-evm/std',
+    'pallet-evm-precompile-simple/std',
+    'pallet-evm-precompile-sha3fips/std',
     'pallet-ethereum/std',
     'pallet-crowdloan-rewards/std',
     'pallet-treasury/std',
