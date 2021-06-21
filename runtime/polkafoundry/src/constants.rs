@@ -36,6 +36,7 @@ pub mod version {
 	use sp_version::RuntimeVersion;
 	use sp_runtime::create_runtime_str;
 
+	#[sp_version::runtime_version]
 	pub const VERSION: RuntimeVersion = RuntimeVersion {
 		spec_name: create_runtime_str!("polkafoundry"),
 		impl_name: create_runtime_str!("polkafoundry"),
