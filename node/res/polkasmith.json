@@ -2,7 +2,11 @@
   "name": "PolkaSmith",
   "id": "polkasmith_canary_network",
   "chainType": "Live",
-  "bootNodes": [],
+  "bootNodes": [
+    "/dns/polkasmith-bootnode-0.polkafoundry.com/tcp/30333/p2p/12D3KooWA6sLsmR8rkhzrQ6t3D1Ydqm5AVVNev6VSg3bd3TyZkR5",
+    "/dns/polkasmith-bootnode-1.polkafoundry.com/tcp/30334/p2p/12D3KooWRXtNqq5oKSR2unQfK6y3eyhPaBAUNhaek439pfsSdAtc",
+    "/dns/polkasmith-bootnode-2.polkafoundry.com/tcp/30335/p2p/12D3KooWDWWHMAq3867B5LDPftDYHMTB4th8aqRA3PKHqabfudBZ"
+  ],
   "telemetryEndpoints": null,
   "protocolId": null,
   "properties": {
@@ -10,7 +14,7 @@
     "tokenDecimals": 18,
     "tokenSymbol": "PKS"
   },
-  "relay_chain": "kusama-local",
+  "relay_chain": "kusama",
   "para_id": 2009,
   "consensusEngine": null,
   "lightSyncState": null,
