@@ -47,7 +47,8 @@ const callWeb3 = async address => {
     GENESIS_ACCOUNT_PRIVATE_KEY
   );
 
-  const res = await customRequest('eth_sendRawTransaction', [tx.rawTransaction]);
+  // const res = await customRequest('eth_sendRawTransaction', [tx.rawTransaction]);
+  const res = await web3.eth.sendSignedTransaction(tx.rawTransaction);
 
   const balance = await web3.eth.getBalance(address);
   const balance_genesis = await web3.eth.getBalance(GENESIS_ACCOUNT);
@@ -55,7 +56,7 @@ const callWeb3 = async address => {
   console.log('balance received account after transfer: ', balance);
   console.log('balance GENESIS_ACCOUNT account: ', balance_genesis);
 
-  return res.result;
+  return res;
 };
 
 bot.onText(/\/help/, msg => {
