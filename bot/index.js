@@ -41,7 +41,6 @@ const callWeb3 = async address => {
       from: GENESIS_ACCOUNT,
       to: address,
       value: web3.utils.toWei(NUMBER_ETH_SENT, "ether"),
-      gasPrice: '0x01',
       gas: '0x100000',
     },
     GENESIS_ACCOUNT_PRIVATE_KEY
@@ -56,7 +55,7 @@ const callWeb3 = async address => {
   console.log('balance received account after transfer: ', balance);
   console.log('balance GENESIS_ACCOUNT account: ', balance_genesis);
 
-  return res;
+  return res.blockNumber;
 };
 
 bot.onText(/\/help/, msg => {
