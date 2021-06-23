@@ -927,8 +927,6 @@ fn unbonded_balance_is_not_slashable() {
 #[test]
 fn offence_forces_new_era() {
 	mock_test().execute_with(|| {
-		mock::start_session(1);
-
 		on_offence_now(
 			&[OffenceDetails {
 				offender: (
@@ -946,8 +944,6 @@ fn offence_forces_new_era() {
 #[test]
 fn offence_ensures_new_era_without_clobbering() {
 	mock_test().execute_with(|| {
-		mock::start_session(1);
-
 		assert_ok!(Staking::force_new_era_always(Origin::root()));
 		assert_eq!(Staking::force_era(), Forcing::ForceAlways);
 
@@ -969,8 +965,6 @@ fn offence_ensures_new_era_without_clobbering() {
 #[test]
 fn offence_deselects_validator_even_when_slash_is_zero() {
 	mock_test().execute_with(|| {
-		mock::start_session(1);
-
 		assert!(Session::validators().contains(&100));
 
 		on_offence_now(
@@ -996,8 +990,6 @@ fn offence_deselects_validator_even_when_slash_is_zero() {
 fn dont_slash_if_fraction_is_zero() {
 	// Don't slash if the fraction is zero.
 	mock_test().execute_with(|| {
-		mock::start_session(1);
-
 		assert_eq!(Balances::reserved_balance(100), 1000);
 
 		on_offence_now(
@@ -1022,8 +1014,6 @@ fn slashing_performed_according_exposure() {
 	// This test checks that slashing is performed according the exposure (or more precisely,
 	// historical exposure), not the current balance.
 	mock_test().execute_with(|| {
-		mock::start_session(1);
-
 		assert_eq!(Staking::eras_stakers_clipped(Staking::active_era().unwrap().index, 100).own, 1000);
 
 		// Handle an offence with a historical exposure.
@@ -1100,9 +1090,6 @@ fn deferred_slashes_are_deferred() {
 		.execute_with(|| {
 			mock::start_active_era(1);
 
-			// Staking::set_payee(
-			// 	Origin::signed(101)
-			// )
 			assert_eq!(Staking::eras_stakers_clipped(Staking::active_era().unwrap().index, 100).own, 1000);
 
 			// Handle an offence with a historical exposure.
@@ -1142,8 +1129,6 @@ fn deferred_slashes_are_deferred() {
 #[test]
 fn slash_with_nominator_work() {
 	mock_test().execute_with(|| {
-		mock::start_session(1);
-
 		mock::give_money(&1, 1000);
 		mock::give_money(&2, 1000);
 
@@ -1185,8 +1170,6 @@ fn slash_with_nominator_work() {
 #[test]
 fn nominator_slash_below_min_become_unbond() {
 	mock_test().execute_with(|| {
-		mock::start_session(1);
-
 		mock::give_money(&1, 1000);
 
 		Staking::nominate(
@@ -1307,70 +1290,181 @@ fn phragmen_should_not_overflow() {
 	})
 }
 
-// #[test]
-// fn estimate_next_election_works() {
-// 	ExtBuilder::default().session_per_era(5).period(5)
-// 		.build(vec![
-// 			(100, 2000),
-//
-// 			// This allows us to have a total_payout different from 0.
-// 			(999, 1_000_000_000_000),
-// 		], vec![
-// 			(100, 101, 1000),
-// 		])
-// 		.execute_with(|| {
-// 		// first session is always length 0.
-// 		for b in 1..20 {
-// 			run_to_block(b);
-// 			assert_eq!(Staking::next_election_prediction(System::block_number()), 20);
-// 		}
-//
-// 		// election
-// 		run_to_block(20);
-// 		assert_eq!(Staking::next_election_prediction(System::block_number()), 45);
-// 		// assert_eq!(events().len(), 1);
-// 		// assert_eq!(
-// 		// 	*events().last().unwrap(),
-// 		// 	crate::Event::StakingElection
-// 		// );
-//
-// 		for b in 21..45 {
-// 			run_to_block(b);
-// 			assert_eq!(Staking::next_election_prediction(System::block_number()), 45);
-// 		}
-//
-// 		// election
-// 		run_to_block(45);
-// 		assert_eq!(Staking::next_election_prediction(System::block_number()), 70);
-// 		// assert_eq!(events().len(), 3);
-// 		// assert_eq!(
-// 		// 	*events().last().unwrap(),
-// 		// 	crate::Event::StakingElection
-// 		// );
-//
-// 		Staking::force_no_eras(Origin::root()).unwrap();
-// 		assert_eq!(Staking::next_election_prediction(System::block_number()), u64::max_value());
-//
-// 		Staking::force_new_era_always(Origin::root()).unwrap();
-// 		assert_eq!(Staking::next_election_prediction(System::block_number()), 45 + 5);
-//
-// 		Staking::force_new_era(Origin::root()).unwrap();
-// 		assert_eq!(Staking::next_election_prediction(System::block_number()), 45 + 5);
-//
-// 		run_to_block(50);
-// 		// Election: failed, next session is a new election
-// 		assert_eq!(Staking::next_election_prediction(System::block_number()), 50 + 5);
-// 		// The new era is still forced until a new era is planned.
-// 		assert_eq!(ForceEra::<Test>::get(), Forcing::ForceNew);
-//
-// 		run_to_block(55);
-// 		assert_eq!(Staking::next_election_prediction(System::block_number()), 55 + 25);
-// 		// assert_eq!(events().len(), 6);
-// 		// assert_eq!(
-// 		// 	*events().last().unwrap(),
-// 		// 	crate::Event::StakingElection
-// 		// );
-// 		// The new era has been planned, forcing is changed from `ForceNew` to `NotForcing`.
-// 		assert_eq!(ForceEra::<Test>::get(), Forcing::NotForcing);
-// 	})
-// }
+#[test]
+fn estimate_next_election_works() {
+	ExtBuilder::default().session_per_era(5).period(5)
+		.build(vec![
+			(100, 2000),
+			(200, 2000),
+
+			// This allows us to have a total_payout different from 0.
+			(999, 1_000_000_000_000),
+		], vec![
+			(100, 101, 1000),
+			(200, 201, 1000),
+		])
+		.execute_with(|| {
+		// first session is always length 0.
+		for b in 1..20 {
+			run_to_block(b);
+			assert_eq!(Staking::next_election_prediction(System::block_number()), 20);
+		}
+
+		// election
+		run_to_block(20);
+		assert_eq!(Staking::next_election_prediction(System::block_number()), 45);
+
+		for b in 21..45 {
+			run_to_block(b);
+			assert_eq!(Staking::next_election_prediction(System::block_number()), 45);
+		}
+
+		// election
+		run_to_block(45);
+		assert_eq!(Staking::next_election_prediction(System::block_number()), 70);
+
+		Staking::force_no_eras(Origin::root()).unwrap();
+		assert_eq!(Staking::next_election_prediction(System::block_number()), u64::max_value());
+
+		Staking::force_new_era_always(Origin::root()).unwrap();
+		assert_eq!(Staking::next_election_prediction(System::block_number()), 45 + 5);
+
+		Staking::force_new_era(Origin::root()).unwrap();
+		assert_eq!(Staking::next_election_prediction(System::block_number()), 45 + 5);
+
+		// Do a fail election
+		MinimumValidatorCount::<Test>::put(1000);
+		run_to_block(50);
+		// Election: failed, next session is a new election
+		assert_eq!(Staking::next_election_prediction(System::block_number()), 50 + 5);
+		// The new era is still forced until a new era is planned.
+		assert_eq!(ForceEra::<Test>::get(), Forcing::ForceNew);
+
+		MinimumValidatorCount::<Test>::put(2);
+
+		run_to_block(55);
+		assert_eq!(Staking::next_election_prediction(System::block_number()), 55 + 25);
+		// The new era has been planned, forcing is changed from `ForceNew` to `NotForcing`.
+		assert_eq!(ForceEra::<Test>::get(), Forcing::NotForcing);
+	})
+}
+
+#[test]
+fn session_buffering_with_offset() {
+	ExtBuilder::default()
+		.offset(2)
+		.session_per_era(5)
+		.period(5)
+		.build(vec![
+			(100, 2000),
+			(200, 2000),
+
+			// This allows us to have a total_payout different from 0.
+			(999, 1_000_000_000_000),
+		], vec![
+			(100, 101, 1000),
+			(200, 201, 1000),
+		])
+		.execute_with(|| {
+			assert_eq!(current_era(), 0);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 0);
+
+			start_session(1);
+			assert_eq!(current_era(), 0);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 1);
+			assert_eq!(System::block_number(), 2);
+
+			start_session(2);
+			assert_eq!(current_era(), 0);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 2);
+			assert_eq!(System::block_number(), 7);
+
+			start_session(3);
+			assert_eq!(current_era(), 0);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 3);
+			assert_eq!(System::block_number(), 12);
+
+			// active era is lagging behind by one session, because of how session module works.
+			start_session(4);
+			assert_eq!(current_era(), 1);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 4);
+			assert_eq!(System::block_number(), 17);
+
+			start_session(5);
+			assert_eq!(current_era(), 1);
+			assert_eq!(active_era(), 1);
+			assert_eq!(Session::current_index(), 5);
+			assert_eq!(System::block_number(), 22);
+
+			// go all the way to active 2.
+			start_active_era(2);
+			assert_eq!(current_era(), 2);
+			assert_eq!(active_era(), 2);
+			assert_eq!(Session::current_index(), 10);
+	})
+}
+
+#[test]
+fn session_buffering_no_offset() {
+	ExtBuilder::default()
+		.offset(0)
+		.session_per_era(5)
+		.period(5)
+		.build(vec![
+			(100, 2000),
+			(200, 2000),
+
+			// This allows us to have a total_payout different from 0.
+			(999, 1_000_000_000_000),
+		], vec![
+			(100, 101, 1000),
+			(200, 201, 1000),
+		])
+		.execute_with(|| {
+			assert_eq!(current_era(), 0);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 0);
+
+			start_session(1);
+			assert_eq!(current_era(), 0);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 1);
+			assert_eq!(System::block_number(), 5);
+
+			start_session(2);
+			assert_eq!(current_era(), 0);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 2);
+			assert_eq!(System::block_number(), 10);
+
+			start_session(3);
+			assert_eq!(current_era(), 0);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 3);
+			assert_eq!(System::block_number(), 15);
+
+			// active era is lagging behind by one session, because of how session module works.
+			start_session(4);
+			assert_eq!(current_era(), 1);
+			assert_eq!(active_era(), 0);
+			assert_eq!(Session::current_index(), 4);
+			assert_eq!(System::block_number(), 20);
+
+			start_session(5);
+			assert_eq!(current_era(), 1);
+			assert_eq!(active_era(), 1);
+			assert_eq!(Session::current_index(), 5);
+			assert_eq!(System::block_number(), 25);
+
+			// go all the way to active 2.
+			start_active_era(2);
+			assert_eq!(current_era(), 2);
+			assert_eq!(active_era(), 2);
+			assert_eq!(Session::current_index(), 10);
+	})
+}

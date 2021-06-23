@@ -1559,14 +1559,14 @@ impl <T: Config> Pallet<T> {
 				.unwrap_or(0); // Must never happen.
 
 			match ForceEra::<T>::get() {
-				// Will set to default again, which is `NotForcing`.
-				Forcing::ForceNew => ForceEra::<T>::kill(),
-				// Short circuit to `new_era`.
+				// Will be set to `NotForcing` again if a new era has been triggered.
+				Forcing::ForceNew => (),
+				// Short circuit to `try_trigger_new_era`.
 				Forcing::ForceAlways => (),
-				// Only go to `new_era` if deadline reached.
+				// Only go to `try_trigger_new_era` if deadline reached.
 				Forcing::NotForcing if era_length >= T::SessionsPerEra::get() => (),
 				_ => {
-					// either `Forcing::ForceNone`,
+					// Either `Forcing::ForceNone`,
 					// or `Forcing::NotForcing if era_length >= T::SessionsPerEra::get()`.
 					return None
 				},
@@ -2234,7 +2234,6 @@ for Pallet<T>
 			.saturating_sub(now);
 
 		let session_length = T::NextNewSession::average_session_length();
-
 		let sessions_left: T::BlockNumber = match ForceEra::<T>::get() {
 			Forcing::ForceNone => Bounded::max_value(),
 			Forcing::ForceNew | Forcing::ForceAlways => Zero::zero(),

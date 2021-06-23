@@ -275,6 +275,10 @@ impl ExtBuilder {
 		PERIOD.with(|v| *v.borrow_mut() = length);
 		self
 	}
+	pub fn offset(self, offset: BlockNumber) -> Self {
+		OFFSET.with(|v| *v.borrow_mut() = offset);
+		self
+	}
 
 	pub fn build(
 		self,
