@@ -1,12 +1,13 @@
 use crate::{self as pallet_crowdloan_rewards, Config};
-use frame_support::{construct_runtime, parameter_types, PalletId};
-use sp_core::{ed25519, Pair, H256};
+use frame_support::{construct_runtime, parameter_types, PalletId, assert_ok};
+
+use sp_core::{H256};
 use sp_io;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 };
-use sp_std::convert::{From, TryInto};
+use sp_std::convert::{From};
 
 pub type AccountId = u64;
 pub type Balance = u128;
@@ -64,22 +65,22 @@ impl pallet_utility::Config for Test {
 }
 
 parameter_types! {
-	pub const TreasuryPalletId: PalletId = PalletId(*b"Treasury");
-}
-
-impl pallet_treasury::Config for Test {
-	type PalletId = TreasuryPalletId;
-	type Currency = Balances;
-	type Event = Event;
+	pub const CrowdloanPalletId: PalletId = PalletId(*b"Crowdloa");
 }
 
 impl Config for Test {
 	type Event = Event;
+	type PalletId = CrowdloanPalletId;
+	type RewardCurrency = Balances;
+	const TGE_RATE: u32 = 35;
 	type RelayChainAccountId = [u8; 32];
 }
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
+pub const INIT_BALANCE: u128 = 100_000_000;
+pub const INIT_CONTRIBUTED: u128 = 5000;
+pub const MINIMUM_BALANCE: u128 = ExistentialDeposit::get();
 
 construct_runtime!(
 	pub enum Test where
@@ -91,56 +92,40 @@ construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 		Utility: pallet_utility::{Pallet, Call, Storage, Event},
-		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
 pub struct ExtBuilder;
 
 impl ExtBuilder {
-	pub fn build(contributions: Vec<([u8; 32], u32)>) -> sp_io::TestExternalities {
+	pub fn build(contributions: Vec<(u64, u128)>) -> sp_io::TestExternalities {
 		let mut storage = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 		// Provide some initial balances
-		pallet_balances::GenesisConfig::<Test> {balances: vec![(100, 100_000_000)]}
+		pallet_balances::GenesisConfig::<Test> {balances: vec![(Crowdloan::account_id(), INIT_BALANCE)]}
 			.assimilate_storage(&mut storage)
 			.unwrap();
 
 		let mut ext = sp_io::TestExternalities::from(storage);
 		ext.execute_with(|| {
-			Crowdloan::initialize_reward(
+			System::set_block_number(4);
+			assert_ok!(Crowdloan::initialize_reward(
 				Origin::root(),
 				contributions.clone(),
-				10,
-				10
-			).unwrap();
-			System::set_block_number(1)
+				14
+			));
+			// mock: reward from block 5 to block 14 (10 blocks)
+			System::set_block_number(5);
 		});
 
 		ext
 	}
 }
 
-pub(crate) fn get_ed25519_pairs(num: u32) -> Vec<ed25519::Pair> {
-	let seed: u128 = 12345678901234567890123456789012;
-	let mut pairs = Vec::new();
-	for i in 0..num {
-		pairs.push(ed25519::Pair::from_seed(
-			(seed.clone() + i as u128)
-				.to_string()
-				.as_bytes()
-				.try_into()
-				.unwrap(),
-		))
-	}
-	pairs
-}
-
 pub(crate) fn mock_test() -> sp_io::TestExternalities {
-	let pairs = get_ed25519_pairs(3);
 	ExtBuilder::build(vec![
-		([1u8; 32].into(), 500),
-		([2u8; 32].into(), 500),
-		(pairs[0].public().into(), 500),
+		(1u64, INIT_CONTRIBUTED),
+		(2u64, INIT_CONTRIBUTED),
+		(3u64, INIT_CONTRIBUTED),
 	])
 }
 

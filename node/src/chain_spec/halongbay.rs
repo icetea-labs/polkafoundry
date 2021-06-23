@@ -3,6 +3,7 @@ use sc_service::ChainType;
 use sc_chain_spec::{Properties};
 
 use sp_core::{crypto::UncheckedInto};
+use sp_runtime::traits::{AccountIdConversion};
 
 use halongbay_runtime as halongbay;
 
@@ -22,6 +23,8 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 	let endowed_accounts = vec![
 		// 5HNFRkCYoriHQwuJbt5YgSwegRTxmSQRe51UKEEBWnUZuHf5
 		hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(),
+		// init Crowdloan fund for testing purpose
+		halongbay::CrowdloanPalletId::get().into_account(),
 	];
 
 	halongbay::GenesisConfig {

@@ -1,241 +1,93 @@
 use crate::*;
 use frame_support::{assert_noop, assert_ok};
 use mock::*;
-use codec::Encode;
-use sp_core::Pair;
-use sp_runtime::MultiSignature;
 
 #[test]
 fn init_reward_work () {
+	// mock_test have already called initialize_reward successfully
 	mock_test().execute_with(|| {
 		assert_noop!(
 			Crowdloan::initialize_reward(
 				Origin::root(),
 				vec![
-					([1u8; 32].into(), 500),
-					([2u8; 32].into(), 500)
+					(1u64, 500),
+					(2u64, 500)
 				],
-				10,
-				10
+				1
 			),
-			Error::<Test>::AlreadyInitReward
+			Error::<Test>::InvalidEndBlock
 		);
 		run_to_block(10);
 		assert_noop!(
 				Crowdloan::initialize_reward(
 				Origin::root(),
 				vec![
-					([1u8; 32].into(), 500),
-					([2u8; 32].into(), 500)
+					(1u64, 500),
+					(2u64, 500)
 				],
-				10,
-				10
+				15
 			),
-			Error::<Test>::InvalidEndBlock
-		);
-		assert_ok!(
-				Crowdloan::initialize_reward(
-				Origin::root(),
-				vec![
-					([1u8; 32].into(), 500),
-					([2u8; 32].into(), 500)
-				],
-				10,
-				20
-			),
+			Error::<Test>::AlreadyInitReward
 		);
 	})
 }
 
 #[test]
-fn associate_account_work() {
-	let pairs = get_ed25519_pairs(1);
-	let proof: MultiSignature = pairs[0].sign(&1u64.encode()).into();
-	mock_test().execute_with(|| {
-		assert_noop!(
-			Crowdloan::associate_account(
-				Origin::signed(2),
-				pairs[0].public().into(),
-				proof.clone()
-			),
-			Error::<Test>::InvalidSignature
-		);
-		assert_ok!(
-			Crowdloan::associate_account(
-				Origin::signed(1),
-				pairs[0].public().into(),
-				proof.clone()
-			)
-		);
-		assert_noop!(
-			Crowdloan::associate_account(
-				Origin::signed(1),
-				pairs[0].public().into(),
-				proof.clone()
-			),
-			Error::<Test>::AlreadyAssociated
-		);
-		let expected = vec![crate::Event::AssociatedAccount(
-			1,
-			pairs[0].public().into(),
-		)];
-		assert_eq!(events(), expected);
-	})
-}
-
-#[test]
-fn get_money_work() {
-	let pairs = get_ed25519_pairs(2);
-	let proof: MultiSignature = pairs[0].sign(&1u64.encode()).into();
-	let proof1: MultiSignature = pairs[1].sign(&11u64.encode()).into();
-	let relay_account = pairs[0].public().into();
+fn claim_work() {
 	// 1 is contributor, 11 not
 	mock_test().execute_with(|| {
-		// user 100 donate fund to Treasury
-		assert_ok!(Treasury::donate(Origin::signed(100), 10_000_000));
-
+		// we mock tge_rate = 35%, period = 10 and account 1-2-3 contribute 5000
+		// total: 5000 * 3 = 15000
+		// claimed at tge each account: 5000 * 35% = 1750
+		// total claimed: 3 * 1750 = 5250
+		assert_eq!(Crowdloan::pot(), INIT_BALANCE - MINIMUM_BALANCE - 3 * INIT_CONTRIBUTED * 35 / 100);
+		assert_eq!(Crowdloan::reward_period(), 10u64);
+		assert_eq!(Crowdloan::contributors(1).unwrap().last_paid, 4u64);
 		assert_noop!(
-			Crowdloan::get_money(
-				Origin::signed(1),
-			),
-			Error::<Test>::NoAssociatedAccount
-		);
-		Crowdloan::associate_account(
-			Origin::signed(11),
-			pairs[1].public().into(),
-			proof1.clone()
-		).unwrap();
-		assert_noop!(
-			Crowdloan::get_money(
+			Crowdloan::claim(
 				Origin::signed(11),
 			),
 			Error::<Test>::NotContributedYet
 		);
-		Crowdloan::associate_account(
-			Origin::signed(1),
-			relay_account,
-			proof.clone()
-		).unwrap();
-		run_to_block(2);
-		assert_ok!(Crowdloan::get_money(
-				Origin::signed(1),
-		));
+		run_to_block(6);
+		assert_ok!(Crowdloan::claim(Origin::signed(1)));
 		assert_noop!(
-			Crowdloan::get_money(
+			Crowdloan::claim(
 				Origin::signed(1),
 			),
-			Error::<Test>::ScantyReward
+			Error::<Test>::ClaimAmountBelowMinimum
 		);
-		assert_eq!(
-			Crowdloan::contributors(&relay_account).unwrap().last_paid,
-			2u64
-		);
-		// we mock rate = 10 and period = 10 and pair1 contribute 500
-		// earn (500 * 10)/10 = 500 token per block
-		assert_eq!(
-			Crowdloan::contributors(&relay_account).unwrap().claimed_reward,
-			1000
-		);
-		run_to_block(8);
-		assert_ok!(Crowdloan::get_money(
-				Origin::signed(1),
-		));
-		assert_eq!(
-			Crowdloan::contributors(&relay_account).unwrap().claimed_reward,
-			4000
-		);
-		run_to_block(11);
-		assert_ok!(Crowdloan::get_money(
-				Origin::signed(1),
-		));
-		assert_eq!(
-			Crowdloan::contributors(&relay_account).unwrap().claimed_reward,
-			5000
-		);
+		assert_eq!(Crowdloan::contributors(1).unwrap().last_paid, 6u64);
+		// we mock tge_rate = 35%, period = 10 and account 1 contribute 5000
+		// total: 5000
+		// claimed at tge: 5000 * 35% = 1750
+		// earn until block 6: ((5000 - 1750)) * (6-4)) / 10 = 650
+		// total claimed: 1750 + 650 = 2400
+		assert_eq!(Crowdloan::contributors(1).unwrap().claimed_reward, 2400);
+		run_to_block(9);
+		assert_ok!(Crowdloan::claim(Origin::signed(1)));
+		// total: 5000
+		// claimed: 2400
+		// earn from block 6 to block 10: ((5000 - 1750) * (9 - 6)) / 10 = 975
+		// total claimed: 2400 + 975 = 3375
+		assert_eq!(Crowdloan::contributors(1).unwrap().claimed_reward, 3375);
+		run_to_block(20);
+		assert_ok!(Crowdloan::claim(Origin::signed(1)));
+		assert_eq!(Crowdloan::contributors(1).unwrap().claimed_reward, 5000);
 		assert_noop!(
-			Crowdloan::get_money(
+			Crowdloan::claim(
 				Origin::signed(1),
 			),
 			Error::<Test>::AlreadyPaid
 		);
 		let expected = vec![
-			crate::Event::AssociatedAccount(11, pairs[1].public().into()),
-			crate::Event::AssociatedAccount(1, relay_account),
-			crate::Event::RewardPaid(1, 1000),
-			crate::Event::RewardPaid(1, 3000),
-			crate::Event::RewardPaid(1, 1000),
+			crate::Event::RewardPaid(1, 1750),
+			crate::Event::RewardPaid(2, 1750),
+			crate::Event::RewardPaid(3, 1750),
+			crate::Event::RewardPaid(1, 650),
+			crate::Event::RewardPaid(1, 975),
+			crate::Event::RewardPaid(1, 1625),
 		];
 		assert_eq!(events(), expected);
-	})
-}
-
-#[test]
-fn update_associate_account_work() {
-	let pairs = get_ed25519_pairs(2);
-	let proof: MultiSignature = pairs[0].sign(&1u64.encode()).into();
-	let proof1: MultiSignature = pairs[1].sign(&2u64.encode()).into();
-	let proof2: MultiSignature = pairs[0].sign(&3u64.encode()).into();
-	mock_test().execute_with(|| {
-		// user 100 donate fund to Treasury
-		assert_ok!(Treasury::donate(Origin::signed(100), 10_000_000));
-
-		Crowdloan::associate_account(
-			Origin::signed(1),
-			pairs[0].public().into(),
-			proof.clone()
-		).unwrap();
-		// user 2 try to get reward of user 1 by input address of user 1
-		assert_noop!(
-			Crowdloan::update_associate_account(
-				Origin::signed(2),
-				1,
-				pairs[1].public().into(),
-				proof1.clone()
-			),
-			Error::<Test>::BadRelayAccount
-		);
-		assert_noop!(
-			Crowdloan::update_associate_account(
-				Origin::signed(2),
-				1,
-				pairs[0].public().into(),
-				proof1.clone()
-			),
-			Error::<Test>::InvalidSignature
-		);
-		assert_noop!(
-			Crowdloan::update_associate_account(
-				Origin::signed(2),
-				2,
-				pairs[1].public().into(),
-				proof1.clone()
-			),
-			Error::<Test>::NoAssociatedAccount
-		);
-		run_to_block(5);
-		Crowdloan::get_money(
-			Origin::signed(1),
-		).unwrap();
-		// the only way to update is sign proof by own relay account and input correct associated account
-		assert_ok!(
-			Crowdloan::update_associate_account(
-				Origin::signed(3),
-				1,
-				pairs[0].public().into(),
-				proof2.clone()
-			),
-		);
-		run_to_block(6);
-		assert_ok!(
-			Crowdloan::get_money(
-				Origin::signed(3)
-			)
-		);
-		assert_noop!(
-			Crowdloan::get_money(
-				Origin::signed(1)
-			),
-			Error::<Test>::NoAssociatedAccount
-		);
 	})
 }
