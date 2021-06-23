@@ -4,16 +4,14 @@ use sp_arithmetic::PerThing;
 use sp_std::{ops::Mul};
 
 pub fn compute_total_payout<N>(
+	i_npos: INposInput,
 	npos_token_staked: N,
 	total_tokens: N,
-	i_0: u32,
-	i_ideal: u32,
-	x_ideal: u32,
-	d: u32,
-	round_duration: u64
+	era_duration: u64
 ) -> N
 	where N: AtLeast32BitUnsigned + Clone
 {
+	let INposInput { i_0, i_ideal, x_ideal, d } = i_npos;
 	// Milliseconds per year for the Julian year (365.25 days).
 	const MILLISECONDS_PER_YEAR: u64 = 1000 * 3600 * 24 * 36525 / 100;
 	let i_0 = Perbill::from_rational(i_0, 1000);
@@ -22,9 +20,19 @@ pub fn compute_total_payout<N>(
 	let x_ideal = Perbill::from_rational(x_ideal, 100);
 	let d = Perbill::from_rational(d, 100);
 
-	let portion = Perbill::from_rational(round_duration,MILLISECONDS_PER_YEAR);
+	let portion = Perbill::from_rational(era_duration as u64,MILLISECONDS_PER_YEAR);
 
-	portion * (compute_i_npos(i_0, i_ideal, x, x_ideal, d)).mul(total_tokens)
+	let payout =  portion * (compute_i_npos(i_0, i_ideal, x, x_ideal, d)).mul(total_tokens);
+
+	payout
+}
+
+#[derive(Clone, Debug)]
+pub struct INposInput {
+	pub i_0: u32,
+	pub i_ideal: u32,
+	pub x_ideal: u32,
+	pub d: u32,
 }
 
 pub fn compute_i_npos<P: PerThing> (
@@ -127,30 +135,36 @@ mod test {
 	fn compute_total_payout_work() {
 		const YEAR: u64 = 365 * 24 * 60 * 60 * 1000;
 
-		assert_eq!(super::compute_total_payout(0, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 2498);
-		assert_eq!(super::compute_total_payout(5_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 3_248);
-		assert_eq!(super::compute_total_payout(25_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 6_246);
-		assert_eq!(super::compute_total_payout(40_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 8_494);
-		assert_eq!(super::compute_total_payout(50_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 9_993);
-		assert_eq!(super::compute_total_payout(60_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 4_372);
-		assert_eq!(super::compute_total_payout(75_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 2_732);
-		assert_eq!(super::compute_total_payout(95_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 2_513);
-		assert_eq!(super::compute_total_payout(100_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, YEAR), 2_505);
+		let i_npos = INposInput {
+			i_0: 2_5u32,
+			i_ideal: 20u32,
+			x_ideal: 50u32,
+			d: 5u32
+
+		};
+		assert_eq!(super::compute_total_payout(i_npos.clone(), 0, 100_000u64,YEAR), 2498);
+		assert_eq!(super::compute_total_payout(i_npos.clone(), 5_000, 100_000u64, YEAR), 3_248);
+		assert_eq!(super::compute_total_payout(i_npos.clone(), 25_000, 100_000u64, YEAR), 6_246);
+		assert_eq!(super::compute_total_payout(i_npos.clone(), 40_000, 100_000u64, YEAR), 8_494);
+		assert_eq!(super::compute_total_payout(i_npos.clone(), 50_000, 100_000u64, YEAR), 9_993);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),60_000, 100_000u64, YEAR), 4_372);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),75_000, 100_000u64, YEAR), 2_732);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),95_000, 100_000u64, YEAR), 2_513);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),100_000, 100_000u64, YEAR), 2_505);
 
 		const DAY: u64 = 24 * 60 * 60 * 1000;
-		assert_eq!(super::compute_total_payout(0, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, DAY), 7);
-		assert_eq!(super::compute_total_payout(25_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, DAY), 17);
-		assert_eq!(super::compute_total_payout(50_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, DAY), 27);
-		assert_eq!(super::compute_total_payout(100_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, DAY), 7);
+		assert_eq!(super::compute_total_payout(i_npos.clone(), 0, 100_000u64, DAY), 7);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),25_000, 100_000u64, DAY), 17);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),50_000, 100_000u64, DAY), 27);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),100_000, 100_000u64, DAY), 7);
 
 		const SIX_HOURS: u64 = 6 * 60 * 60 * 1000;
-		assert_eq!(super::compute_total_payout(0, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, SIX_HOURS), 2);
-		assert_eq!(super::compute_total_payout(25_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, SIX_HOURS), 4);
-		assert_eq!(super::compute_total_payout(50_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, SIX_HOURS), 7);
-		assert_eq!(super::compute_total_payout(100_000, 100_000u64, 2_5u32, 20u32, 50u32, 5u32, SIX_HOURS), 2);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),0, 100_000u64, SIX_HOURS), 2);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),25_000, 100_000u64, SIX_HOURS), 4);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),50_000, 100_000u64, SIX_HOURS), 7);
+		assert_eq!(super::compute_total_payout(i_npos.clone(),100_000, 100_000u64, SIX_HOURS), 2);
 
 		const HOUR: u64 = 60 * 60 * 1000;
-		assert_eq!(super::compute_total_payout(2_500_000_000_000_000_000_000_000_000u128, 5_000_000_000_000_000_000_000_000_000u128, 2_5u32, 20u32, 50u32, 5u32, HOUR), 57_038_500_000_000_000_000_000);
-
+		assert_eq!(super::compute_total_payout(i_npos.clone(),2_500_000_000_000_000_000_000_000_000u128, 5_000_000_000_000_000_000_000_000_000u128, HOUR), 57_038_500_000_000_000_000_000);
 	}
 }
