@@ -5,7 +5,7 @@ services:
     ports:
       - "9944:9944"
       - "30444:30333"
-    image: icetealabs/test:polkadot-v0.9.4
+    image: icetealabs/test:polkadot-v0.9.6
     volumes:
       - "polkadot-data-alice:/data"
       -  ../node/res:/spec
@@ -27,7 +27,7 @@ services:
     ports:
       - "9955:9944"
       - "30555:30333"
-    image: icetealabs/test:polkadot-v0.9.4
+    image: icetealabs/test:polkadot-v0.9.6
     volumes:
       - "polkadot-data-bob:/data"
       - ../node/res:/spec
@@ -51,7 +51,7 @@ services:
     ports:
       - "9966:9944"
       - "30666:30333"
-    image: icetealabs/test:polkadot-v0.9.4
+    image: icetealabs/test:polkadot-v0.9.6
     volumes:
       - "polkadot-data-charlie:/data"
       - ../node/res:/spec
@@ -75,7 +75,7 @@ services:
     ports:
       - "9977:9944"
       - "30777:30333"
-    image: icetealabs/test:polkadot-v0.9.4
+    image: icetealabs/test:polkadot-v0.9.6
     volumes:
       - "polkadot-data-dave:/data"
       - ../node/res:/spec

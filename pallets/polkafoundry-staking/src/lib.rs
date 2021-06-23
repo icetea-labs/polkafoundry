@@ -2510,37 +2510,34 @@ for FilterHistoricalOffences<Pallet<T>, R>
 	}
 }
 
-/// Add reward points to block authors:
-/// * 20 points to the block producer for producing a block in
-impl<T> pallet_authorship::EventHandler<
-	<T as frame_system::Config>::AccountId,
-	<T as frame_system::Config>::BlockNumber
-> for Pallet<T>
-	where
-		T: Config + pallet_authorship::Config + pallet_session::Config,
-{
-	fn note_author(author: <T as frame_system::Config>::AccountId) {
-		Self::reward_by_ids(author, 20);
-	}
-
-	// just ignore it
-	fn note_uncle(_author: <T as frame_system::Config>::AccountId, _age: <T as frame_system::Config>::BlockNumber) {
-
-	}
-}
+// /// Add reward points to block authors:
+// /// * 20 points to the block producer for producing a block in
 // impl<T> pallet_authorship::EventHandler<
-// 	T::AccountId,
-// 	T::BlockNumber
+// 	<T as frame_system::Config>::AccountId,
+// 	<T as frame_system::Config>::BlockNumber
 // > for Pallet<T>
 // 	where
 // 		T: Config + pallet_authorship::Config + pallet_session::Config,
 // {
-// 	fn note_author(author: T::AccountId) {
+// 	fn note_author(author: <T as frame_system::Config>::AccountId) {
 // 		Self::reward_by_ids(author, 20);
 // 	}
 //
 // 	// just ignore it
-// 	fn note_uncle(_author: T::AccountId, _age: T::BlockNumber) {
+// 	fn note_uncle(_author: <T as frame_system::Config>::AccountId, _age: <T as frame_system::Config>::BlockNumber) {
 //
 // 	}
 // }
+impl<T> pallet_authorship::EventHandler<T::AccountId, T::BlockNumber> for Pallet<T>
+	where
+		T: Config + pallet_authorship::Config + pallet_session::Config,
+{
+	fn note_author(author: T::AccountId) {
+		Self::reward_by_ids(author, 20);
+	}
+
+	// just ignore it
+	fn note_uncle(_author: T::AccountId, _age: T::BlockNumber) {
+
+	}
+}
