@@ -24,7 +24,6 @@ version = '2.1.0'
 hex-literal = { optional = true, version = '0.3.1' }
 serde = { features = ['derive'], optional = true, version = '1.0.119' }
 
-author-inherent = { default-features = false, path = '../../pallets/author-inherent' }
 # Substrate dependencies
 frame-benchmarking = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4', optional = true }
 frame-executive = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4' }
@@ -65,8 +64,6 @@ pallet-evm-precompile-simple = { default-features = false, git = 'https://github
 pallet-evm-precompile-sha3fips = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-evm-precompile-modexp = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-crowdloan-rewards = { default-features = false, path = '../../pallets/crowdloan-rewards' }
-polkafoundry-staking = { default-features = false, path = '../../pallets/polkafoundry-staking' }
-pallet-treasury = { default-features = false, path = "../../pallets/treasury" }
 
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 
@@ -103,7 +100,6 @@ runtime-benchmarks = [
     'sp-runtime/runtime-benchmarks',
 ]
 std = [
-    'author-inherent/std',
     'codec/std',
     'serde',
     'frame-executive/std',
@@ -125,10 +121,8 @@ std = [
     'pallet-evm-precompile-sha3fips/std',
     'pallet-ethereum/std',
     'pallet-crowdloan-rewards/std',
-    'pallet-treasury/std',
     'pallet-election-provider-multi-phase/std',
     'runtime-primitives/std',
-    'polkafoundry-staking/std',
     'sp-api/std',
     'sp-block-builder/std',
     'sp-consensus-aura/std',

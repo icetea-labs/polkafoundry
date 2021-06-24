@@ -413,20 +413,10 @@ impl pallet_evm::Config for Runtime {
 }
 
 
-impl pallet_crowdloan_rewards::Config for Runtime {
-	type Event = Event;
-	type RelayChainAccountId = AccountId32;
-}
-
-parameter_types! {
-	pub const TreasuryPalletId: PalletId = PalletId(*b"Treasury");
-}
-
-impl pallet_treasury::Config for Runtime {
-	type PalletId = TreasuryPalletId;
-	type Currency = Balances;
-	type Event = Event;
-}
+// impl pallet_crowdloan_rewards::Config for Runtime {
+// 	type Event = Event;
+// 	type RelayChainAccountId = AccountId32;
+// }
 
 // parameter_types! {
 // 	// no signed phase for now, just unsigned.
@@ -477,40 +467,6 @@ impl pallet_treasury::Config for Runtime {
 // 	type WeightInfo = weights::pallet_election_provider_multi_phase::WeightInfo<Runtime>;
 // }
 
-parameter_types! {
-	pub const BlocksPerRound: u32 = 600;
-	pub const MaxCollatorsPerNominator: u32 = 5;
-	pub const MaxNominationsPerCollator: u32 = 2;
-	pub const BondDuration: u32 = 2;
-	pub const MinCollatorStake: u32 = 500;
-	pub const MinNominatorStake: u32 = 100;
-	pub const PayoutDuration: u32 = 2;
-	pub const DesiredTarget: u32 = 2;
-}
-
-// impl frame_election_provider_support::onchain::Config for Runtime {
-// 	type AccountId = AccountId32;
-// 	type BlockNumber = BlockNumber;
-// 	type BlockWeights = BlockWeights;
-// 	type Accuracy = Perbill;
-// 	type DataProvider = Staking;
-// }
-
-// impl polkafoundry_staking::Config for Runtime {
-// 	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
-// 	type Event = Event;
-// 	type Currency = Balances;
-// 	type BlocksPerRound = BlocksPerRound;
-// 	type MaxNominationsPerCollator = MaxNominationsPerCollator;
-// 	type BondDuration = BondDuration;
-// 	type MinCollatorStake = MinCollatorStake;
-// 	type MinNominatorStake = MinNominatorStake;
-// 	type PayoutDuration = PayoutDuration;
-// 	type ElectionProvider = frame_election_provider_support::onchain::OnChainSequentialPhragmen<Self>;
-// 	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
-// 	type DesiredTarget = DesiredTarget;
-// }
-
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -535,10 +491,7 @@ construct_runtime!(
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
 
-		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
-		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>},
-
-		// Staking: polkafoundry_staking::{Pallet, Call, Storage, Event<T>, Config<T>},
+		// Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 
 		// XCM helpers.
 		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>},

@@ -32,8 +32,6 @@ hex = '0.4.3'
 async-trait = { version = "0.1.48" }
 
 # local dependencies
-author-inherent = { path = '../pallets/author-inherent' }
-
 polkafoundry-runtime = { path = '../runtime/polkafoundry', version = '0.0.1', optional = true }
 polkasmith-runtime = { path = '../runtime/polkasmith', version = '0.0.1', optional = true }
 halongbay-runtime = { path = '../runtime/halongbay', version = '0.0.1', optional = true }
