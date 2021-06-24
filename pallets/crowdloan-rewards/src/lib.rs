@@ -218,11 +218,7 @@ pub mod pallet {
 			T::PalletId::get().into_account()
 		}
 
-		pub fn pot() -> BalanceOf<T> {
-			T::RewardCurrency::free_balance(&Self::account_id())
-				// Must never be less than 0 but better be safe.
-				.saturating_sub(T::RewardCurrency::minimum_balance())
-		}
+		pub fn pot() -> BalanceOf<T> { T::RewardCurrency::free_balance(&Self::account_id()) }
 	}
 }
 

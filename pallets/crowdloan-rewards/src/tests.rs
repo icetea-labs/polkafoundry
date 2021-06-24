@@ -40,7 +40,7 @@ fn claim_work() {
 		// total: 5000 * 3 = 15000
 		// claimed at tge each account: 5000 * 35% = 1750
 		// total claimed: 3 * 1750 = 5250
-		assert_eq!(Crowdloan::pot(), INIT_BALANCE - MINIMUM_BALANCE - 3 * INIT_CONTRIBUTED * 35 / 100);
+		assert_eq!(Crowdloan::pot(), INIT_BALANCE - 3 * INIT_CONTRIBUTED * 35 / 100);
 		assert_eq!(Crowdloan::reward_period(), 10u64);
 		assert_eq!(Crowdloan::contributors(1).unwrap().last_paid, 4u64);
 		assert_noop!(

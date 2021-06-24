@@ -80,7 +80,6 @@ type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 pub const INIT_BALANCE: u128 = 100_000_000;
 pub const INIT_CONTRIBUTED: u128 = 5000;
-pub const MINIMUM_BALANCE: u128 = ExistentialDeposit::get();
 
 construct_runtime!(
 	pub enum Test where
