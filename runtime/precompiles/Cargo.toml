@@ -10,8 +10,8 @@ edition = '2018'
 log = '0.4.8'
 rustc-hex = { version = '2.0.1', default-features = false }
 
-sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4' }
-sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4' }
+sp-core = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
+sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
 
 pallet-evm = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-evm-precompile-dispatch = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
