@@ -12,7 +12,11 @@
 # The cache for chain data in container
 .local
 
-customSpec.json
-customSpecRaw.json
-
 .idea
+
+bin
+
+
+scripts/js/node_modules
+scripts/js/.env
+

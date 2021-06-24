@@ -3,7 +3,8 @@ const RPC_PORT = 1332;
 const WS_PORT = 1333;
 const SPECS_PATH = './specs';
 
-const BINARY_PATH = '../target/release/polkafoundry';
+const BINARY_PATH = `../target/release/polkafoundry`;
+
 const SPAWNING_TIME = 30000;
 
 const GENESIS_ACCOUNT = '0x6be02d1d3665660d22ff9624b7be0551ee1ac91b';
