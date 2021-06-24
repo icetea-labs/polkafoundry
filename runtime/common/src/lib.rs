@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
-	parameter_types, traits::{Currency, OneSessionHandler},
+	parameter_types,
 	weights::{Weight, constants::WEIGHT_PER_SECOND, DispatchClass},
 };
 use frame_system::limits;

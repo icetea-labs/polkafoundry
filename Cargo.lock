@@ -2918,6 +2918,7 @@ dependencies = [
  "frame-system-rpc-runtime-api",
  "hex-literal",
  "pallet-aura",
+ "pallet-authorship",
  "pallet-balances",
  "pallet-crowdloan-rewards",
  "pallet-election-provider-multi-phase",
@@ -2927,11 +2928,16 @@ dependencies = [
  "pallet-evm-precompile-sha3fips",
  "pallet-evm-precompile-simple",
  "pallet-grandpa",
- "pallet-randomness-collective-flip",
+ "pallet-im-online",
+ "pallet-offences",
+ "pallet-session",
+ "pallet-staking 3.0.0",
+ "pallet-staking-reward-curve 3.0.0",
  "pallet-sudo",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
+ "pallet-treasury 3.0.0",
  "pallet-xcm",
  "parachain-info",
  "parity-scale-codec",
@@ -2950,6 +2956,7 @@ dependencies = [
  "sp-offchain",
  "sp-runtime",
  "sp-session",
+ "sp-staking",
  "sp-std",
  "sp-transaction-pool",
  "sp-version",
@@ -5601,6 +5608,38 @@ dependencies = [
 [[package]]
 name = "pallet-staking"
 version = "3.0.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-election-provider-support",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "log",
+ "pallet-authorship",
+ "pallet-balances",
+ "pallet-session",
+ "pallet-staking-reward-curve 3.0.0",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "parking_lot 0.11.1",
+ "paste",
+ "rand_chacha 0.2.2",
+ "serde",
+ "sp-application-crypto",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-staking",
+ "sp-std",
+ "sp-storage",
+ "sp-tracing",
+ "static_assertions",
+ "substrate-test-utils",
+]
+
+[[package]]
+name = "pallet-staking"
+version = "3.0.0"
 source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6#9c572625f6557dfdb19f47474369a0327d51dfbc"
 dependencies = [
  "frame-election-provider-support",
@@ -5618,6 +5657,17 @@ dependencies = [
  "sp-staking",
  "sp-std",
  "static_assertions",
+]
+
+[[package]]
+name = "pallet-staking-reward-curve"
+version = "3.0.0"
+dependencies = [
+ "proc-macro-crate 1.0.0",
+ "proc-macro2",
+ "quote",
+ "sp-runtime",
+ "syn",
 ]
 
 [[package]]
@@ -6885,8 +6935,8 @@ dependencies = [
  "pallet-randomness-collective-flip",
  "pallet-scheduler",
  "pallet-session",
- "pallet-staking",
- "pallet-staking-reward-curve",
+ "pallet-staking 3.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6)",
+ "pallet-staking-reward-curve 3.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6)",
  "pallet-timestamp",
  "pallet-tips",
  "pallet-transaction-payment",
@@ -6938,7 +6988,7 @@ dependencies = [
  "pallet-mmr",
  "pallet-offences",
  "pallet-session",
- "pallet-staking",
+ "pallet-staking 3.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6)",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-treasury 3.0.0",
@@ -6977,7 +7027,7 @@ dependencies = [
  "pallet-balances",
  "pallet-offences",
  "pallet-session",
- "pallet-staking",
+ "pallet-staking 3.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6)",
  "pallet-timestamp",
  "pallet-vesting",
  "parity-scale-codec",
@@ -7014,7 +7064,7 @@ dependencies = [
  "pallet-babe",
  "pallet-im-online",
  "pallet-mmr-primitives",
- "pallet-staking",
+ "pallet-staking 3.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6)",
  "pallet-transaction-payment-rpc-runtime-api",
  "polkadot-approval-distribution",
  "polkadot-availability-bitfield-distribution",
@@ -7142,8 +7192,8 @@ dependencies = [
  "pallet-offences",
  "pallet-randomness-collective-flip",
  "pallet-session",
- "pallet-staking",
- "pallet-staking-reward-curve",
+ "pallet-staking 3.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6)",
+ "pallet-staking-reward-curve 3.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6)",
  "pallet-sudo",
  "pallet-timestamp",
  "pallet-transaction-payment",
@@ -7186,7 +7236,7 @@ dependencies = [
  "futures 0.3.15",
  "hex",
  "pallet-balances",
- "pallet-staking",
+ "pallet-staking 3.0.0 (git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6)",
  "pallet-transaction-payment",
  "polkadot-node-primitives",
  "polkadot-node-subsystem",
@@ -10660,6 +10710,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "substrate-test-utils"
+version = "3.0.0"
+source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6#9c572625f6557dfdb19f47474369a0327d51dfbc"
+dependencies = [
+ "futures 0.3.15",
+ "substrate-test-utils-derive",
+ "tokio 0.2.25",
+]
+
+[[package]]
+name = "substrate-test-utils-derive"
+version = "0.9.0"
+source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.6#9c572625f6557dfdb19f47474369a0327d51dfbc"
+dependencies = [
+ "proc-macro-crate 1.0.0",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "substrate-wasm-builder"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10923,6 +10993,7 @@ dependencies = [
  "pin-project-lite 0.1.12",
  "signal-hook-registry",
  "slab",
+ "tokio-macros",
  "winapi 0.3.9",
 ]
 
@@ -10998,6 +11069,17 @@ dependencies = [
  "bytes 0.4.12",
  "futures 0.1.31",
  "log",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e44da00bfc73a25f814cd8d7e57a68a5c31b74b3152a0a1d1f590c97ed06265a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
