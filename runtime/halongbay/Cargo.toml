@@ -24,7 +24,6 @@ version = '2.1.0'
 hex-literal = { optional = true, version = '0.3.1' }
 serde = { features = ['derive'], optional = true, version = '1.0.119' }
 
-author-inherent = { default-features = false, path = '../../pallets/author-inherent' }
 # Substrate dependencies
 frame-benchmarking = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6', optional = true }
 frame-executive = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
@@ -34,7 +33,6 @@ frame-system-benchmarking = { default-features = false, git = 'https://github.co
 frame-system-rpc-runtime-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
 frame-election-provider-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
 
-precompiles = { default-features = false, path = '../precompiles/' }
 pallet-aura = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
 pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
 pallet-grandpa = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
@@ -65,13 +63,15 @@ pallet-evm-precompile-simple = { default-features = false, git = 'https://github
 pallet-evm-precompile-sha3fips = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-evm-precompile-modexp = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-crowdloan-rewards = { default-features = false, path = '../../pallets/crowdloan-rewards' }
-polkafoundry-staking = { default-features = false, path = '../../pallets/polkafoundry-staking' }
-pallet-treasury = { default-features = false, path = "../../pallets/treasury" }
+#polkafoundry-staking = { default-features = false, path = '../../pallets/polkafoundry-staking' }
+pallet-treasury = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = 'polkadot-v0.9.6' }
+pallet-collective = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = 'polkadot-v0.9.6' }
 
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 
 cumulus-pallet-parachain-system = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.6' }
 cumulus-primitives-core = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.6' }
+cumulus-primitives-timestamp = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.6' }
 cumulus-pallet-xcmp-queue =  { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.6' }
 cumulus-primitives-utility = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.6' }
 cumulus-pallet-xcm = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.6' }
@@ -89,6 +89,7 @@ pallet-xcm = { default-features = false, git = 'https://github.com/paritytech/po
 
 runtime-primitives = { default-features = false, path = '../../primitives' }
 runtime-common = { default-features = false, path = '../common' }
+polkadot-primitives = { git = 'https://github.com/paritytech/polkadot', branch = 'release-v0.9.6', default-features = false }
 
 [features]
 default = ['std']
@@ -99,11 +100,11 @@ runtime-benchmarks = [
     'frame-system-benchmarking',
     'frame-system/runtime-benchmarks',
     'pallet-balances/runtime-benchmarks',
+#    'polkafoundry-staking/runtime-benchmarks',
     'pallet-timestamp/runtime-benchmarks',
     'sp-runtime/runtime-benchmarks',
 ]
 std = [
-    'author-inherent/std',
     'codec/std',
     'serde',
     'frame-executive/std',
@@ -127,8 +128,10 @@ std = [
     'pallet-crowdloan-rewards/std',
     'pallet-treasury/std',
     'pallet-election-provider-multi-phase/std',
+    'pallet-collective/std',
+    'polkadot-primitives/std',
     'runtime-primitives/std',
-    'polkafoundry-staking/std',
+#    'polkafoundry-staking/std',
     'sp-api/std',
     'sp-block-builder/std',
     'sp-consensus-aura/std',
@@ -146,7 +149,9 @@ std = [
 	'cumulus-pallet-xcmp-queue/std',
 	'cumulus-pallet-xcm/std',
 	'cumulus-primitives-core/std',
+	'cumulus-primitives-timestamp/std',
 	'cumulus-primitives-utility/std',
+    'cumulus-primitives-timestamp/std',
 	'cumulus-ping/std',
     'cumulus-pallet-parachain-system/std',
     'cumulus-pallet-dmp-queue/std',

@@ -1,3 +1,18 @@
+
+/// Money matters.
+pub mod currency {
+	use polkadot_primitives::v0::Balance;
+
+	pub const UNITS: Balance = 1_000_000_000_000_000_000;
+	pub const CENTS: Balance = UNITS / 10_000;
+	pub const GRAND: Balance = CENTS * 100_000;
+	pub const MILLICENTS: Balance = CENTS / 1_000;
+
+	pub const fn deposit(items: u32, bytes: u32) -> Balance {
+		items as Balance * 2_000 * CENTS + (bytes as Balance) * 100 * MILLICENTS
+	}
+}
+
 pub mod time {
 	use runtime_primitives::{BlockNumber};
 	/// This determines the average expected block time that we are targeting.

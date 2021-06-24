@@ -29,11 +29,18 @@ frame-election-provider-support = { default-features = false, git = 'https://git
 pallet-authorship = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.6", default-features = false }
 pallet-session = { git = "https://github.com/paritytech/substrate", features = ["historical"], branch = "polkadot-v0.9.6", default-features = false }
 
+# Optional imports for benchmarking
+frame-benchmarking = { version = "3.1.0", git = 'https://github.com/paritytech/substrate.git', default-features = false, branch = 'polkadot-v0.9.6', optional = true }
+rand_chacha = { version = "0.2", default-features = false, optional = true }
+
 [dev-dependencies]
-pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.6", default-features = false }
-pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.6", default-features = false }
-pallet-timestamp = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.6", default-features = false }
-substrate-test-utils = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.6", default-features = false }
+pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.6" }
+pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.6" }
+pallet-timestamp = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.6" }
+substrate-test-utils = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.6" }
+frame-election-provider-support = { features = ["runtime-benchmarks"], git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
+frame-benchmarking = { version = "3.1.0", git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6'  }
+rand_chacha = { version = "0.2" }
 
 [features]
 default = ['std']
@@ -42,11 +49,8 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'frame-election-provider-support/std',
-    'pallet-balances/std',
-    'pallet-utility/std',
     'pallet-authorship/std',
     'pallet-session/std',
-    'pallet-timestamp/std',
     'log/std',
     'sp-core/std',
     'sp-io/std',
@@ -55,4 +59,9 @@ std = [
     'sp-arithmetic/std',
     'sp-staking/std',
     'serde'
+]
+runtime-benchmarks = [
+    "frame-benchmarking",
+    "frame-election-provider-support/runtime-benchmarks",
+    "rand_chacha",
 ]

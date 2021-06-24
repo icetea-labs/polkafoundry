@@ -323,6 +323,19 @@ impl ExtBuilder {
 
 		ext
 	}
+
+	pub fn build_and_execute(self, test: impl FnOnce() -> ()) {
+		let mut ext = self.build(vec![
+			(100, 2000),
+			(200, 2000),
+
+			// This allows us to have a total_payout different from 0.
+			(999, 1_000_000_000_000),
+		], vec![
+			(100, 101, 1000),
+			(200, 201, 1000)]);
+		ext.execute_with(test);
+	}
 }
 
 pub(crate) fn mock_test() -> sp_io::TestExternalities {

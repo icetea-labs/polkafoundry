@@ -7,14 +7,18 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use sp_std::{prelude::*, marker::PhantomData};
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256, H160, H256};
+use sp_core::{
+	u32_trait::{_2, _3, _5},
+	crypto::KeyTypeId, OpaqueMetadata, U256, H160, H256
+};
+
 use sp_runtime::{
 	ApplyExtrinsicResult, generic, impl_opaque_keys,
 	transaction_validity::{TransactionValidity, TransactionSource, TransactionPriority},
 	AccountId32
 };
 use sp_runtime::traits::{
-	AccountIdLookup, BlakeTwo256, Block as BlockT,
+	AccountIdLookup, BlakeTwo256, Block as BlockT, Verify
 };
 use sp_api::impl_runtime_apis;
 use sp_version::RuntimeVersion;
@@ -58,6 +62,7 @@ pub use frame_support::{
 	},
 	ConsensusEngineId
 };
+use frame_system::{EnsureRoot, EnsureOneOf};
 pub use runtime_primitives::{
 	AccountId, AccountIndex, Balance, BlockNumber,
 	DigestItem, Index, Hash, Moment, Nonce, Signature,
@@ -419,75 +424,169 @@ impl pallet_crowdloan_rewards::Config for Runtime {
 }
 
 parameter_types! {
-	pub const TreasuryPalletId: PalletId = PalletId(*b"Treasury");
+	pub const ProposalBond: Permill = Permill::from_percent(5);
+	pub const ProposalBondMinimum: Balance = 2000 * CENTS;
+	pub const SpendPeriod: BlockNumber = 6 * DAYS;
+	pub const Burn: Permill = Permill::from_perthousand(2);
+	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
+
+	pub const TipCountdown: BlockNumber = 1 * DAYS;
+	pub const TipFindersFee: Percent = Percent::from_percent(20);
+	pub const TipReportDepositBase: Balance = 100 * CENTS;
+	pub const DataDepositPerByte: Balance = 1 * CENTS;
+	pub const BountyDepositBase: Balance = 100 * CENTS;
+	pub const BountyDepositPayoutDelay: BlockNumber = 4 * DAYS;
+	pub const BountyUpdatePeriod: BlockNumber = 90 * DAYS;
+	pub const MaximumReasonLength: u32 = 16384;
+	pub const BountyCuratorDeposit: Permill = Permill::from_percent(50);
+	pub const BountyValueMinimum: Balance = 200 * CENTS;
+	pub const MaxApprovals: u32 = 100;
 }
+
+type ApproveOrigin = EnsureOneOf<
+	AccountId,
+	EnsureRoot<AccountId>,
+	pallet_collective::EnsureProportionAtLeast<_3, _5, AccountId, CouncilCollective>
+>;
 
 impl pallet_treasury::Config for Runtime {
 	type PalletId = TreasuryPalletId;
 	type Currency = Balances;
+	type ApproveOrigin = ApproveOrigin;
+	type RejectOrigin = MoreThanHalfCouncil;
 	type Event = Event;
+	type OnSlash = Treasury;
+	type ProposalBond = ProposalBond;
+	type ProposalBondMinimum = ProposalBondMinimum;
+	type SpendPeriod = SpendPeriod;
+	type Burn = Burn;
+	type BurnDestination = Society;
+	type MaxApprovals = MaxApprovals;
+	type WeightInfo = ();
+	type SpendFunds = Bounties;
 }
 
-// parameter_types! {
-// 	// no signed phase for now, just unsigned.
-// 	pub const SignedPhase: u32 = 0;
-// 	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_SLOTS / 4;
-//
-// 	// fallback: run election on-chain.
-// 	pub const Fallback: pallet_election_provider_multi_phase::FallbackStrategy =
-// 		pallet_election_provider_multi_phase::FallbackStrategy::OnChain;
-// 	pub SolutionImprovementThreshold: Perbill = Perbill::from_rational(5u32, 10_000);
-//
-// 	// miner configs
-// 	pub const MinerMaxIterations: u32 = 10;
-// 	pub NposSolutionPriority: TransactionPriority =
-// 		Perbill::from_percent(90) * TransactionPriority::max_value();
-// }
-// impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime where
-// 	Call: From<C>,
-// {
-// 	type OverarchingCall = Call;
-// 	type Extrinsic = UncheckedExtrinsic;
-// }
+parameter_types! {
+	pub const TechnicalMotionDuration: BlockNumber = 3 * DAYS;
+	pub const TechnicalMaxProposals: u32 = 100;
+	pub const TechnicalMaxMembers: u32 = 100;
+}
+
+type TechnicalCollective = pallet_collective::Instance2;
+impl pallet_collective::Config<TechnicalCollective> for Runtime {
+	type Origin = Origin;
+	type Proposal = Call;
+	type Event = Event;
+	type MotionDuration = TechnicalMotionDuration;
+	type MaxProposals = TechnicalMaxProposals;
+	type MaxMembers = TechnicalMaxMembers;
+	type DefaultVote = pallet_collective::PrimeDefaultVote;
+	type WeightInfo = weights::pallet_collective::WeightInfo<Runtime>;
+}
+
+
+
+parameter_types! {
+	// no signed phase for now, just unsigned.
+	pub const SignedPhase: u32 = 0;
+	pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_SLOTS / 4;
+
+	// fallback: run election on-chain.
+	pub const Fallback: pallet_election_provider_multi_phase::FallbackStrategy =
+		pallet_election_provider_multi_phase::FallbackStrategy::Nothing;
+	pub SolutionImprovementThreshold: Perbill = Perbill::from_rational(5u32, 10_000);
+
+	// miner configs
+	pub const MinerMaxIterations: u32 = 10;
+	pub OffchainRepeat: BlockNumber = 5;
+}
+
+/// Submits transaction with the node's public and signature type. Adheres to the signed extension
+/// format of the chain.
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime where
+	Call: From<LocalCall>,
+{
+	fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+		call: Call,
+		public: <Signature as Verify>::Signer,
+		account: AccountId,
+		nonce: <Runtime as frame_system::Config>::Index,
+	) -> Option<(Call, <UncheckedExtrinsic as ExtrinsicT>::SignaturePayload)> {
+		use sp_runtime::traits::StaticLookup;
+		// take the biggest period possible.
+		let period = BlockHashCount::get()
+			.checked_next_power_of_two()
+			.map(|c| c / 2)
+			.unwrap_or(2) as u64;
+
+		let current_block = System::block_number()
+			.saturated_into::<u64>()
+			// The `System::block_number` is initialized with `n+1`,
+			// so the actual block number is `n`.
+			.saturating_sub(1);
+		let tip = 0;
+		let extra: SignedExtra = (
+			frame_system::CheckSpecVersion::<Runtime>::new(),
+			frame_system::CheckTxVersion::<Runtime>::new(),
+			frame_system::CheckGenesis::<Runtime>::new(),
+			frame_system::CheckMortality::<Runtime>::from(generic::Era::mortal(period, current_block)),
+			frame_system::CheckNonce::<Runtime>::from(nonce),
+			frame_system::CheckWeight::<Runtime>::new(),
+			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+		);
+		let raw_payload = SignedPayload::new(call, extra).map_err(|e| {
+			log::warn!("Unable to create signed payload: {:?}", e);
+		}).ok()?;
+		let signature = raw_payload.using_encoded(|payload| {
+			C::sign(payload, public)
+		})?;
+		let (call, extra, _) = raw_payload.deconstruct();
+		let address = <Runtime as frame_system::Config>::Lookup::unlookup(account);
+		Some((call, (address, signature, extra)))
+	}
+}
+
+impl frame_system::offchain::SigningTypes for Runtime {
+	type Public = <Signature as Verify>::Signer;
+	type Signature = Signature;
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime where
+	Call: From<C>,
+{
+	type OverarchingCall = Call;
+	type Extrinsic = UncheckedExtrinsic;
+}
 //
 // sp_npos_elections::generate_solution_type!(
-// 	#[compact]
-// 	pub struct NposCompactSolution5::<
-// 		VoterIndex = u32,
-// 		TargetIndex = u16,
-// 		Accuracy = sp_runtime::PerU16,
-// 	>(5)
+//     #[compact]
+//     pub struct NposCompactSolution16::<
+//         VoterIndex = u32,
+//         TargetIndex = u16,
+//         Accuracy = sp_runtime::PerU16,
+//     >(16)
 // );
 //
 // impl pallet_election_provider_multi_phase::Config for Runtime {
 // 	type Event = Event;
 // 	type Currency = Balances;
-// 	type SignedPhase = SignedPhase;
 // 	type UnsignedPhase = UnsignedPhase;
+// 	type SignedPhase = SignedPhase;
 // 	type SolutionImprovementThreshold = SolutionImprovementThreshold;
 // 	type MinerMaxIterations = MinerMaxIterations;
-// 	type MinerMaxWeight = OffchainSolutionWeightLimit;
+// 	type MinerMaxWeight = OffchainSolutionWeightLimit; // For now use the one from staking.
 // 	type MinerMaxLength = OffchainSolutionLengthLimit;
+// 	type OffchainRepeat = OffchainRepeat;
 // 	type MinerTxPriority = NposSolutionPriority;
 // 	type DataProvider = Staking;
+// 	type CompactSolution = NposCompactSolution16;
 // 	type OnChainAccuracy = Perbill;
-// 	type CompactSolution = NposCompactSolution5;
 // 	type Fallback = Fallback;
 // 	type BenchmarkingConfig = ();
+// 	type ForceOrigin = EnsureRoot<AccountId>;
 // 	type WeightInfo = weights::pallet_election_provider_multi_phase::WeightInfo<Runtime>;
 // }
-
-parameter_types! {
-	pub const BlocksPerRound: u32 = 600;
-	pub const MaxCollatorsPerNominator: u32 = 5;
-	pub const MaxNominationsPerCollator: u32 = 2;
-	pub const BondDuration: u32 = 2;
-	pub const MinCollatorStake: u32 = 500;
-	pub const MinNominatorStake: u32 = 100;
-	pub const PayoutDuration: u32 = 2;
-	pub const DesiredTarget: u32 = 2;
-}
-
+//
 // impl frame_election_provider_support::onchain::Config for Runtime {
 // 	type AccountId = AccountId32;
 // 	type BlockNumber = BlockNumber;
@@ -495,20 +594,43 @@ parameter_types! {
 // 	type Accuracy = Perbill;
 // 	type DataProvider = Staking;
 // }
+//
+// parameter_types! {
+// 	// Six sessions in an era (6 hours).
+// 	pub const SessionsPerEra: SessionIndex = 6;
+// 	// 28 eras for unbonding (7 days).
+// 	pub const BondingDuration: polkafoundry_staking::EraIndex = 28;
+// 	// 27 eras in which slashes can be cancelled (slightly less than 7 days).
+// 	pub const SlashDeferDuration: polkafoundry_staking::EraIndex = 27;
+// 	pub const MaxNominatorRewardedPerValidator: u32 = 256;
+// 	pub const MinCollatorStake: u32 = 500;
+// 	pub const MinNominatorStake: u32 = 100;
+// 	pub const MaxNominationsPerCollator: u32 = 16;
+// 	pub const PayoutDuration: u32 = 2;
+// }
 
 // impl polkafoundry_staking::Config for Runtime {
-// 	const MAX_COLLATORS_PER_NOMINATOR: u32 = 5u32;
+// 	const MAX_COLLATORS_PER_NOMINATOR: u32 = <NposCompactSolution16 as sp_npos_elections::CompactSolution>::LIMIT as u32;
 // 	type Event = Event;
+// 	type UnixTime = Timestamp;
 // 	type Currency = Balances;
-// 	type BlocksPerRound = BlocksPerRound;
 // 	type MaxNominationsPerCollator = MaxNominationsPerCollator;
-// 	type BondDuration = BondDuration;
 // 	type MinCollatorStake = MinCollatorStake;
 // 	type MinNominatorStake = MinNominatorStake;
 // 	type PayoutDuration = PayoutDuration;
-// 	type ElectionProvider = frame_election_provider_support::onchain::OnChainSequentialPhragmen<Self>;
+// 	type ElectionProvider = ElectionProviderMultiPhase;
+// 	type GenesisElectionProvider =
+// 	frame_election_provider_support::onchain::OnChainSequentialPhragmen<
+// 		pallet_election_provider_multi_phase::OnChainConfig<Self>
+// 	>;
 // 	type CurrencyToVote = frame_support::traits::SaturatingCurrencyToVote;
-// 	type DesiredTarget = DesiredTarget;
+// 	type SessionsPerEra = SessionsPerEra;
+// 	type SessionInterface = Self;
+// 	type BondingDuration = BondingDuration;
+// 	type NextNewSession = Session;
+// 	type RewardRemainder = Treasury;
+// 	type Slash = ();
+// 	type SlashDeferDuration = SlashDeferDuration;
 // }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -519,7 +641,6 @@ construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Call, Storage},
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>},
@@ -536,7 +657,7 @@ construct_runtime!(
 		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
 
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
-		Treasury: pallet_treasury::{Pallet, Call, Storage, Event<T>},
+		Treasury: pallet_treasury::{Pallet, Call, Storage, Config, Event<T>},
 
 		// Staking: polkafoundry_staking::{Pallet, Call, Storage, Event<T>, Config<T>},
 
@@ -601,6 +722,8 @@ pub type Executive = frame_executive::Executive<
 	Runtime,
 	AllPallets,
 >;
+/// The payload being signed in the transactions.
+pub type SignedPayload = generic::SignedPayload<Call, SignedExtra>;
 
 impl_runtime_apis! {
 	impl sp_api::Core<Block> for Runtime {
@@ -855,6 +978,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, frame_system, SystemBench::<Runtime>);
 			add_benchmark!(params, batches, pallet_balances, Balances);
 			add_benchmark!(params, batches, pallet_timestamp, Timestamp);
+			add_benchmark!(params, batches, polkafoundry_staking, Staking);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)
@@ -862,7 +986,31 @@ impl_runtime_apis! {
 	}
 }
 
-cumulus_pallet_parachain_system::register_validate_block!(
-	Runtime,
-	cumulus_pallet_aura_ext::BlockExecutor::<Runtime, Executive>,
-);
+struct CheckInherents;
+
+impl cumulus_pallet_parachain_system::CheckInherents<Block> for CheckInherents {
+	fn check_inherents(
+		block: &Block,
+		relay_state_proof: &cumulus_pallet_parachain_system::RelayChainStateProof,
+	) -> sp_inherents::CheckInherentsResult {
+		let relay_chain_slot = relay_state_proof
+			.read_slot()
+			.expect("Could not read the relay chain slot from the proof");
+
+		let inherent_data =
+			cumulus_primitives_timestamp::InherentDataProvider::from_relay_chain_slot_and_duration(
+				relay_chain_slot,
+				sp_std::time::Duration::from_secs(6),
+			)
+				.create_inherent_data()
+				.expect("Could not create the timestamp inherent data");
+
+		inherent_data.check_extrinsics(&block)
+	}
+}
+
+cumulus_pallet_parachain_system::register_validate_block! {
+	Runtime = Runtime,
+	BlockExecutor = cumulus_pallet_aura_ext::BlockExecutor::<Runtime, Executive>,
+	CheckInherents = CheckInherents,
+}

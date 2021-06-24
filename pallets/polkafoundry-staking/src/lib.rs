@@ -4,7 +4,6 @@
 use frame_support::{
 	pallet_prelude::*,
 	traits::{Currency, ReservableCurrency, CurrencyToVote, Imbalance, OnUnbalanced, UnixTime, EstimateNextNewSession},
-	sp_std::fmt::Debug
 };
 use frame_system::{
 	pallet_prelude::*,
@@ -16,11 +15,16 @@ use sp_runtime::{
 	traits::{Saturating, Zero, AtLeast32BitUnsigned, Convert, SaturatedConversion, Bounded},
 	Perbill
 };
-use sp_std::{convert::{From}, vec::Vec};
 use pallet_session::historical;
-use serde::{Serialize, Deserialize};
+use sp_std::{
+	result,
+	prelude::*,
+	collections::btree_map::BTreeMap,
+	convert::From,
+	cmp::Ordering, ops::{Mul, AddAssign},
+	fmt::Debug
+};
 
-use sp_std::{cmp::Ordering, ops::{Mul, AddAssign}};
 use sp_staking::{
 	offence::{OnOffenceHandler, OffenceDetails, Offence, ReportOffence, OffenceError},
 };
@@ -30,6 +34,10 @@ pub use pallet::*;
 pub(crate) mod mock;
 #[cfg(test)]
 mod tests;
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod testing_utils;
+#[cfg(any(feature = "runtime-benchmarks", test))]
+pub mod benchmarking;
 
 pub mod taylor_series;
 pub mod inflation;
@@ -45,6 +53,7 @@ pub type SessionIndex = u32;
 pub(crate) type BalanceOf<T> = <<T as Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
 >>::Balance;
+
 
 type PositiveImbalanceOf<T> = <<T as Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
@@ -126,7 +135,7 @@ pub struct UnappliedSlash<AccountId, Balance> {
 
 /// Mode of era-forcing.
 #[derive(Copy, Clone, PartialEq, Eq, Encode, Decode, RuntimeDebug)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
 pub enum Forcing {
 	/// Not forcing anything - just let whatever happen.
 	NotForcing,
