@@ -17,6 +17,10 @@ pub fn halongbay_config() -> Result<HalongbayChainSpec, String> {
 	HalongbayChainSpec::from_json_bytes(&include_bytes!("../../res/halongbay.json")[..])
 }
 
+fn session_keys(aura: AuraId, im_online: ImOnlineId) -> SessionKeys {
+	SessionKeys { aura, im_online }
+}
+
 fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::GenesisConfig {
 	const ENDOWMENT: halongbay::Balance = 200_000_000 * halongbay::HLB;
 	let endowed_accounts = vec![

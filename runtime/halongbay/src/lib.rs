@@ -68,7 +68,7 @@ pub use runtime_primitives::{
 };
 
 use runtime_common::{
-	BlockHashCount, BlockWeights, BlockLength, MAXIMUM_BLOCK_WEIGHT
+	BlockHashCount, BlockWeights, BlockLength, MAXIMUM_BLOCK_WEIGHT, DealWithFees
 };
 
 // Weights used in the runtime.
@@ -193,7 +193,7 @@ parameter_types! {
 }
 
 impl pallet_transaction_payment::Config for Runtime {
-	type OnChargeTransaction = pallet_transaction_payment::CurrencyAdapter<Balances, ()>;
+	type OnChargeTransaction = pallet_transaction_payment::CurrencyAdapter<Balances, DealWithFees<Runtime>>;
 	type TransactionByteFee = TransactionByteFee;
 	type WeightToFee = IdentityFee<Balance>;
 	type FeeMultiplierUpdate = ();
@@ -519,7 +519,7 @@ impl pallet_staking::Config for Runtime {
 	type ElectionProvider = ElectionProviderMultiPhase;
 	type GenesisElectionProvider =
 	OnChainSequentialPhragmen<pallet_election_provider_multi_phase::OnChainConfig<Self>>;
-	type WeightInfo = ();
+	type WeightInfo = pallet_staking::weights::SubstrateWeight<Runtime>;
 }
 
 

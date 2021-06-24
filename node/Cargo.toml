@@ -111,6 +111,10 @@ polkadot-parachain = { git = 'https://github.com/paritytech/polkadot', branch = 
 
 pallet-evm = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-ethereum = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
+pallet_im_online = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
+pallet_session = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
+pallet_staking = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
+
 runtime-primitives = { path = '../primitives' }
 
 [features]

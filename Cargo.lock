@@ -8140,8 +8140,13 @@ version = "0.0.1"
 dependencies = [
  "frame-support",
  "frame-system",
+ "pallet-authorship",
+ "pallet-balances",
+ "pallet-treasury 3.0.0",
+ "polkadot-primitives",
  "runtime-primitives",
  "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]
