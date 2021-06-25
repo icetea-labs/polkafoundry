@@ -4,7 +4,9 @@ const contract = require('@truffle/contract');
 const UniswapV2Factory = contract(jsonFactory);
 const UniswapV2Router02 = contract(jsonRouter02);
 const HDWalletProvider = require('@truffle/hdwallet-provider');
-const provider = new HDWalletProvider('0x99B3C12287537E38C90A9219D4CB074A89A16E9CDB20BF85728EBD97C343E342', `http://127.0.0.1:9933`)
+const Web3 = require('web3');
+
+const provider = (process.env.RPC || '').indexOf('127.0.0.1') >=0 ? new Web3.providers.HttpProvider(process.env.RPC) : new HDWalletProvider(process.env.PRIVATEKEY, process.env.RPC);
 const WETH = artifacts.require("WETH9");
 
 UniswapV2Factory.setProvider(provider);
