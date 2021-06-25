@@ -11,7 +11,7 @@ const HLB_PRIVATE_KEY = "f20d960bfe1c2810c8e825a7f66b1cd27ac5a0ad045ed47965e5ba1
 module.exports = {
   solidity: "0.7.3",
   networks: {
-    hlb: {
+    halongbay: {
       url: `https://rpc-halongbay.polkafoundry.com`,
       chainId: 11,
       accounts: [`0x${HLB_PRIVATE_KEY}`]
