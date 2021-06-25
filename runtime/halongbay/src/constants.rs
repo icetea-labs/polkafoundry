@@ -46,7 +46,7 @@ pub mod version {
 		spec_name: create_runtime_str!("halongbay"),
 		impl_name: create_runtime_str!("halongbay"),
 		authoring_version: 1,
-		spec_version: 2,
+		spec_version: 3,
 		impl_version: 1,
 		apis: crate::RUNTIME_API_VERSIONS,
 		transaction_version: 1,
