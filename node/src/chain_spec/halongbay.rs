@@ -8,7 +8,6 @@ use runtime_primitives::AccountId;
 use sp_runtime::Perbill;
 use sp_core::{
 	crypto::UncheckedInto,
-	sr25519::Public
 };
 
 use halongbay_runtime as halongbay;

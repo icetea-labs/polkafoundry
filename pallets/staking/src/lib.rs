@@ -293,11 +293,9 @@ use frame_support::{
 		Weight, WithPostDispatchInfo,
 		constants::{WEIGHT_PER_MICROS, WEIGHT_PER_NANOS},
 	},
-	PalletId,
 	traits::{
 		Currency, LockIdentifier, LockableCurrency, WithdrawReasons, OnUnbalanced, Imbalance, Get,
 		UnixTime, EstimateNextNewSession, EnsureOrigin, CurrencyToVote,
-		ExistenceRequirement::KeepAlive
 	},
 };
 use pallet_session::historical;
@@ -306,7 +304,7 @@ use sp_runtime::{
 	curve::PiecewiseLinear,
 	traits::{
 		Convert, Zero, StaticLookup, CheckedSub, Saturating, SaturatedConversion,
-		AtLeast32BitUnsigned, Bounded, AccountIdConversion
+		AtLeast32BitUnsigned, Bounded
 	},
 };
 use sp_staking::{
@@ -318,7 +316,6 @@ use frame_system::{
 	offchain::SendTransactionTypes,
 };
 use frame_election_provider_support::{ElectionProvider, VoteWeight, Supports, data_provider};
-use core::ops::Div;
 
 pub use weights::WeightInfo;
 pub use pallet::*;
@@ -753,7 +750,6 @@ impl Default for Releases {
 }
 
 pub mod migrations {
-	use super::*;
 }
 
 #[frame_support::pallet]
