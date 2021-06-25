@@ -3,7 +3,7 @@ const WETH9 = require('../build/contracts/WETH9.json');
 const UniswapV2Factory = require('@uniswap/v2-core/build/UniswapV2Factory.json');
 const UniswapV2Pair = require('@uniswap/v2-core/build/UniswapV2Pair.json');
 const UniswapRouter02 = require('@uniswap/v2-periphery/build/UniswapV2Router02.json');
-const { createAndFinalizeBlock, customRequest, describeWithPolkafoundry, deployContract } = require('../../test/utils');
+const { createAndFinalizeBlock, customRequest, describeWithPolkafoundry, deployContract } = require('../../../test/utils');
 const { GENESIS_ACCOUNT, GENESIS_ACCOUNT_PRIVATE_KEY, } = require('./constants');
 const { expect } = require('chai');
 
