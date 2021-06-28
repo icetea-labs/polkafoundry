@@ -9,6 +9,7 @@ use sp_runtime::{
 };
 use sp_std::convert::{From};
 use frame_support::traits::GenesisBuild;
+use cumulus_primitives_core::ParaId;
 
 pub type AccountId = u64;
 pub type Balance = u128;
@@ -40,7 +41,7 @@ impl frame_system::Config for Test {
 	type AccountData = pallet_balances::AccountData<Balance>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
-	type OnSetCode = ();
+	type OnSetCode = cumulus_pallet_parachain_system::ParachainSetCode<Self>;
 	type SystemWeightInfo = ();
 	type SS58Prefix = ();
 }
@@ -63,6 +64,20 @@ impl pallet_utility::Config for Test {
 	type Event = Event;
 	type Call = Call;
 	type WeightInfo = ();
+}
+
+parameter_types! {
+	pub const ParachainId: ParaId = ParaId::new(200);
+}
+impl cumulus_pallet_parachain_system::Config for Test {
+	type Event = Event;
+	type OnValidationData = ();
+	type SelfParaId = ParachainId;
+	type OutboundXcmpMessageSource = ();
+	type DmpMessageHandler = ();
+	type ReservedDmpWeight = ();
+	type XcmpMessageHandler = ();
+	type ReservedXcmpWeight = ();
 }
 
 parameter_types! {
@@ -91,6 +106,7 @@ construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
 		Utility: pallet_utility::{Pallet, Call, Storage, Event},
+		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>},
 	}
 );
 

@@ -32,7 +32,7 @@ fn claim_work() {
         );
         assert_eq!(
             Crowdloan::settings(),
-            SettingStruct {
+            Setting {
                 tge_rate: 35,
                 reward_start_block: 4,
                 reward_end_block: 14
@@ -87,7 +87,7 @@ fn update_setting_work() {
     mock_test().execute_with(|| {
         assert_eq!(
             Crowdloan::settings(),
-            SettingStruct {
+            Setting {
                 tge_rate: 35,
                 reward_start_block: 4,
                 reward_end_block: 14
@@ -95,7 +95,7 @@ fn update_setting_work() {
         );
         assert_ok!(Crowdloan::config(
             Origin::root(),
-            SettingStruct {
+            Setting {
                 tge_rate: 0, // Don't modify if tge_rate = 0
                 reward_start_block: 5,
                 reward_end_block: 7
@@ -104,7 +104,7 @@ fn update_setting_work() {
 
         assert_eq!(
             Crowdloan::settings(),
-            SettingStruct {
+            Setting {
                 tge_rate: 35,
                 reward_start_block: 5,
                 reward_end_block: 7
@@ -113,7 +113,7 @@ fn update_setting_work() {
 
 		assert_ok!(Crowdloan::config(
             Origin::root(),
-            SettingStruct {
+            Setting {
                 tge_rate: 10,
                 reward_start_block: 8, // Don't modify lock duration if start_block > end_block
                 reward_end_block: 6
@@ -122,7 +122,7 @@ fn update_setting_work() {
 
 		assert_eq!(
 			Crowdloan::settings(),
-			SettingStruct {
+			Setting {
 				tge_rate: 10,
 				reward_start_block: 5,
 				reward_end_block: 7
@@ -131,7 +131,7 @@ fn update_setting_work() {
 
 		assert_ok!(Crowdloan::config(
             Origin::root(),
-            SettingStruct {
+            Setting {
                 tge_rate: 0,
                 reward_start_block: 0, // Don't modify lock duration if start_block = 0
                 reward_end_block: 6
@@ -140,7 +140,7 @@ fn update_setting_work() {
 
 		assert_eq!(
 			Crowdloan::settings(),
-			SettingStruct {
+			Setting {
 				tge_rate: 10,
 				reward_start_block: 5,
 				reward_end_block: 7

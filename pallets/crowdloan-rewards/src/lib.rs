@@ -25,7 +25,7 @@ pub mod pallet {
 	};
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config + cumulus_pallet_parachain_system::Config {
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
 		/// The crowdloan's module id, used for deriving its sovereign account ID.
@@ -39,22 +39,25 @@ pub mod pallet {
 		<T as frame_system::Config>::AccountId,
 	>>::Balance;
 
+	pub type BlockNumberOf<T> = <T as frame_system::Config>::BlockNumber;
+	pub type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
+
 	#[derive(Default, Clone, Encode, Decode, RuntimeDebug)]
 	pub struct RewardInfo<T: Config> {
 		pub total_reward: BalanceOf<T>, // Total of rewarded token
 		pub init_locked: BalanceOf<T>, // The initialize locked token = total_reward - Distributed Token at TGE
 		pub claimed_reward: BalanceOf<T>,
-		pub last_paid: T::BlockNumber,
+		pub last_paid: BlockNumberOf<T>,
 	}
 
 	#[derive(Default, PartialEq, Eq, Copy, Clone, Encode, Decode, RuntimeDebug)]
-	pub struct SettingStruct<BlockNumber> {
+	pub struct Setting<BlockNumber> {
 		pub tge_rate: u32, // Percentage rates of token at Token generating event (TGE)
 		pub reward_start_block: BlockNumber,
 		pub reward_end_block: BlockNumber,
 	}
 
-	impl<BlockNumber> SettingStruct<BlockNumber> where
+	impl<BlockNumber> Setting<BlockNumber> where
 		BlockNumber: PartialOrd
 		+ Copy
 		+ Debug
@@ -63,7 +66,7 @@ pub mod pallet {
 		+ From<u32>,
 	{
 		pub fn new(tge_rate: u32, reward_start_block: BlockNumber, reward_end_block: BlockNumber) -> Self {
-			SettingStruct {
+			Setting {
 				tge_rate,
 				reward_start_block,
 				reward_end_block,
@@ -95,12 +98,11 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn initialize_reward(
 			origin: OriginFor<T>,
-			contributions: Vec<(T::AccountId, BalanceOf<T>)>,
+			contributions: Vec<(AccountIdOf<T>, BalanceOf<T>)>,
 		) -> DispatchResultWithPostInfo {
 			ensure_root(origin)?;
 
 			let now = frame_system::Pallet::<T>::block_number();
-
 			let setting = Settings::<T>::get();
 			ensure!(InitRewardAt::<T>::get().is_zero(), Error::<T>::AlreadyInitReward);
 
@@ -141,12 +143,15 @@ pub mod pallet {
 			origin: OriginFor<T>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			let now = frame_system::Pallet::<T>::block_number();
+			// let now = frame_system::Pallet::<T>::block_number();
 			let mut info = Contributors::<T>::get(&who)
 				.ok_or(Error::<T>::NotContributedYet)?;
 			let setting = Settings::<T>::get();
+			let relay_block_now = BlockNumberOf::<T>::from(cumulus_pallet_parachain_system::Pallet::<T>::validation_data()
+				.expect("set_validation_data inherent needs to be present in every block!")
+				.relay_parent_number);
 
-			ensure!(now >= setting.reward_start_block, Error::<T>::ClaimInLockedTime);
+			ensure!(relay_block_now >= setting.reward_start_block, Error::<T>::ClaimInLockedTime);
 			ensure!(
 				info.total_reward > info.claimed_reward,
 				Error::<T>::AlreadyPaid
@@ -170,7 +175,7 @@ pub mod pallet {
 			};
 
 			let reward_per_block = info.init_locked / reward_period;
-			let reward_period = now.saturating_sub(last_paid);
+			let reward_period = relay_block_now.saturating_sub(last_paid);
 
 			let reward_period_as_balance: BalanceOf<T> = reward_period
 				.saturated_into::<u128>()
@@ -184,7 +189,7 @@ pub mod pallet {
 			} else {
 				reward_per_block.saturating_mul(reward_period_as_balance)
 			};
-			info.last_paid = now;
+			info.last_paid = relay_block_now;
 			info.claimed_reward = info.claimed_reward.saturating_add(amount);
 			Contributors::<T>::insert(&who, info);
 
@@ -201,7 +206,7 @@ pub mod pallet {
 		}
 
 		#[pallet::weight(0)]
-		pub fn config(origin: OriginFor<T>, setting: SettingStruct<T::BlockNumber>) -> DispatchResultWithPostInfo {
+		pub fn config(origin: OriginFor<T>, setting: Setting<BlockNumberOf<T>>) -> DispatchResultWithPostInfo {
 			ensure_root(origin)?;
 			let mut current_setting = Settings::<T>::get();
 
@@ -222,15 +227,15 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn contributors)]
 	pub type Contributors<T: Config> =
-	StorageMap<_, Blake2_128Concat, T::AccountId, RewardInfo<T>>;
+	StorageMap<_, Blake2_128Concat, AccountIdOf<T>, RewardInfo<T>>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn settings)]
-	pub type Settings<T: Config> = StorageValue<_, SettingStruct<T::BlockNumber>, ValueQuery>;
+	pub type Settings<T: Config> = StorageValue<_, Setting<BlockNumberOf<T>>, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn init_reward_at)]
-	pub type InitRewardAt<T: Config> = StorageValue<_, T::BlockNumber, ValueQuery>;
+	pub type InitRewardAt<T: Config> = StorageValue<_, BlockNumberOf<T>, ValueQuery>;
 
 	#[pallet::error]
 	pub enum Error<T> {
@@ -257,16 +262,16 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(fn deposit_event)]
 	pub enum Event<T: Config> {
-		RewardPaid(T::AccountId, BalanceOf<T>),
-		SettingChanged(SettingStruct<T::BlockNumber>),
+		RewardPaid(AccountIdOf<T>, BalanceOf<T>),
+		SettingChanged(Setting<BlockNumberOf<T>>),
 		FundDeposited(BalanceOf<T>),
 	}
 
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
 		// pub reward_fund: BalanceOf<T>,
-		pub start_block: T::BlockNumber,
-		pub end_block: T::BlockNumber,
+		pub start_block: BlockNumberOf<T>,
+		pub end_block: BlockNumberOf<T>,
 		pub tge_rate: u32,
 	}
 
@@ -275,8 +280,8 @@ pub mod pallet {
 		fn default() -> Self {
 			Self {
 				// reward_fund: Zero::zero(),
-				start_block: T::BlockNumber::zero(),
-				end_block: T::BlockNumber::zero(),
+				start_block: <T as frame_system::Config>::BlockNumber::zero(),
+				end_block: <T as frame_system::Config>::BlockNumber::zero(),
 				tge_rate: 0u32,
 			}
 		}
@@ -285,9 +290,9 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
 		fn build(&self) {
-			let setting: SettingStruct<T::BlockNumber> = SettingStruct::new(self.tge_rate, self.start_block, self.end_block);
+			let setting: Setting<BlockNumberOf<T>> = Setting::new(self.tge_rate, self.start_block, self.end_block);
 			Settings::<T>::put(setting);
-			Pallet::<T>::deposit_event(Event::SettingChanged(setting));
+			Pallet::<T>::deposit_event(Event::SettingChanged(setting.clone()));
 			Pallet::<T>::deposit_event(Event::FundDeposited(Pallet::<T>::pot()));
 		}
 	}
@@ -297,7 +302,7 @@ pub mod pallet {
 		///
 		/// This actually does computation. If you need to keep using it, then make sure you cache the
 		/// value and only call this once.
-		pub fn account_id() -> T::AccountId {
+		pub fn account_id() -> AccountIdOf<T> {
 			T::PalletId::get().into_account()
 		}
 
