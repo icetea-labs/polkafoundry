@@ -8,6 +8,7 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 };
 use sp_std::convert::{From};
+use frame_support::traits::GenesisBuild;
 
 pub type AccountId = u64;
 pub type Balance = u128;
@@ -72,14 +73,13 @@ impl Config for Test {
 	type Event = Event;
 	type PalletId = CrowdloanPalletId;
 	type RewardCurrency = Balances;
-	const TGE_RATE: u32 = 35;
-	type RelayChainAccountId = [u8; 32];
 }
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 pub const INIT_BALANCE: u128 = 100_000_000;
 pub const INIT_CONTRIBUTED: u128 = 5000;
+pub const MINIMUM_BALANCE: u128 = ExistentialDeposit::get();
 
 construct_runtime!(
 	pub enum Test where
@@ -104,16 +104,22 @@ impl ExtBuilder {
 			.assimilate_storage(&mut storage)
 			.unwrap();
 
+		// mock: reward from block 4 to block 14
+		pallet_crowdloan_rewards::GenesisConfig::<Test> {
+			// reward_fund: INIT_BALANCE,
+			start_block: 4,
+			end_block: 14,
+			tge_rate: 35,
+		}.assimilate_storage(&mut storage)
+			.unwrap();
+
 		let mut ext = sp_io::TestExternalities::from(storage);
 		ext.execute_with(|| {
-			System::set_block_number(4);
+			System::set_block_number(2);
 			assert_ok!(Crowdloan::initialize_reward(
 				Origin::root(),
 				contributions.clone(),
-				14
 			));
-			// mock: reward from block 5 to block 14 (10 blocks)
-			System::set_block_number(5);
 		});
 
 		ext
