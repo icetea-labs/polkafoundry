@@ -102,7 +102,9 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			ensure_root(origin)?;
 
-			let now = frame_system::Pallet::<T>::block_number();
+			let relay_block_now = BlockNumberOf::<T>::from(cumulus_pallet_parachain_system::Pallet::<T>::validation_data()
+				.expect("set_validation_data inherent needs to be present in every block!")
+				.relay_parent_number);
 			let setting = Settings::<T>::get();
 			ensure!(InitRewardAt::<T>::get().is_zero(), Error::<T>::AlreadyInitReward);
 
@@ -129,12 +131,12 @@ pub mod pallet {
 						total_reward,
 						init_locked,
 						claimed_reward,
-						last_paid: now.clone(),
+						last_paid: relay_block_now.clone(),
 					},
 				);
 			}
 
-			InitRewardAt::<T>::put(now);
+			InitRewardAt::<T>::put(relay_block_now);
 			Ok(Default::default())
 		}
 
@@ -143,7 +145,6 @@ pub mod pallet {
 			origin: OriginFor<T>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			// let now = frame_system::Pallet::<T>::block_number();
 			let mut info = Contributors::<T>::get(&who)
 				.ok_or(Error::<T>::NotContributedYet)?;
 			let setting = Settings::<T>::get();
@@ -269,7 +270,6 @@ pub mod pallet {
 
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
-		// pub reward_fund: BalanceOf<T>,
 		pub start_block: BlockNumberOf<T>,
 		pub end_block: BlockNumberOf<T>,
 		pub tge_rate: u32,
@@ -279,7 +279,6 @@ pub mod pallet {
 	impl <T: Config> Default for GenesisConfig<T> {
 		fn default() -> Self {
 			Self {
-				// reward_fund: Zero::zero(),
 				start_block: <T as frame_system::Config>::BlockNumber::zero(),
 				end_block: <T as frame_system::Config>::BlockNumber::zero(),
 				tge_rate: 0u32,

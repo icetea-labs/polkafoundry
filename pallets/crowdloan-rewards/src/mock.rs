@@ -8,8 +8,10 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 };
 use sp_std::convert::{From};
-use frame_support::traits::GenesisBuild;
-use cumulus_primitives_core::ParaId;
+use frame_support::traits::{GenesisBuild, Hooks};
+use cumulus_primitives_core::{ParaId, PersistedValidationData};
+use cumulus_test_relay_sproof_builder::RelayStateSproofBuilder;
+use cumulus_primitives_parachain_inherent::ParachainInherentData;
 
 pub type AccountId = u64;
 pub type Balance = u128;
@@ -131,7 +133,7 @@ impl ExtBuilder {
 
 		let mut ext = sp_io::TestExternalities::from(storage);
 		ext.execute_with(|| {
-			System::set_block_number(2);
+			run_to_relay_chain_block(2);
 			assert_ok!(Crowdloan::initialize_reward(
 				Origin::root(),
 				contributions.clone(),
@@ -168,5 +170,29 @@ pub(crate) fn run_to_block(n: u64) {
 	while System::block_number() < n {
 		System::set_block_number(System::block_number() + 1);
 	}
+}
+
+pub (crate) fn run_to_relay_chain_block(n: u64) {
+	// clear state of relay chain
+	let _ = ParachainSystem::on_initialize(n);
+	run_to_block(n);
+
+	let builder = RelayStateSproofBuilder::default();
+	let (relay_parent_storage_root, relay_chain_state) = builder.into_state_root_and_proof();
+
+	let vfp = PersistedValidationData {
+		relay_parent_number: n as u32,
+		relay_parent_storage_root,
+		..Default::default()
+	};
+
+	let system_inherent_data = ParachainInherentData {
+		validation_data: vfp.clone(),
+		relay_chain_state,
+		downward_messages: Default::default(),
+		horizontal_messages: Default::default(),
+	};
+
+	assert_ok!(ParachainSystem::set_validation_data(Origin::none(), system_inherent_data));
 }
 

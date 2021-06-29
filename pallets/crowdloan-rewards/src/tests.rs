@@ -7,7 +7,7 @@ fn init_reward_work() {
     // mock_test have already called initialize_reward successfully
     mock_test().execute_with(|| {
         assert_noop!(
-            Crowdloan::initialize_reward(Origin::root(), vec![(1u64, 500), (2u64, 500)],),
+            Crowdloan::initialize_reward(Origin::root(), vec![(1u64, 500), (2u64, 500)]),
             Error::<Test>::AlreadyInitReward
         );
     })
@@ -27,7 +27,7 @@ fn claim_work() {
         );
         assert_eq!(Crowdloan::contributors(1).unwrap().last_paid, 2u64);
         assert_noop!(
-            Crowdloan::claim(Origin::signed(11),),
+            Crowdloan::claim(Origin::signed(11)),
             Error::<Test>::NotContributedYet
         );
         assert_eq!(
@@ -42,10 +42,10 @@ fn claim_work() {
             Crowdloan::claim(Origin::signed(1),),
             Error::<Test>::ClaimInLockedTime
         );
-        System::set_block_number(6);
-        assert_ok!(Crowdloan::claim(Origin::signed(1)));
+		run_to_relay_chain_block(6);
+		assert_ok!(Crowdloan::claim(Origin::signed(1)));
         assert_noop!(
-            Crowdloan::claim(Origin::signed(1),),
+            Crowdloan::claim(Origin::signed(1)),
             Error::<Test>::ClaimAmountBelowMinimum
         );
         assert_eq!(Crowdloan::contributors(1).unwrap().last_paid, 6u64);
@@ -55,18 +55,18 @@ fn claim_work() {
         // earn until block 6: ((5000 - 1750)) * (6-4)) / 10 = 650
         // total claimed: 1750 + 650 = 2400
         assert_eq!(Crowdloan::contributors(1).unwrap().claimed_reward, 2400);
-        run_to_block(9);
-        assert_ok!(Crowdloan::claim(Origin::signed(1)));
+		run_to_relay_chain_block(9);
+		assert_ok!(Crowdloan::claim(Origin::signed(1)));
         // total: 5000
         // claimed: 2400
         // earn from block 6 to block 10: ((5000 - 1750) * (9 - 6)) / 10 = 975
         // total claimed: 2400 + 975 = 3375
         assert_eq!(Crowdloan::contributors(1).unwrap().claimed_reward, 3375);
-        run_to_block(20);
-        assert_ok!(Crowdloan::claim(Origin::signed(1)));
+		run_to_relay_chain_block(20);
+		assert_ok!(Crowdloan::claim(Origin::signed(1)));
         assert_eq!(Crowdloan::contributors(1).unwrap().claimed_reward, 5000);
         assert_noop!(
-            Crowdloan::claim(Origin::signed(1),),
+            Crowdloan::claim(Origin::signed(1)),
             Error::<Test>::AlreadyPaid
         );
         let expected = vec![

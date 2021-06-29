@@ -5366,10 +5366,13 @@ dependencies = [
 name = "pallet-crowdloan-rewards"
 version = "0.0.1"
 dependencies = [
+ "cumulus-pallet-parachain-system",
+ "cumulus-primitives-core",
+ "cumulus-primitives-parachain-inherent",
+ "cumulus-test-relay-sproof-builder",
  "frame-support",
  "frame-system",
  "pallet-balances",
- "pallet-treasury 0.0.1",
  "pallet-utility",
  "parity-scale-codec",
  "serde",

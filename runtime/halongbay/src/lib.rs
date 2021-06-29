@@ -420,8 +420,6 @@ impl pallet_crowdloan_rewards::Config for Runtime {
 	type Event = Event;
 	type PalletId = CrowdloanPalletId;
 	type RewardCurrency = Balances;
-	const TGE_RATE: u32 = 35;
-	type RelayChainAccountId = AccountId32;
 }
 
 parameter_types! {

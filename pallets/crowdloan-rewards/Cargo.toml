@@ -23,6 +23,11 @@ sp-io = { default-features = false, git = 'https://github.com/paritytech/substra
 sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4' }
 sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.4' }
 
+cumulus-pallet-parachain-system = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.4' }
+cumulus-primitives-core = { default-features = false, git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.4' }
+cumulus-test-relay-sproof-builder = { git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.4' }
+cumulus-primitives-parachain-inherent = { git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.4' }
+
 pallet-balances = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.4", default-features = false }
 pallet-utility = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.4", default-features = false }
 
@@ -37,5 +42,8 @@ std = [
     'sp-core/std',
     'sp-io/std',
     'sp-runtime/std',
-    'sp-std/std'
+    'sp-std/std',
+    'cumulus-pallet-parachain-system/std',
+    'cumulus-primitives-core/std',
+    'cumulus-primitives-parachain-inherent/std',
 ]
