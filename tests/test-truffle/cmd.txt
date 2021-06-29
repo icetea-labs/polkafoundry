@@ -1,2 +1,2 @@
 mocha --timeout 30000 test/incrementer.test.js
-mocha test/contract.test.js
+mocha --timeout 30000 test/migrations.test.js
