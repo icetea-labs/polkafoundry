@@ -1,5 +1,5 @@
-use crate::{self as pallet_crowdloan_rewards, Config};
-use frame_support::{construct_runtime, parameter_types, PalletId, assert_ok};
+use crate::{self as pallet_crowdloan_rewards, Config, Error};
+use frame_support::{construct_runtime, parameter_types, PalletId, assert_ok, assert_noop};
 
 use sp_core::{H256};
 use sp_io;
@@ -134,6 +134,15 @@ impl ExtBuilder {
 		let mut ext = sp_io::TestExternalities::from(storage);
 		ext.execute_with(|| {
 			run_to_relay_chain_block(2);
+			assert_noop!(
+				Crowdloan::initialize_reward(
+					Origin::root(),
+					vec![
+						(1u64, INIT_BALANCE + 1),
+					]
+				),
+				Error::<Test>::InsufficientFunds
+			);
 			assert_ok!(Crowdloan::initialize_reward(
 				Origin::root(),
 				contributions.clone(),

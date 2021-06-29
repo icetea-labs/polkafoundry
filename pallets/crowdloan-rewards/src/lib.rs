@@ -108,10 +108,11 @@ pub mod pallet {
 			let setting = Settings::<T>::get();
 			ensure!(InitRewardAt::<T>::get().is_zero(), Error::<T>::AlreadyInitReward);
 
-			let mut total_reward_amount = BalanceOf::<T>::from(0u32);
-			for (_, amount) in &contributions {
-				total_reward_amount = total_reward_amount.saturating_add(BalanceOf::<T>::from(*amount));
-			}
+			let total_reward_amount: BalanceOf<T> = contributions
+				.iter()
+				.fold(0u32.into(), |reward: BalanceOf<T>, (_, amount)| {
+				reward + *amount
+			});
 			ensure!(Self::pot() >= total_reward_amount, Error::<T>::InsufficientFunds);
 
 			for (who, amount) in &contributions {
