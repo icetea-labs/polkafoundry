@@ -2,11 +2,10 @@ require('../config');
 const Web3 = require('web3');
 const { expect } = require('chai');
 const contractObj = require('../build/contracts/Migrations.json');
-const { deployContract } = require('../utils');
+const { deployContract, callMethod } = require('../utils');
 
 const RPC = process.env.RPC;
 const GENESIS_ACCOUNT = process.env.GENESIS_ACCOUNT;
-const GENESIS_ACCOUNT_PRIVATE_KEY = process.env.GENESIS_ACCOUNT_PRIVATE_KEY;
 const OTHER_ACCOUNT = process.env.OTHER_ACCOUNT;
 const OTHER_ACCOUNT_PRIVATE_KEY = process.env.OTHER_ACCOUNT_PRIVATE_KEY;
 const value = 1232132; // uint
@@ -37,17 +36,7 @@ describe("Contract Migrations", () => {
     it('Call method setCompleted() -> set last_completed_migration', async () => {
         const incrementer = new web3.eth.Contract(abi);
         const encoded = incrementer.methods.setCompleted(value).encodeABI();
-        const callTransaction = await web3.eth.accounts.signTransaction(
-            {
-                from: GENESIS_ACCOUNT,
-                to: contractAddress,
-                data: encoded,
-                gas: process.env.GAS || await web3.eth.getGasPrice(),
-            },
-            GENESIS_ACCOUNT_PRIVATE_KEY
-        );
-
-        const callReceipt = await web3.eth.sendSignedTransaction(callTransaction.rawTransaction);
+        const callReceipt = await callMethod(web3, abi, contractAddress, encoded);
         const transactionHash = callReceipt.transactionHash;
         expect(transactionHash).to.match(/^0x[0-9A-Za-z]{64}$/);
     });
@@ -61,18 +50,9 @@ describe("Contract Migrations", () => {
     it('Call method setCompleted() by other address => not success', async () => {
         const incrementer = new web3.eth.Contract(abi);
         const encoded = incrementer.methods.setCompleted(value - 1).encodeABI();
-        const callTransaction = await web3.eth.accounts.signTransaction(
-            {
-                from: OTHER_ACCOUNT,
-                to: contractAddress,
-                data: encoded,
-                gas: process.env.GAS || await web3.eth.getGasPrice(),
-            },
-            OTHER_ACCOUNT_PRIVATE_KEY
-        );
 
         try {
-            const callReceipt = await web3.eth.sendSignedTransaction(callTransaction.rawTransaction);
+            const callReceipt = await callMethod(web3, abi, contractAddress, encoded, OTHER_ACCOUNT, OTHER_ACCOUNT_PRIVATE_KEY);
             const transactionHash = callReceipt.transactionHash;
             expect(transactionHash).to.not.match(/^0x[0-9A-Za-z]{64}$/);
         } catch (e) {

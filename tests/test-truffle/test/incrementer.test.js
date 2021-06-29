@@ -2,11 +2,9 @@ require('../config');
 const Web3 = require('web3');
 const { expect } = require('chai');
 const contractObj = require('../build/contracts/Incrementer.json');
-const { deployContract } = require('../utils');
+const { deployContract, callMethod } = require('../utils');
 
 const RPC = process.env.RPC;
-const GENESIS_ACCOUNT = process.env.GENESIS_ACCOUNT;
-const GENESIS_ACCOUNT_PRIVATE_KEY = process.env.GENESIS_ACCOUNT_PRIVATE_KEY;
 const initValue = 554; // uint256
 const addValue = 3453; // uint256
 
@@ -30,17 +28,7 @@ describe("Contract Incrementer", () => {
   it('Call contract set value', async () => {
     const incrementer = new web3.eth.Contract(abi);
     const encoded = incrementer.methods.increment(addValue).encodeABI();
-    const callTransaction = await web3.eth.accounts.signTransaction(
-        {
-          from: GENESIS_ACCOUNT,
-          to: contractAddress,
-          data: encoded,
-          gas: process.env.GAS || await web3.eth.getGasPrice(),
-        },
-        GENESIS_ACCOUNT_PRIVATE_KEY
-    );
-
-    const callReceipt = await web3.eth.sendSignedTransaction(callTransaction.rawTransaction);
+    const callReceipt = await callMethod(web3, abi, contractAddress, encoded);
     const transactionHash = callReceipt.transactionHash;
     expect(transactionHash).to.match(/^0x[0-9A-Za-z]{64}$/);
   });

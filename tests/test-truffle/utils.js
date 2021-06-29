@@ -56,9 +56,24 @@ const deployContract = async (web3, contractObj, args = []) => {
   return web3.eth.sendSignedTransaction(createTransaction.rawTransaction);
 }
 
+const callMethod = async (web3, abi, contractAddress, encoded, account = process.env.GENESIS_ACCOUNT, privateKey = process.env.GENESIS_ACCOUNT_PRIVATE_KEY) => {
+    const callTransaction = await web3.eth.accounts.signTransaction(
+        {
+            from: account,
+            to: contractAddress,
+            data: encoded,
+            gas: process.env.GAS || await web3.eth.getGasPrice(),
+        },
+        privateKey
+    );
+
+    return web3.eth.sendSignedTransaction(callTransaction.rawTransaction);
+}
+
 module.exports = {
     customRequest,
     createAndFinalizeBlock,
     describeWithPolkafoundry,
     deployContract,
+    callMethod,
 }
