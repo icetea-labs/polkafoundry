@@ -523,7 +523,6 @@ impl pallet_staking::Config for Runtime {
 	type WeightInfo = pallet_staking::weights::SubstrateWeight<Runtime>;
 }
 
-
 sp_npos_elections::generate_solution_type!(
     #[compact]
     pub struct NposCompactSolution16::<
@@ -614,38 +613,44 @@ construct_runtime!(
 		NodeBlock = runtime_primitives::Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
-		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
-		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>},
-		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
-		ParachainInfo: parachain_info::{Pallet, Storage, Config},
-		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
-        Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>},
-		Staking: pallet_staking::{Pallet, Call, Storage, Config<T>, Event<T>},
+		// Basic stuff
+		System: frame_system::{Pallet, Call, Config, Storage, Event<T>} = 0,
+		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent} = 1,
+		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>} = 2,
+		TransactionPayment: pallet_transaction_payment::{Pallet, Storage} = 3,
 
-		Aura: pallet_aura::{Pallet, Config<T>},
-		AuraExt: cumulus_pallet_aura_ext::{Pallet, Config},
-        Authorship: pallet_authorship::{Pallet, Call, Storage, Inherent},
-        ImOnline: pallet_im_online::{Pallet, Call, Storage, Event<T>, ValidateUnsigned, Config<T>},
-        Offences: pallet_offences::{Pallet, Call, Storage, Event},
-        Historical: pallet_session_historical::{Pallet},
-		Treasury: pallet_treasury::{Pallet, Call, Storage, Config, Event<T>},
+		// Consensus stuff. The order of the pallets below are important and shall not change.
+        Authorship: pallet_authorship::{Pallet, Call, Storage, Inherent} = 10,
+		Staking: pallet_staking::{Pallet, Call, Storage, Config<T>, Event<T>} = 11,
+        Offences: pallet_offences::{Pallet, Call, Storage, Event} = 12,
+        Historical: pallet_session_historical::{Pallet} = 13,
+        Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>} = 14,
+		Aura: pallet_aura::{Pallet, Config<T>} = 15,
+		AuraExt: cumulus_pallet_aura_ext::{Pallet, Config} = 16,
+        ImOnline: pallet_im_online::{Pallet, Call, Storage, Event<T>, ValidateUnsigned, Config<T>} = 17,
 
-		// Include the custom logic from the template pallet in the runtime.
-		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>, ValidateUnsigned},
+		// Treasury
+		Treasury: pallet_treasury::{Pallet, Call, Storage, Config, Event<T>} = 18,
 
+		// Election pallet. Only works with staking, but placed here to maintain indices.
+		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>, ValidateUnsigned} = 19,
 
-		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
-		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned},
+		//SmartContract
+		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>} = 30,
+		Ethereum: pallet_ethereum::{Pallet, Call, Storage, Event, Config, ValidateUnsigned} = 31,
 
-		// Crowdloan: pallet_crowdloan_rewards::{Pallet, Call, Storage, Event<T>},
+		// Parachain stuff
+		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Storage, Inherent, Event<T>} = 40,
+		ParachainInfo: parachain_info::{Pallet, Storage, Config} = 41,
 
 		// XCM helpers.
-		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>},
-		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin},
-		CumulusXcm: cumulus_pallet_xcm::{Pallet, Call, Event<T>, Origin},
-		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>},
+		XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>} = 50,
+		PolkadotXcm: pallet_xcm::{Pallet, Call, Event<T>, Origin} = 51,
+		CumulusXcm: cumulus_pallet_xcm::{Pallet, Call, Event<T>, Origin} = 52,
+		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>} = 53,
+
+		// Temporary
+		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>} = 60,
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
 	}
