@@ -1,7 +1,4 @@
-const Web3 = require('web3');
-const { RPC_PORT, SPECS_PATH, PORT, WS_PORT, BINARY_PATH, SPAWNING_TIME, GENESIS_ACCOUNT, GENESIS_ACCOUNT_PRIVATE_KEY } = require('./constants');
-const { spawn } = require('child_process');
-
+require('./config');
 
 const customRequest = async (web3, method, params) => {
     return new Promise((resolve, reject) => {
@@ -21,46 +18,10 @@ const customRequest = async (web3, method, params) => {
                 );
             }
             resolve(result);
-        }
-        resolve(result);
-      }
-    );
+        });
     });
 }
 
-const deployContract = async (web3, contractJson, args, gas, gasPrice) => {
-    return new Promise(async (resolve, reject) => {
-        const contract = await new web3.eth.Contract(contractJson.abi);
-        const deployJson = {
-            data: contractJson.bytecode,
-        }
-
-        if (args && args.length) {
-            deployJson.arguments = args;
-        }
-        const deployContract = await contract.deploy(deployJson)
-        const deployData = await deployContract.encodeABI();
-        const tx = await web3.eth.accounts.signTransaction({
-            from: GENESIS_ACCOUNT,
-            data: deployData,
-            gas,
-            gasPrice,
-        }, GENESIS_ACCOUNT_PRIVATE_KEY);
-
-        web3.eth.sendSignedTransaction(tx.rawTransaction, (error, result) => {
-            if (error) {
-                reject(
-                    `Failed to deploy contract: ${
-                        error.message || error.toString()
-                    }`
-                );
-            }
-            resolve(result);
-        });
-    })
-}
-// Create a block and finalize it.
-// It will include all previously executed transactions since the last finalized block.
 async function createAndFinalizeBlock(web3) {
     const response = await customRequest(web3, 'engine_createBlock', [true, true, null]);
     if (!response.result) {
@@ -68,110 +29,36 @@ async function createAndFinalizeBlock(web3) {
     }
 }
 
-const startPolkafoundryNode = async (specFileName, provider) => {
-    let web3;
-    if (!provider || provider === 'http') {
-        web3 = new Web3(`http://localhost:${RPC_PORT}`);
-    }
-
-    const cmd = BINARY_PATH;
-    const args = [
-        `--chain=${SPECS_PATH}/${specFileName}`,
-        `--validator`, // Required by manual sealing to author the blocks
-        `--execution=Native`, // Faster execution using native
-        `--no-telemetry`,
-        `--no-prometheus`,
-        `--sealing=Manual`,
-        `-linfo`,
-        `--port=${PORT}`,
-        `--rpc-port=${RPC_PORT}`,
-        `--ws-port=${WS_PORT}`,
-        '--start-dev',
-        `--tmp`,
-    ];
-    const binary = spawn(cmd, args);
-
-    binary.on("error", (err) => {
-        if (err.errno === 'ENOENT') {
-            console.error(
-                `\x1b[31mMissing Polkafoundry binary (${BINARY_PATH}).\nPlease compile the Polkafoundry project:\ncargo build\x1b[0m`
-            );
-        } else {
-            console.error(err);
-            binary.kill();
-        }
-        process.exit(1);
+const describeWithPolkafoundry = (title, cb, provider) => {
+    cb({
+      web3: new Web3(process.env.RPC),
     });
-    const binaryLogs = [];
-    await new Promise((resolve => {
-        const timer = setTimeout(() => {
-            console.error(`\x1b[31m Failed to start Polkafoundry Node.\x1b[0m`);
-            console.error(`Command: ${cmd} ${args.join(" ")}`);
-            console.error(`Logs:`);
-            console.error(binaryLogs.map((chunk) => chunk.toString()).join("\n"));
-            binary.kill();
-            process.exit(1);
-        }, SPAWNING_TIME - 2000);
-        const onData = async (chunk) => {
-            const log = chunk.toString()
-            if (process.env.DISPLAY_LOG) {
-                console.log(log);
-            }
+};
 
-            binaryLogs.push(chunk);
+const deployContract = async (web3, contractObj, args = []) => {
+  const { abi, bytecode } = contractObj;
 
-            if (log.match(/Polkafoundry dev ready/)) {
-                if (!provider || provider === 'http') {
-                    // This is needed as the EVM runtime needs to warmup with a first call
-                    await web3.eth.getChainId();
-                }
+  const incrementer = new web3.eth.Contract(abi);
+  const incrementerTx = incrementer.deploy({
+   data: bytecode,
+   arguments: args,
+  });
 
-                clearTimeout(timer);
-                if (!process.env.DISPLAY_LOG) {
-                    binary.stderr.off('data', onData);
-                    binary.stdout.off('data', onData);
-                }
-                // console.log(`\x1b[31m Starting RPC\x1b[0m`);
-                resolve();
-            }
-        };
-        binary.stderr.on("data", onData);
-        binary.stdout.on("data", onData);
-    }))
-    if (provider === 'ws') {
-        web3 = new Web3(`ws://localhost:${WS_PORT}`);
-    }
+  const createTransaction = await web3.eth.accounts.signTransaction({
+    from: process.env.GENESIS_ACCOUNT,
+    data: incrementerTx.encodeABI(),
+    gas: process.env.GAS || await web3.eth.getGasPrice(),
+    // gas: '6721975',
+    // gasPrice: '0x01',
+    // gasLimit: await web3.eth.getBlock("latest").gasLimit,
+  }, process.env.GENESIS_ACCOUNT_PRIVATE_KEY);
 
-    return { web3, binary };
-
-}
-
-const describeWithPolkafoundry = (title, specFilename, cb, provider) => {
-    describe(title, () => {
-        let context = { web3: null };
-        let binary;
-        // Making sure the Frontier node has started
-        before('Starting Polkafoundry Test Node', async function () {
-            this.timeout(SPAWNING_TIME);
-            const init = await startPolkafoundryNode(specFilename, provider);
-            context.web3 = init.web3;
-            binary = init.binary;
-        });
-
-        after(async function () {
-            //console.log(`\x1b[31m Killing RPC\x1b[0m`);
-            binary.kill();
-        });
-
-        cb(context);
-    });
-
+  return web3.eth.sendSignedTransaction(createTransaction.rawTransaction);
 }
 
 module.exports = {
     customRequest,
     createAndFinalizeBlock,
-    startPolkafoundryNode,
     describeWithPolkafoundry,
     deployContract,
 }
