@@ -3,7 +3,6 @@ use sc_service::ChainType;
 use sc_chain_spec::{Properties};
 
 use sp_core::{crypto::UncheckedInto};
-use sp_runtime::traits::{AccountIdConversion};
 
 use halongbay_runtime as halongbay;
 
