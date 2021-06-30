@@ -341,6 +341,7 @@ pub mod pallet {
 		}
 	}
 
+	#[pallet::extra_constants]
 	impl<T: Config> Pallet<T> {
 		/// The account ID of the pallet.
 		///
