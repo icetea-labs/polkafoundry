@@ -2,3 +2,4 @@ mocha --timeout 30000 test/incrementer.test.js
 mocha --timeout 30000 test/migrations.test.js
 mocha --timeout 30000 test/multicall.test.js
 mocha --timeout 30000 test/storage.test.js
+mocha --timeout 30000 test/polkafoundryERC20.test.js

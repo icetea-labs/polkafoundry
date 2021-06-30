@@ -12,7 +12,8 @@
     "test:incrementer": "mocha --timeout 30000 test/incrementer.test.js",
     "test:migrations": "mocha --timeout 30000 test/migrations.test.js",
     "test:multicall": "mocha --timeout 30000 test/multicall.test.js",
-    "test:storage": "mocha --timeout 30000 test/storage.test.js"
+    "test:storage": "mocha --timeout 30000 test/storage.test.js",
+    "test:polkafoundryERC20": "mocha --timeout 30000 test/polkafoundryERC20.test.js"
   },
   "author": "",
   "license": "ISC",
