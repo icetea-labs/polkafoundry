@@ -253,6 +253,9 @@ pub mod pallet {
 					0u32.into()
 				};
 
+				// avoid transfer 0 amount of tokens to users
+				if amount < T::RewardCurrency::minimum_balance() { return (); }
+
 				match T::RewardCurrency::transfer(&Self::account_id(), &who, amount, AllowDeath) {
 					Ok(_) => {
 						info.last_paid = relay_block_now;

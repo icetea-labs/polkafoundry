@@ -117,6 +117,9 @@ fn distribute_all_work() {
 			crate::Event::RewardPaid(2, 3250),
 		];
 		assert_eq!(events(), expected);
+		// avoid transfer 0 amount of tokens to users
+		assert_ok!(Crowdloan::distribute_all(Origin::root()));
+		assert_eq!(events(), expected);
 	})
 }
 
