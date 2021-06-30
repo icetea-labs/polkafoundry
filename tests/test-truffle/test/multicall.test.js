@@ -2,7 +2,7 @@ require('../config');
 const Web3 = require('web3');
 const { expect } = require('chai');
 const contractObj = require('../build/contracts/Multicall.json');
-const { deployContract, callMethod } = require('../utils');
+const { deployContract } = require('../utils');
 
 const RPC = process.env.RPC;
 const GENESIS_ACCOUNT = process.env.GENESIS_ACCOUNT;

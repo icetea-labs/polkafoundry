@@ -10,7 +10,9 @@
     "test:local": "RPC=http://127.0.0.1:7545 PRIVATEKEY=0xa02e23ce5464f3424ade39531c1bb59bd4ec146432e41cd5939da55e15f6e010 truffle test --network test",
     "test": "mocha --timeout 30000",
     "test:incrementer": "mocha --timeout 30000 test/incrementer.test.js",
-    "test:migrations": "mocha --timeout 30000 test/migrations.test.js"
+    "test:migrations": "mocha --timeout 30000 test/migrations.test.js",
+    "test:multicall": "mocha --timeout 30000 test/multicall.test.js",
+    "test:storage": "mocha --timeout 30000 test/storage.test.js"
   },
   "author": "",
   "license": "ISC",
