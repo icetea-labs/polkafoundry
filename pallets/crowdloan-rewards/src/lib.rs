@@ -116,7 +116,7 @@ pub mod pallet {
 			ensure!(Self::pot() >= total_reward_amount, Error::<T>::InsufficientFunds);
 
 			for (who, amount) in &contributions {
-				let total_reward = BalanceOf::<T>::from(*amount);
+				let total_reward = *amount;
 				let claimed_reward = Perbill::from_percent(setting.tge_rate).mul_floor(total_reward);
 				let init_locked = total_reward.saturating_sub(claimed_reward);
 
@@ -224,6 +224,48 @@ pub mod pallet {
 			Self::deposit_event(Event::SettingChanged(current_setting.clone()));
 			Ok(Default::default())
 		}
+
+		#[pallet::weight(0)]
+		pub fn distribute_all(origin: OriginFor<T>) -> DispatchResultWithPostInfo {
+			ensure_root(origin)?;
+			let setting = Settings::<T>::get();
+			let relay_block_now = BlockNumberOf::<T>::from(cumulus_pallet_parachain_system::Pallet::<T>::validation_data()
+				.expect("set_validation_data inherent needs to be present in every block!")
+				.relay_parent_number);
+			ensure!(relay_block_now >= setting.reward_end_block, Error::<T>::DistributeNotReady);
+
+			let total_remaining_reward_amount = Contributors::<T>::iter_values()
+				.fold(0u32.into(), |reward: BalanceOf<T>, t| {
+					let amount = if t.total_reward > t.claimed_reward {
+						t.total_reward - t.claimed_reward
+					} else {
+						0u32.into()
+					};
+
+					reward + amount
+				});
+			ensure!(Self::pot() >= total_remaining_reward_amount, Error::<T>::InsufficientFunds);
+
+			Contributors::<T>::iter().for_each(|(who, mut info)| {
+				let amount = if info.total_reward > info.claimed_reward {
+					info.total_reward - info.claimed_reward
+				} else {
+					0u32.into()
+				};
+
+				match T::RewardCurrency::transfer(&Self::account_id(), &who, amount, AllowDeath) {
+					Ok(_) => {
+						info.last_paid = relay_block_now;
+						info.claimed_reward = info.claimed_reward.saturating_add(amount);
+						Contributors::<T>::insert(&who, info);
+						Self::deposit_event(Event::RewardPaid(who.clone(), amount))
+					},
+					Err(_) => (),
+				}
+			});
+
+			Ok(Default::default())
+		}
 	}
 
 	#[pallet::storage]
@@ -259,6 +301,8 @@ pub mod pallet {
 		ClaimInLockedTime,
 		/// The total reward amount exceed the pallet's fund
 		InsufficientFunds,
+		/// Cannot distribute token during vesting period
+		DistributeNotReady,
 	}
 
 	#[pallet::event]

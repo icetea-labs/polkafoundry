@@ -39,7 +39,7 @@ fn claim_work() {
             }
         );
         assert_noop!(
-            Crowdloan::claim(Origin::signed(1),),
+            Crowdloan::claim(Origin::signed(1)),
             Error::<Test>::ClaimInLockedTime
         );
 		run_to_relay_chain_block(6);
@@ -79,6 +79,45 @@ fn claim_work() {
         ];
         assert_eq!(events(), expected);
     })
+}
+
+#[test]
+fn distribute_all_work() {
+	mock_test().execute_with(|| {
+		// we mock tge_rate = 35%, period = 10 and account 1-2-3 contribute 5000
+		// total: 5000 * 3 = 15000
+		// claimed at tge each account: 5000 * 35% = 1750
+		// total claimed: 3 * 1750 = 5250
+		assert_eq!(
+			Crowdloan::pot(),
+			INIT_BALANCE - 3 * INIT_CONTRIBUTED * 35 / 100 - MINIMUM_BALANCE
+		);
+		run_to_relay_chain_block(6);
+		assert_ok!(Crowdloan::claim(Origin::signed(1)));
+		// we mock tge_rate = 35%, period = 10 and account 1 contribute 5000
+		// total: 5000
+		// claimed at tge: 5000 * 35% = 1750
+		// earn until block 6: ((5000 - 1750)) * (6-4)) / 10 = 650
+		// total claimed: 1750 + 650 = 2400
+		assert_eq!(Crowdloan::contributors(1).unwrap().claimed_reward, 2400);
+		assert_noop!(
+			Crowdloan::distribute_all(Origin::root()),
+			Error::<Test>::DistributeNotReady,
+		);
+		run_to_relay_chain_block(20);
+		assert_ok!(Crowdloan::distribute_all(Origin::root()));
+		let expected = vec![
+			crate::Event::RewardPaid(1, 1750),
+			crate::Event::RewardPaid(2, 1750),
+			crate::Event::RewardPaid(3, 1750),
+			crate::Event::RewardPaid(1, 650),
+			// distribute all the remaining amount after end vesting period
+			crate::Event::RewardPaid(3, 3250),
+			crate::Event::RewardPaid(1, 2600),
+			crate::Event::RewardPaid(2, 3250),
+		];
+		assert_eq!(events(), expected);
+	})
 }
 
 #[test]
