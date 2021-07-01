@@ -2,7 +2,7 @@ require('../config');
 const Web3 = require('web3');
 const { expect } = require('chai');
 const contractObj = require('../build/contracts/WETH9.json');
-const { deployContract, transferPayment } = require('../utils');
+const { deployContract, callMethod, transferPayment } = require('../utils');
 
 const RPC = process.env.RPC;
 const GENESIS_ACCOUNT = process.env.GENESIS_ACCOUNT;
@@ -88,4 +88,12 @@ describe("Contract Weth9", () => {
         expect(data).to.equal(web3.utils.toWei((amountTransfer + amountOtherTransfer).toString()));
     });
     // End OTHER_ACCOUNT Transfer to contract
+
+    it(`${OTHER_ACCOUNT} call method withdraw()`, async () => {
+        const incrementer = new web3.eth.Contract(abi);
+        const encoded = incrementer.methods.withdraw(web3.utils.toWei(amountOtherTransfer.toString())).encodeABI();
+        const callReceipt = await callMethod(web3, abi, contractAddress, encoded, OTHER_ACCOUNT, OTHER_ACCOUNT_PRIVATE_KEY);
+        const transactionHash = callReceipt.transactionHash;
+        expect(transactionHash).to.match(/^0x[0-9A-Za-z]{64}$/);
+    });
 });
