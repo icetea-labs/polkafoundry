@@ -14,7 +14,7 @@ const decimals = 18;
 const amountTransfer = 1.23;
 const amountOtherTransfer = 1.35;
 
-describe("Contract PolkafoundryERC20", () => {
+describe("Contract Weth9", () => {
     const web3 = new Web3(RPC);
     const abi = contractObj.abi;
     let contractAddress = null;
