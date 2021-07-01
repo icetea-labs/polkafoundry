@@ -115,8 +115,8 @@ pub mod pallet {
 			});
 			ensure!(Self::pot() >= total_reward_amount, Error::<T>::InsufficientFunds);
 
-			for (who, amount) in &contributions {
-				let total_reward = *amount;
+			for (who, amount) in contributions {
+				let total_reward = amount;
 				let claimed_reward = Perbill::from_percent(setting.tge_rate).mul_floor(total_reward);
 				let init_locked = total_reward.saturating_sub(claimed_reward);
 
