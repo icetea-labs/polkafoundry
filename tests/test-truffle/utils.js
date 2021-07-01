@@ -1,4 +1,8 @@
 require('./config');
+const { Transaction } = require('ethereumjs-tx');
+
+const GENESIS_ACCOUNT = process.env.GENESIS_ACCOUNT;
+const GENESIS_ACCOUNT_PRIVATE_KEY = process.env.GENESIS_ACCOUNT_PRIVATE_KEY;
 
 const customRequest = async (web3, method, params) => {
     return new Promise((resolve, reject) => {
@@ -56,7 +60,7 @@ const deployContract = async (web3, contractObj, args = []) => {
   return web3.eth.sendSignedTransaction(createTransaction.rawTransaction);
 }
 
-const callMethod = async (web3, abi, contractAddress, encoded, account = process.env.GENESIS_ACCOUNT, privateKey = process.env.GENESIS_ACCOUNT_PRIVATE_KEY) => {
+const callMethod = async (web3, abi, contractAddress, encoded, account = GENESIS_ACCOUNT, privateKey = GENESIS_ACCOUNT_PRIVATE_KEY) => {
     const callTransaction = await web3.eth.accounts.signTransaction(
         {
             from: account,
@@ -70,10 +74,24 @@ const callMethod = async (web3, abi, contractAddress, encoded, account = process
     return web3.eth.sendSignedTransaction(callTransaction.rawTransaction);
 }
 
+const transferPayment = async (web3, to, amount, from = GENESIS_ACCOUNT, privateKey = GENESIS_ACCOUNT_PRIVATE_KEY) => {
+    const tx = await web3.eth.accounts.signTransaction({
+            from: from,
+            to: to,
+            value: web3.utils.toWei(amount.toString(), "ether"),
+            gas: web3.utils.toHex(process.env.GAS),
+        },
+        privateKey
+    );
+
+    return web3.eth.sendSignedTransaction(tx.rawTransaction);
+}
+
 module.exports = {
     customRequest,
     createAndFinalizeBlock,
     describeWithPolkafoundry,
     deployContract,
     callMethod,
+    transferPayment,
 }
