@@ -5,7 +5,10 @@
   "bootNodes": [
     "/dns/polkasmith-bootnode-0.polkafoundry.com/tcp/30333/p2p/12D3KooWA6sLsmR8rkhzrQ6t3D1Ydqm5AVVNev6VSg3bd3TyZkR5",
     "/dns/polkasmith-bootnode-1.polkafoundry.com/tcp/30334/p2p/12D3KooWRXtNqq5oKSR2unQfK6y3eyhPaBAUNhaek439pfsSdAtc",
-    "/dns/polkasmith-bootnode-2.polkafoundry.com/tcp/30335/p2p/12D3KooWDWWHMAq3867B5LDPftDYHMTB4th8aqRA3PKHqabfudBZ"
+    "/dns/polkasmith-bootnode-2.polkafoundry.com/tcp/30335/p2p/12D3KooWDWWHMAq3867B5LDPftDYHMTB4th8aqRA3PKHqabfudBZ",
+    "/dns/polkasmith-bootnode-3.polkafoundry.com/tcp/30333/p2p/12D3KooWKYXm7vw2XCW5E77aXS6xxc9PUxiQjon9e3kratVZ9nyh",
+    "/dns/polkasmith-bootnode-4.polkafoundry.com/tcp/30334/p2p/12D3KooWCKjpp3Dj7poBBXGqVtBbwoUZFGjDm62jNiQvXVAee3BH",
+    "/dns/polkasmith-bootnode-5.polkafoundry.com/tcp/30335/p2p/12D3KooWAMinphyFkrP7X9L977N5Mzoj9uajZ3Ehi82Az8Ve3DPG"
   ],
   "telemetryEndpoints": null,
   "protocolId": null,
