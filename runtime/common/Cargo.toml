@@ -7,14 +7,14 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
-frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
-sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
-sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
-polkadot-primitives = { default-features = false, git = 'https://github.com/paritytech/polkadot.git', branch = 'release-v0.9.6' }
-pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
-pallet-authorship = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
-pallet-treasury = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.6' }
+frame-support = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
+frame-system = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
+sp-runtime = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
+sp-std = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
+polkadot-primitives = { default-features = false, git = 'https://github.com/paritytech/polkadot.git', branch = 'release-v0.9.7' }
+pallet-balances = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
+pallet-authorship = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
+pallet-treasury = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
 runtime-primitives = { default-features = false, path = '../../primitives' }
 
 [features]
