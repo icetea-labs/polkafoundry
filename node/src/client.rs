@@ -195,6 +195,17 @@ impl sc_client_api::BlockBackend<Block> for Client {
 		}
 	}
 
+	fn block_indexed_body(&self, id: &BlockId<Block>) -> sp_blockchain::Result<Option<Vec<Vec<u8>>>> {
+		match self {
+			#[cfg(feature = "polkafoundry")]
+			Self::PolkaFoundry(client) => client.block_indexed_body(id),
+			#[cfg(feature = "polkasmith")]
+			Self::PolkaSmith(client) => client.block_indexed_body(id),
+			#[cfg(feature = "halongbay")]
+			Self::Halongbay(client) => client.block_indexed_body(id),
+		}
+	}
+
 	fn block(&self, id: &BlockId<Block>) -> sp_blockchain::Result<Option<SignedBlock<Block>>> {
 		match self {
 			#[cfg(feature = "polkafoundry")]

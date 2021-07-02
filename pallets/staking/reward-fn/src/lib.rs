@@ -59,7 +59,7 @@ pub fn compute_inflation<P: PerThing>(
 	ideal_stake: P,
 	falloff: P,
 ) -> P {
-	if stake <= ideal_stake {
+	if stake < ideal_stake {
 		// ideal_stake is more than 0 because it is strictly more than stake
 		return stake / ideal_stake
 	}
@@ -169,11 +169,7 @@ fn compute_taylor_serie_part(p: &INPoSParam) -> BigUint {
 	taylor_sum
 }
 
-/// Return the absolute value of k-th taylor term of `2^((x_ideal - x))/d`
-/// Because `x_ideal - x < 0 => 2^((x_ideal - x))/d = 1/2^(x - x_ideal)/d = e^(-ln(2^(x - x_ideal)/d)) = (x - x_ideal)/d * e^(-ln(2))`
-/// Now just have to use the Taylor expansion of the exponential function
-/// i.e.
-/// exp(𝑋)=1+𝑋+𝑋2/2+𝑋3/3!+⋯ with X = ln(2) * (x - x_ideal)/d
+/// Return the absolute value of k-th taylor term of `2^((x_ideal - x))/d` i.e.
 /// `((x - x_ideal) * ln(2) / d)^k / k!`
 ///
 /// x must be strictly more x_ideal.

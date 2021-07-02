@@ -24,28 +24,28 @@ fn polkafoundry_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkafound
 	];
 
 	polkafoundry::GenesisConfig {
-		frame_system: polkafoundry::SystemConfig {
+		system: polkafoundry::SystemConfig {
 			code: wasm_binary.to_vec(),
 			changes_trie_config: Default::default(),
 		},
-		pallet_balances: polkafoundry::BalancesConfig {
+		balances: polkafoundry::BalancesConfig {
 			balances: endowed_accounts
 				.iter()
 				.cloned()
 				.map(|k| (k, ENDOWMENT))
 				.collect(),
 		},
-		pallet_sudo: polkafoundry::SudoConfig { key: endowed_accounts[0].clone() },
+		sudo: polkafoundry::SudoConfig { key: endowed_accounts[0].clone() },
 		parachain_info: polkafoundry::ParachainInfoConfig { parachain_id: 1111.into() },
-		pallet_evm: polkafoundry::EVMConfig {
+		evm: polkafoundry::EVMConfig {
 			accounts: BTreeMap::new(),
 		},
-		pallet_ethereum: polkafoundry::EthereumConfig {},
-		pallet_aura: halongbay::AuraConfig {
+		ethereum: polkafoundry::EthereumConfig {},
+		aura: halongbay::AuraConfig {
 			authorities: vec![hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"]
 				.unchecked_into()]
 		},
-		cumulus_pallet_aura_ext: Default::default(),
+		aura_ext: Default::default(),
 	}
 }
 

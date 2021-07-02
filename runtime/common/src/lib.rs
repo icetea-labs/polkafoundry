@@ -1,8 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
-	parameter_types, traits::{Currency, OneSessionHandler},
+	parameter_types,
 	weights::{Weight, constants::WEIGHT_PER_SECOND, DispatchClass},
+	traits::{Currency, Imbalance, OnUnbalanced}
 };
 use frame_system::limits;
 use sp_runtime::{Perbill};
@@ -61,5 +62,45 @@ parameter_types! {
 		*BlockLength::get()
 		.max
 		.get(DispatchClass::Normal);
+}
+
+pub type NegativeImbalance<T> = <pallet_balances::Pallet<T> as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
+
+/// Logic for the author to get a portion of fees.
+pub struct ToAuthor<R>(sp_std::marker::PhantomData<R>);
+impl<R> OnUnbalanced<NegativeImbalance<R>> for ToAuthor<R>
+	where
+		R: pallet_balances::Config + pallet_authorship::Config,
+		<R as frame_system::Config>::AccountId: From<polkadot_primitives::v1::AccountId>,
+		<R as frame_system::Config>::AccountId: Into<polkadot_primitives::v1::AccountId>,
+		<R as frame_system::Config>::Event: From<pallet_balances::Event<R>>,
+{
+	fn on_nonzero_unbalanced(amount: NegativeImbalance<R>) {
+		let numeric_amount = amount.peek();
+		let author = <pallet_authorship::Pallet<R>>::author();
+		<pallet_balances::Pallet<R>>::resolve_creating(&<pallet_authorship::Pallet<R>>::author(), amount);
+		<frame_system::Pallet<R>>::deposit_event(pallet_balances::Event::Deposit(author, numeric_amount));
+	}
+}
+
+pub struct DealWithFees<R>(sp_std::marker::PhantomData<R>);
+impl<R> OnUnbalanced<NegativeImbalance<R>> for DealWithFees<R>
+	where
+		R: pallet_balances::Config + pallet_authorship::Config + pallet_treasury::Config,
+		<R as frame_system::Config>::AccountId: From<polkadot_primitives::v1::AccountId>,
+		<R as frame_system::Config>::AccountId: Into<polkadot_primitives::v1::AccountId>,
+		<R as frame_system::Config>::Event: From<pallet_balances::Event<R>>,
+		pallet_treasury::Pallet<R>: OnUnbalanced<NegativeImbalance<R>>,
+{
+	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance<R>>) {
+		if let Some(fees) = fees_then_tips.next() {
+			// for fees, 90% are burned, 5% to the treasury, 5% to block author
+			let (_, to_treasury_and_staking) = fees.ration(90, 10);
+			let (treasury_part, staking_part) = to_treasury_and_staking.ration(50, 50);
+
+			<ToAuthor<R> as OnUnbalanced<_>>::on_unbalanced(staking_part);
+			<pallet_treasury::Pallet<R> as OnUnbalanced<_>>::on_unbalanced(treasury_part);
+		}
+	}
 }
 

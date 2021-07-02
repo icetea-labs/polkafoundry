@@ -22,24 +22,24 @@ fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::
 	];
 
 	polkasmith::GenesisConfig {
-		frame_system: polkasmith::SystemConfig {
+		system: polkasmith::SystemConfig {
 			code: wasm_binary.to_vec(),
 			changes_trie_config: Default::default(),
 		},
-		pallet_balances: polkasmith::BalancesConfig {
+		balances: polkasmith::BalancesConfig {
 			balances: endowed_accounts
 				.iter()
 				.cloned()
 				.map(|k| (k, ENDOWMENT))
 				.collect(),
 		},
-		pallet_sudo: polkasmith::SudoConfig { key: endowed_accounts[0].clone() },
+		sudo: polkasmith::SudoConfig { key: endowed_accounts[0].clone() },
 		parachain_info: polkasmith::ParachainInfoConfig { parachain_id: 2009.into() },
-		pallet_evm: polkasmith::EVMConfig {
+		evm: polkasmith::EVMConfig {
 			accounts: BTreeMap::new(),
 		},
-		pallet_ethereum: polkasmith::EthereumConfig {},
-		pallet_aura: polkasmith::AuraConfig {
+		ethereum: polkasmith::EthereumConfig {},
+		aura: polkasmith::AuraConfig {
 			authorities: vec![
 				hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"]
 				.unchecked_into(),
@@ -47,7 +47,7 @@ fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::
 				.unchecked_into(),
 			]
 		},
-		cumulus_pallet_aura_ext: Default::default(),
+		aura_ext: Default::default(),
 	}
 }
 
