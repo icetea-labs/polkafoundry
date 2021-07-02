@@ -412,10 +412,14 @@ impl pallet_evm::Config for Runtime {
 	type OnChargeTransaction = ();
 }
 
+parameter_types! {
+	pub const CrowdloanPalletId: PalletId = PalletId(*b"Crowdloa");
+}
 
 impl pallet_crowdloan_rewards::Config for Runtime {
 	type Event = Event;
-	type RelayChainAccountId = AccountId32;
+	type PalletId = CrowdloanPalletId;
+	type RewardCurrency = Balances;
 }
 
 parameter_types! {
