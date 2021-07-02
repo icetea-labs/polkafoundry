@@ -116,9 +116,8 @@ pub mod pallet {
 			ensure!(Self::pot() >= total_reward_amount, Error::<T>::InsufficientFunds);
 
 			for (who, amount) in contributions {
-				let total_reward = amount;
-				let claimed_reward = Perbill::from_percent(setting.tge_rate).mul_floor(total_reward);
-				let init_locked = total_reward.saturating_sub(claimed_reward);
+				let claimed_reward = Perbill::from_percent(setting.tge_rate).mul_floor(amount);
+				let init_locked = amount.saturating_sub(claimed_reward);
 
 				// A part of token are distributed immediately at TGE.
 				T::RewardCurrency::transfer(&Self::account_id(), &who, claimed_reward, AllowDeath)
@@ -129,7 +128,7 @@ pub mod pallet {
 				Contributors::<T>::insert(
 					who,
 					RewardInfo {
-						total_reward,
+						total_reward: amount,
 						init_locked,
 						claimed_reward,
 						last_paid: relay_block_now.clone(),
