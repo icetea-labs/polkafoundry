@@ -52,3 +52,22 @@ pub mod version {
 		transaction_version: 1,
 	};
 }
+
+/// Money matters.
+pub mod currency {
+	use runtime_primitives::Balance;
+	use pkfp_primitives::CurrencyId;
+	use pkfp_primitives::currency::TokenInfo;
+
+	pub fn dollars(currency: CurrencyId) -> Balance {
+		1u128.saturating_mul(currency.decimals().expect("TokenInfo must be implemented qed").into())
+	}
+
+	pub fn cent(currency: CurrencyId) -> Balance {
+		dollars(currency) / 1000
+	}
+
+	pub fn millicent(currency: CurrencyId) -> Balance {
+		cent(currency) / 1000
+	}
+}
