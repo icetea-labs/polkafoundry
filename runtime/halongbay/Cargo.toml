@@ -94,6 +94,12 @@ pallet-xcm = { default-features = false, git = 'https://github.com/paritytech/po
 
 runtime-primitives = { default-features = false, path = '../../primitives' }
 runtime-common = { default-features = false, path = '../common' }
+pkfp-primitives = { default-features = false, path = '../../pkfp/primitives' }
+orml-tokens = { default-features = false, path = '../../pkfp/tokens' }
+orml-currencies = { default-features = false, path = '../../pkfp/currencies' }
+orml-unknown-tokens = { default-features = false, path = '../../pkfp/unknown-tokens' }
+orml-traits = { default-features = false, path = '../../pkfp/traits' }
+orml-xcm-support = { default-features = false, path = '../../pkfp/xcm-support' }
 
 [features]
 default = ['std']
@@ -135,6 +141,12 @@ std = [
     'pallet-crowdloan-rewards/std',
     'pallet-election-provider-multi-phase/std',
     'pallet-staking/std',
+    'pkfp-primitives/std',
+    'orml-tokens/std',
+    'orml-currencies/std',
+    'orml-unknown-tokens/std',
+    'orml-traits/std',
+    'orml-xcm-support/std',
     'runtime-primitives/std',
     'sp-api/std',
     'sp-block-builder/std',

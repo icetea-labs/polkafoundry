@@ -1,0 +1,3 @@
+[submodule "pkfp"]
+	path = pkfp
+	url = https://github.com/polkafoundry/polkafoundry-pallets.git
