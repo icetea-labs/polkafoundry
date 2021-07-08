@@ -37,22 +37,6 @@ pub mod weights {
 	pub const WEIGHT_PER_GAS: u64 = WEIGHT_PER_SECOND / GAS_PER_SECOND;
 }
 
-pub mod version {
-	use sp_version::RuntimeVersion;
-	use sp_runtime::create_runtime_str;
-
-	#[sp_version::runtime_version]
-	pub const VERSION: RuntimeVersion = RuntimeVersion {
-		spec_name: create_runtime_str!("halongbay"),
-		impl_name: create_runtime_str!("halongbay"),
-		authoring_version: 1,
-		spec_version: 3,
-		impl_version: 1,
-		apis: crate::RUNTIME_API_VERSIONS,
-		transaction_version: 1,
-	};
-}
-
 /// Money matters.
 pub mod currency {
 	use runtime_primitives::Balance;

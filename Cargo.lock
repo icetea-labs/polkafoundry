@@ -2942,6 +2942,8 @@ dependencies = [
  "pallet-xcm",
  "parachain-info",
  "parity-scale-codec",
+ "pkfp-oracle",
+ "pkfp-oracle-runtime-api",
  "pkfp-primitives",
  "polkadot-parachain",
  "precompiles",
@@ -6317,6 +6319,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
+name = "pkfp-oracle"
+version = "0.0.1"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "orml-traits",
+ "pallet-balances",
+ "parity-scale-codec",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pkfp-oracle-rpc"
+version = "0.0.1"
+dependencies = [
+ "jsonrpc-core 15.1.0",
+ "jsonrpc-core-client 15.1.0",
+ "jsonrpc-derive 15.1.0",
+ "parity-scale-codec",
+ "pkfp-oracle-runtime-api",
+ "serde",
+ "sp-api",
+ "sp-blockchain",
+ "sp-core",
+ "sp-rpc",
+ "sp-runtime",
+]
+
+[[package]]
+name = "pkfp-oracle-runtime-api"
+version = "0.0.1"
+dependencies = [
+ "parity-scale-codec",
+ "sp-api",
+ "sp-std",
+]
+
+[[package]]
 name = "pkfp-primitives"
 version = "0.0.1"
 dependencies = [
@@ -7404,6 +7449,8 @@ dependencies = [
  "pallet-transaction-payment-rpc",
  "pallet-transaction-payment-rpc-runtime-api",
  "parity-scale-codec",
+ "pkfp-oracle-rpc",
+ "pkfp-primitives",
  "polkadot-cli",
  "polkadot-parachain",
  "polkadot-primitives",
@@ -7411,6 +7458,7 @@ dependencies = [
  "polkadot-test-service",
  "polkafoundry-runtime",
  "polkasmith-runtime",
+ "runtime-common",
  "runtime-primitives",
  "sc-basic-authorship",
  "sc-chain-spec",
@@ -8232,6 +8280,8 @@ dependencies = [
  "pallet-authorship",
  "pallet-balances",
  "pallet-treasury 3.0.0",
+ "pkfp-oracle",
+ "pkfp-primitives",
  "polkadot-primitives",
  "runtime-primitives",
  "sp-runtime",

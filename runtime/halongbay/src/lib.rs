@@ -13,6 +13,7 @@ use sp_runtime::{
 	curve::PiecewiseLinear,
 	ApplyExtrinsicResult, generic, impl_opaque_keys,
 	transaction_validity::{TransactionValidity, TransactionSource, TransactionPriority},
+	FixedU128
 };
 use sp_runtime::traits::{
 	AccountIdLookup, BlakeTwo256, Block as BlockT, OpaqueKeys
@@ -53,6 +54,7 @@ pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{
+	create_runtime_str,
 	Permill, Perbill,
 	traits::{AccountIdConversion, Convert}
 };
@@ -72,20 +74,32 @@ pub use runtime_primitives::{
 	DigestItem, Index, Hash, Moment, Nonce, Signature,
 };
 use pkfp_primitives::{
-	CurrencyId, TokenSymbol, Amount
+	CurrencyId, TokenSymbol, Amount, Price, DataProviderId
 };
 use orml_traits::{
-	parameter_type_with_key
+	parameter_type_with_key,
+	DataProviderExtended
 };
 
 use runtime_common::{
-	BlockHashCount, BlockWeights, BlockLength, MAXIMUM_BLOCK_WEIGHT, DealWithFees
+	BlockHashCount, BlockWeights, BlockLength, MAXIMUM_BLOCK_WEIGHT, DealWithFees, TimeStampedPrice
 };
 
 // Weights used in the runtime.
 mod weights;
 mod constants;
-pub use constants::{weights::*, time::*, version::*, currency::*};
+pub use constants::{weights::*, time::*, currency::*};
+
+#[sp_version::runtime_version]
+pub const VERSION: RuntimeVersion = RuntimeVersion {
+	spec_name: create_runtime_str!("halongbay"),
+	impl_name: create_runtime_str!("halongbay"),
+	authoring_version: 1,
+	spec_version: 3,
+	impl_version: 1,
+	apis: RUNTIME_API_VERSIONS,
+	transaction_version: 1,
+};
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -684,6 +698,22 @@ impl orml_unknown_tokens::Config for Runtime {
 	type Event = Event;
 }
 
+parameter_types! {
+	pub const MinimumCount: u32 = 1;
+	pub const ExpiresIn: Moment = 1000 * 60 * 60; // 60 mins
+	pub const OracleFee: u128 = 1_000_000_000_000_000;
+}
+
+type OracleInstance1 = pkfp_oracle::Instance1;
+impl pkfp_oracle::Config<OracleInstance1> for Runtime {
+	type Event = Event;
+	type Time = Timestamp;
+	type FeedKey = CurrencyId;
+	type FeedValue = Price;
+	type CombineData = pkfp_oracle::DefaultCombineData<Runtime, MinimumCount, ExpiresIn, OracleInstance1>;
+	type Currency = Balances;
+	type OracleFee = OracleFee;
+}
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -735,6 +765,9 @@ construct_runtime!(
 		Tokens: orml_tokens::{Pallet, Call, Storage, Event<T>, Config<T>} = 70,
 		Currencies: orml_currencies::{Pallet, Call, Event<T>} = 71,
 		UnknownTokens: orml_unknown_tokens::{Pallet, Storage, Event} = 72,
+
+		// Pkfp modules
+		Oracle: pkfp_oracle::<Instance1>::{Pallet, Call, Storage, Event<T>, Config<T>} = 80,
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
 	}
@@ -1008,6 +1041,43 @@ impl_runtime_apis! {
 			len: u32,
 		) -> pallet_transaction_payment::FeeDetails<Balance> {
 			TransactionPayment::query_fee_details(uxt, len)
+		}
+	}
+
+	// we just need one function to get but just put 4 in case we need more instance in future
+	impl pkfp_oracle_runtime_api::OracleApi<
+		Block,
+		DataProviderId,
+		AccountId,
+		CurrencyId,
+		TimeStampedPrice
+	> for Runtime {
+		fn get(provider_id: DataProviderId, key: CurrencyId) -> Option<TimeStampedPrice> {
+			match provider_id {
+				DataProviderId::Combined => Oracle::get(&key),
+				_ => None
+			}
+		}
+
+		fn get_polkafoundry(provider_id: DataProviderId, key: CurrencyId, feeder: AccountId) -> Option<TimeStampedPrice> {
+			match provider_id {
+				DataProviderId::PolkaFoundry => Oracle::get_polkafoundry(&key, feeder),
+				_ => None
+			}
+		}
+
+		fn get_concrete(provider_id: DataProviderId, key: CurrencyId, feeder: AccountId) -> Option<TimeStampedPrice> {
+			match provider_id {
+				DataProviderId::Concrete => Oracle::get_concrete(&key, feeder),
+				_ => None
+			}
+		}
+
+		fn get_all_values(provider_id: DataProviderId) -> Vec<(CurrencyId, Option<TimeStampedPrice>)> {
+			match provider_id {
+				DataProviderId::All => Oracle::get_all_values(),
+				_ => vec![]
+			}
 		}
 	}
 

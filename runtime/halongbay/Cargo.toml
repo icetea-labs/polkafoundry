@@ -100,6 +100,8 @@ orml-currencies = { default-features = false, path = '../../pkfp/currencies' }
 orml-unknown-tokens = { default-features = false, path = '../../pkfp/unknown-tokens' }
 orml-traits = { default-features = false, path = '../../pkfp/traits' }
 orml-xcm-support = { default-features = false, path = '../../pkfp/xcm-support' }
+pkfp-oracle = { default-features = false, path = '../../pkfp/oracle' }
+pkfp-oracle-runtime-api = { default-features = false, path = '../../pkfp/oracle/rpc/runtime-api' }
 
 [features]
 default = ['std']
@@ -113,6 +115,7 @@ runtime-benchmarks = [
     'pallet-timestamp/runtime-benchmarks',
     'sp-runtime/runtime-benchmarks',
     'pallet-staking/runtime-benchmarks',
+    'pkfp-oracle/runtime-benchmarks'
 ]
 std = [
     'codec/std',
@@ -142,6 +145,8 @@ std = [
     'pallet-election-provider-multi-phase/std',
     'pallet-staking/std',
     'pkfp-primitives/std',
+    'pkfp-oracle/std',
+    'pkfp-oracle-runtime-api/std',
     'orml-tokens/std',
     'orml-currencies/std',
     'orml-unknown-tokens/std',
