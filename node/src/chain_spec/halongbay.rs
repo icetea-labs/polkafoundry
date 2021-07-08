@@ -105,7 +105,7 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 		aura_ext: Default::default(),
 		im_online: Default::default(),
 		treasury: Default::default(),
-		orml_tokens: Default::default(),
+		tokens: Default::default(),
 	}
 }
 
