@@ -13,7 +13,6 @@ use sp_runtime::{
 	curve::PiecewiseLinear,
 	ApplyExtrinsicResult, generic, impl_opaque_keys,
 	transaction_validity::{TransactionValidity, TransactionSource, TransactionPriority},
-	FixedU128
 };
 use sp_runtime::traits::{
 	AccountIdLookup, BlakeTwo256, Block as BlockT, OpaqueKeys
@@ -74,7 +73,7 @@ pub use runtime_primitives::{
 	DigestItem, Index, Hash, Moment, Nonce, Signature,
 };
 use pkfp_primitives::{
-	CurrencyId, TokenSymbol, Amount, Price, DataProviderId
+	CurrencyId, TokenSymbol, Amount, Price
 };
 use orml_traits::{
 	parameter_type_with_key,
@@ -1047,37 +1046,24 @@ impl_runtime_apis! {
 	// we just need one function to get but just put 4 in case we need more instance in future
 	impl pkfp_oracle_runtime_api::OracleApi<
 		Block,
-		DataProviderId,
 		AccountId,
 		CurrencyId,
-		TimeStampedPrice
+		TimeStampedPrice,
 	> for Runtime {
-		fn get(provider_id: DataProviderId, key: CurrencyId) -> Option<TimeStampedPrice> {
-			match provider_id {
-				DataProviderId::Combined => Oracle::get(&key),
-				_ => None
-			}
+		fn get(key: CurrencyId) -> Option<TimeStampedPrice> {
+			Oracle::get(&key)
 		}
 
-		fn get_polkafoundry(provider_id: DataProviderId, key: CurrencyId, feeder: AccountId) -> Option<TimeStampedPrice> {
-			match provider_id {
-				DataProviderId::PolkaFoundry => Oracle::get_polkafoundry(&key, feeder),
-				_ => None
-			}
+		fn get_polkafoundry(key: CurrencyId) -> Option<TimeStampedPrice> {
+			Oracle::get_concrete(&key, hex_literal::hex!("8455b1a4c0142f4054aa00540bbdd3377bc393a428540aa44ca20dc90de12a02").into())
 		}
 
-		fn get_concrete(provider_id: DataProviderId, key: CurrencyId, feeder: AccountId) -> Option<TimeStampedPrice> {
-			match provider_id {
-				DataProviderId::Concrete => Oracle::get_concrete(&key, feeder),
-				_ => None
-			}
+		fn get_concrete(key: CurrencyId, feeder: AccountId) -> Option<TimeStampedPrice> {
+			Oracle::get_concrete(&key, feeder)
 		}
 
-		fn get_all_values(provider_id: DataProviderId) -> Vec<(CurrencyId, Option<TimeStampedPrice>)> {
-			match provider_id {
-				DataProviderId::All => Oracle::get_all_values(),
-				_ => vec![]
-			}
+		fn get_all_values() -> Vec<(CurrencyId, Option<TimeStampedPrice>)> {
+			Oracle::get_all_values()
 		}
 	}
 
@@ -1116,6 +1102,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_balances, Balances);
 			add_benchmark!(params, batches, pallet_timestamp, Timestamp);
 			add_benchmark!(params, batches, pallet_staking, Staking);
+			add_benchmark!(params, batches, pkfp_oracle, Oracle);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)

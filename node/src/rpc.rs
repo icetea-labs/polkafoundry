@@ -67,7 +67,7 @@ pub fn create_full<C, P, BE>(
 	C: HeaderBackend<Block> + HeaderMetadata<Block, Error=BlockChainError>,
 	C: Send + Sync + 'static,
 	C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
-	C::Api: pkfp_oracle_rpc::OracleRuntimeApi<Block, pkfp_primitives::DataProviderId, AccountId, pkfp_primitives::CurrencyId, runtime_common::TimeStampedPrice>,
+	C::Api: pkfp_oracle_rpc::OracleRuntimeApi<Block, AccountId, pkfp_primitives::CurrencyId, runtime_common::TimeStampedPrice>,
 	C::Api: BlockBuilder<Block>,
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
 	C::Api: fp_rpc::EthereumRuntimeRPCApi<Block>,
