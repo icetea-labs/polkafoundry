@@ -53,6 +53,7 @@ pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{
+	create_runtime_str,
 	Permill, Perbill,
 	traits::{AccountIdConversion, Convert}
 };
@@ -72,20 +73,32 @@ pub use runtime_primitives::{
 	DigestItem, Index, Hash, Moment, Nonce, Signature,
 };
 use pkfp_primitives::{
-	CurrencyId, TokenSymbol, Amount
+	CurrencyId, TokenSymbol, Amount, Price
 };
 use orml_traits::{
-	parameter_type_with_key
+	parameter_type_with_key,
+	DataProviderExtended
 };
 
 use runtime_common::{
-	BlockHashCount, BlockWeights, BlockLength, MAXIMUM_BLOCK_WEIGHT, DealWithFees
+	BlockHashCount, BlockWeights, BlockLength, MAXIMUM_BLOCK_WEIGHT, DealWithFees, TimeStampedPrice
 };
 
 // Weights used in the runtime.
 mod weights;
 mod constants;
-pub use constants::{weights::*, time::*, version::*, currency::*};
+pub use constants::{weights::*, time::*, currency::*};
+
+#[sp_version::runtime_version]
+pub const VERSION: RuntimeVersion = RuntimeVersion {
+	spec_name: create_runtime_str!("halongbay"),
+	impl_name: create_runtime_str!("halongbay"),
+	authoring_version: 1,
+	spec_version: 3,
+	impl_version: 1,
+	apis: RUNTIME_API_VERSIONS,
+	transaction_version: 1,
+};
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -684,6 +697,22 @@ impl orml_unknown_tokens::Config for Runtime {
 	type Event = Event;
 }
 
+parameter_types! {
+	pub const MinimumCount: u32 = 1;
+	pub const ExpiresIn: Moment = 1000 * 60 * 60; // 60 mins
+	pub const OracleFee: u128 = 1_000_000_000_000_000;
+}
+
+type OracleInstance1 = pkfp_oracle::Instance1;
+impl pkfp_oracle::Config<OracleInstance1> for Runtime {
+	type Event = Event;
+	type Time = Timestamp;
+	type FeedKey = CurrencyId;
+	type FeedValue = Price;
+	type CombineData = pkfp_oracle::DefaultCombineData<Runtime, MinimumCount, ExpiresIn, OracleInstance1>;
+	type Currency = Balances;
+	type OracleFee = OracleFee;
+}
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -735,6 +764,9 @@ construct_runtime!(
 		Tokens: orml_tokens::{Pallet, Call, Storage, Event<T>, Config<T>} = 70,
 		Currencies: orml_currencies::{Pallet, Call, Event<T>} = 71,
 		UnknownTokens: orml_unknown_tokens::{Pallet, Storage, Event} = 72,
+
+		// Pkfp modules
+		Oracle: pkfp_oracle::<Instance1>::{Pallet, Call, Storage, Event<T>, Config<T>} = 80,
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
 	}
@@ -1011,6 +1043,30 @@ impl_runtime_apis! {
 		}
 	}
 
+	// we just need one function to get but just put 4 in case we need more instance in future
+	impl pkfp_oracle_runtime_api::OracleApi<
+		Block,
+		AccountId,
+		CurrencyId,
+		TimeStampedPrice,
+	> for Runtime {
+		fn get(key: CurrencyId) -> Option<TimeStampedPrice> {
+			Oracle::get(&key)
+		}
+
+		fn get_polkafoundry(key: CurrencyId) -> Option<TimeStampedPrice> {
+			Oracle::get_concrete(&key, hex_literal::hex!("8455b1a4c0142f4054aa00540bbdd3377bc393a428540aa44ca20dc90de12a02").into())
+		}
+
+		fn get_concrete(key: CurrencyId, feeder: AccountId) -> Option<TimeStampedPrice> {
+			Oracle::get_concrete(&key, feeder)
+		}
+
+		fn get_all_values() -> Vec<(CurrencyId, Option<TimeStampedPrice>)> {
+			Oracle::get_all_values()
+		}
+	}
+
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn dispatch_benchmark(
@@ -1046,6 +1102,7 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, pallet_balances, Balances);
 			add_benchmark!(params, batches, pallet_timestamp, Timestamp);
 			add_benchmark!(params, batches, pallet_staking, Staking);
+			add_benchmark!(params, batches, pkfp_oracle, Oracle);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)

@@ -106,6 +106,7 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 		im_online: Default::default(),
 		treasury: Default::default(),
 		tokens: Default::default(),
+		oracle: Default::default()
 	}
 }
 

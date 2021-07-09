@@ -8,7 +8,8 @@ use frame_support::{
 use frame_system::limits;
 use sp_runtime::{Perbill};
 pub use frame_support::weights::constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight};
-pub use runtime_primitives::BlockNumber;
+pub use runtime_primitives::{BlockNumber, Moment};
+pub use pkfp_primitives::Price;
 
 /// We assume that ~10% of the block weight is consumed by `on_initalize` handlers.
 /// This is used to limit the maximal weight of a single extrinsic.
@@ -18,6 +19,8 @@ const AVERAGE_ON_INITIALIZE_RATIO: Perbill = Perbill::from_percent(10);
 pub const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 /// We allow for 2 seconds of compute with a 6 second average block time.
 pub const MAXIMUM_BLOCK_WEIGHT: Weight = 2 * WEIGHT_PER_SECOND;
+
+pub type TimeStampedPrice = pkfp_oracle::TimestampedValue<Price, Moment>;
 
 // Common constants used in all runtimes.
 parameter_types! {

@@ -35,6 +35,7 @@ async-trait = { version = "0.1.48" }
 polkafoundry-runtime = { path = '../runtime/polkafoundry', version = '0.0.1', optional = true }
 polkasmith-runtime = { path = '../runtime/polkasmith', version = '0.0.1', optional = true }
 halongbay-runtime = { path = '../runtime/halongbay', version = '0.0.2', optional = true }
+runtime-common = { path = '../runtime/common', version = '0.0.1' }
 
 # Substrate dependencies
 frame-benchmarking = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
@@ -116,6 +117,8 @@ pallet-im-online = { git = 'https://github.com/paritytech/substrate.git', branch
 pallet-session = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
 pallet-staking = { path = '../pallets/staking' }
 orml-tokens = { path = '../pkfp/tokens' }
+pkfp-oracle-rpc = { path = '../pkfp/oracle/rpc' }
+pkfp-primitives = { path = '../pkfp/primitives' }
 
 runtime-primitives = { path = '../primitives' }
 

@@ -16,6 +16,8 @@ pallet-balances = { default-features = false, git = 'https://github.com/parityte
 pallet-authorship = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
 pallet-treasury = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.7' }
 runtime-primitives = { default-features = false, path = '../../primitives' }
+pkfp-oracle = { default-features = false, path = '../../pkfp/oracle' }
+pkfp-primitives = { default-features = false, path = '../../pkfp/primitives' }
 
 [features]
 default = ["std"]
@@ -29,4 +31,6 @@ std = [
     'pallet-authorship/std',
     'pallet-treasury/std',
     'runtime-primitives/std',
+    'pkfp-oracle/std',
+    'pkfp-primitives/std',
 ]

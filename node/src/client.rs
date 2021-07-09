@@ -281,6 +281,7 @@ sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block>
 + sp_block_builder::BlockBuilder<Block>
 + frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Nonce>
 + pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance>
++ pkfp_oracle_rpc::OracleRuntimeApi<Block, AccountId, pkfp_primitives::CurrencyId, runtime_common::TimeStampedPrice>
 + sp_api::Metadata<Block>
 + sp_offchain::OffchainWorkerApi<Block>
 + sp_session::SessionKeys<Block>
@@ -297,6 +298,7 @@ impl<Api> RuntimeApiCollection for Api
 		+ sp_block_builder::BlockBuilder<Block>
 		+ frame_system_rpc_runtime_api::AccountNonceApi<Block, AccountId, Nonce>
 		+ pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance>
+		+ pkfp_oracle_rpc::OracleRuntimeApi<Block, AccountId, pkfp_primitives::CurrencyId, runtime_common::TimeStampedPrice>
 		+ sp_api::Metadata<Block>
 		+ sp_offchain::OffchainWorkerApi<Block>
 		+ sp_session::SessionKeys<Block>
