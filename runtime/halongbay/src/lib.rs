@@ -11,7 +11,7 @@ use sp_std::{prelude::*, marker::PhantomData};
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256, H160, H256};
 use sp_runtime::{
 	curve::PiecewiseLinear,
-	ApplyExtrinsicResult, generic, impl_opaque_keys,
+	ApplyExtrinsicResult, generic, impl_opaque_keys, FixedPointNumber,
 	transaction_validity::{TransactionValidity, TransactionSource, TransactionPriority},
 };
 use sp_runtime::traits::{
@@ -81,8 +81,11 @@ use orml_traits::{
 };
 
 use runtime_common::{
-	BlockHashCount, BlockWeights, BlockLength, MAXIMUM_BLOCK_WEIGHT, DealWithFees, TimeStampedPrice
+	BlockHashCount, BlockWeights, BlockLength, MAXIMUM_BLOCK_WEIGHT, DealWithFees, TimeStampedPrice,
+	OffchainSolutionLengthLimit, OffchainSolutionWeightLimit,
+	elections::fee_for_submit_call
 };
+use pallet_election_provider_multi_phase::WeightInfo;
 
 // Weights used in the runtime.
 mod weights;
@@ -553,6 +556,22 @@ parameter_types! {
     // phase durations. 1/4 of the last session for each.
     pub const SignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
     pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
+
+	// signed config
+	pub const SignedMaxSubmissions: u32 = 16;
+	pub const SignedDepositBase: Balance = deposit(1, 0);
+	// A typical solution occupies within an order of magnitude of 50kb.
+	// This formula is currently adjusted such that a typical solution will spend an amount equal
+	// to the base deposit for every 50 kb.
+	pub const SignedDepositByte: Balance = deposit(1, 0) / (50 * 1024);
+	pub SignedRewardBase: Balance = fee_for_submit_call::<Runtime>(
+		// give 20% threshold.
+		sp_runtime::FixedU128::saturating_from_rational(12, 10),
+		// maximum weight possible.
+		weights::pallet_election_provider_multi_phase::WeightInfo::<Runtime>::submit(SignedMaxSubmissions::get()),
+		// assume a solution of 100kb length.
+		100 * 1024
+	);
     // fallback: no need to do on-chain phragmen initially.
     pub const Fallback: pallet_election_provider_multi_phase::FallbackStrategy =
         pallet_election_provider_multi_phase::FallbackStrategy::OnChain;
@@ -577,8 +596,8 @@ impl pallet_election_provider_multi_phase::Config for Runtime {
 	type SolutionImprovementThreshold = SolutionImprovementThreshold;
 	type OffchainRepeat = OffchainRepeat;
 	type MinerMaxIterations = MinerMaxIterations;
-	type MinerMaxWeight = MinerMaxWeight;
-	type MinerMaxLength = MinerMaxLength;
+	type MinerMaxWeight = OffchainSolutionWeightLimit; // For now use the one from staking.
+	type MinerMaxLength = OffchainSolutionLengthLimit;
 	type MinerTxPriority = MultiPhaseUnsignedPriority;
 	type DataProvider = Staking;
 	type OnChainAccuracy = Perbill;
@@ -587,6 +606,14 @@ impl pallet_election_provider_multi_phase::Config for Runtime {
 	type WeightInfo = pallet_election_provider_multi_phase::weights::SubstrateWeight<Runtime>;
 	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
 	type BenchmarkingConfig = ();
+	type SignedMaxSubmissions = SignedMaxSubmissions;
+	type SignedMaxWeight = Self::MinerMaxWeight;
+	type SignedRewardBase = SignedRewardBase;
+	type SignedDepositBase = SignedDepositBase;
+	type SignedDepositByte = SignedDepositByte;
+	type SignedDepositWeight = ();
+	type SlashHandler = (); // burn slashes
+	type RewardHandler = (); // nothing to do upon rewards
 }
 
 parameter_types! {
@@ -730,7 +757,7 @@ construct_runtime!(
 		// Consensus stuff. The order of the pallets below are important and shall not change.
         Authorship: pallet_authorship::{Pallet, Call, Storage, Inherent} = 10,
 		Staking: pallet_staking::{Pallet, Call, Storage, Config<T>, Event<T>} = 11,
-        Offences: pallet_offences::{Pallet, Call, Storage, Event} = 12,
+        Offences: pallet_offences::{Pallet, Storage, Event} = 12,
         Historical: pallet_session_historical::{Pallet} = 13,
         Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>} = 14,
 		Aura: pallet_aura::{Pallet, Config<T>} = 15,
@@ -871,8 +898,9 @@ impl_runtime_apis! {
 		fn validate_transaction(
 			source: TransactionSource,
 			tx: <Block as BlockT>::Extrinsic,
+			block_hash: <Block as BlockT>::Hash
 		) -> TransactionValidity {
-			Executive::validate_transaction(source, tx)
+			Executive::validate_transaction(source, tx, block_hash)
 		}
 	}
 
