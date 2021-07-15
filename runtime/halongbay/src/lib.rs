@@ -1071,30 +1071,6 @@ impl_runtime_apis! {
 		}
 	}
 
-	// we just need one function to get but just put 4 in case we need more instance in future
-	impl pkfp_oracle_runtime_api::OracleApi<
-		Block,
-		AccountId,
-		CurrencyId,
-		TimeStampedPrice,
-	> for Runtime {
-		fn get(key: CurrencyId) -> Option<TimeStampedPrice> {
-			Oracle::get(&key)
-		}
-
-		fn get_polkafoundry(key: CurrencyId) -> Option<TimeStampedPrice> {
-			Oracle::get_concrete(&key, hex_literal::hex!("8455b1a4c0142f4054aa00540bbdd3377bc393a428540aa44ca20dc90de12a02").into())
-		}
-
-		fn get_concrete(key: CurrencyId, feeder: AccountId) -> Option<TimeStampedPrice> {
-			Oracle::get_concrete(&key, feeder)
-		}
-
-		fn get_all_values() -> Vec<(CurrencyId, Option<TimeStampedPrice>)> {
-			Oracle::get_all_values()
-		}
-	}
-
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn dispatch_benchmark(
