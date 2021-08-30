@@ -42,10 +42,7 @@ pallet-sudo = { default-features = false, git = 'https://github.com/paritytech/s
 pallet-timestamp = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
 pallet-transaction-payment = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
 pallet-transaction-payment-rpc-runtime-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
-pallet-election-provider-multi-phase = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
 pallet-session = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8', features = ["historical"] }
-pallet-im-online = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
-pallet-offences = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
 pallet-treasury = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
 
 sp-api = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
@@ -61,16 +58,13 @@ sp-std = { default-features = false, git = 'https://github.com/paritytech/substr
 sp-transaction-pool = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
 sp-version = { default-features = false, git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
 sp-npos-elections = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = 'polkadot-v0.9.8' }
-sp-staking = { default-features = false, git = 'https://github.com/paritytech/substrate', branch = 'polkadot-v0.9.8' }
 
 pallet-evm = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-ethereum = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-evm-precompile-simple = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-evm-precompile-sha3fips = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-evm-precompile-modexp = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
-pallet-crowdloan-rewards = { default-features = false, path = '../../pallets/crowdloan-rewards' }
-pallet-staking = { default-features = false, path = '../../pallets/staking' }
-pallet-staking-reward-curve = { path = '../../pallets/staking/reward-curve' }
+pallet-collator-selection = { git = "https://github.com/paritytech/cumulus", branch = "polkadot-v0.9.8", default-features = false }
 
 fp-rpc = { default-features = false, git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 
@@ -100,8 +94,6 @@ orml-currencies = { default-features = false, path = '../../pkfp/currencies' }
 orml-unknown-tokens = { default-features = false, path = '../../pkfp/unknown-tokens' }
 orml-traits = { default-features = false, path = '../../pkfp/traits' }
 orml-xcm-support = { default-features = false, path = '../../pkfp/xcm-support' }
-pkfp-oracle = { default-features = false, path = '../../pkfp/oracle' }
-pkfp-oracle-runtime-api = { default-features = false, path = '../../pkfp/oracle/rpc/runtime-api' }
 
 [features]
 default = ['std']
@@ -113,8 +105,6 @@ runtime-benchmarks = [
     'pallet-balances/runtime-benchmarks',
     'pallet-timestamp/runtime-benchmarks',
     'sp-runtime/runtime-benchmarks',
-    'pallet-staking/runtime-benchmarks',
-    'pkfp-oracle/runtime-benchmarks'
 ]
 std = [
     'codec/std',
@@ -123,15 +113,13 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'frame-system-rpc-runtime-api/std',
-    'frame-election-provider-support/std',
     'fp-rpc/std',
     'pallet-aura/std',
     'pallet-balances/std',
     'pallet-grandpa/std',
     'pallet-sudo/std',
     'pallet-session/std',
-    'pallet-im-online/std',
-    'pallet-offences/std',
+    'pallet-collator-selection/std',
     'pallet-timestamp/std',
     'pallet-transaction-payment/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
@@ -140,12 +128,7 @@ std = [
     'pallet-evm-precompile-simple/std',
     'pallet-evm-precompile-sha3fips/std',
     'pallet-ethereum/std',
-    'pallet-crowdloan-rewards/std',
-    'pallet-election-provider-multi-phase/std',
-    'pallet-staking/std',
     'pkfp-primitives/std',
-    'pkfp-oracle/std',
-    'pkfp-oracle-runtime-api/std',
     'orml-tokens/std',
     'orml-currencies/std',
     'orml-unknown-tokens/std',
@@ -160,7 +143,6 @@ std = [
     'sp-offchain/std',
     'sp-runtime/std',
     'sp-session/std',
-    'sp-staking/std',
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
@@ -182,6 +164,4 @@ std = [
     'runtime-common/std'
 ]
 try-runtime = [
-    "pallet-election-provider-multi-phase/try-runtime",
-    "pallet-staking/try-runtime",
 ]

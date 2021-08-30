@@ -93,6 +93,7 @@ fc-mapping-sync = { git = 'https://github.com/polkafoundry/frontier.git', branch
 
 frame-system-rpc-runtime-api = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
 pallet-transaction-payment-rpc-runtime-api = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
+pallet-collator-selection = { git = "https://github.com/paritytech/cumulus", branch = "polkadot-v0.9.8"  }
 
 cumulus-client-service = { git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.8' }
 cumulus-client-cli = { git = 'https://github.com/paritytech/cumulus.git', branch = 'polkadot-v0.9.8' }
@@ -113,9 +114,7 @@ polkadot-parachain = { git = 'https://github.com/paritytech/polkadot', branch = 
 
 pallet-evm = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
 pallet-ethereum = { git = 'https://github.com/polkafoundry/frontier.git', branch = 'polkasmith-v1.0.1' }
-pallet-im-online = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
 pallet-session = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8' }
-pallet-staking = { path = '../pallets/staking' }
 orml-tokens = { path = '../pkfp/tokens' }
 pkfp-oracle-rpc = { path = '../pkfp/oracle/rpc' }
 pkfp-primitives = { path = '../pkfp/primitives' }

@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use sc_service::ChainType;
 use sc_chain_spec::{Properties};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
 use runtime_primitives::AccountId;
 
 use sp_runtime::Perbill;
@@ -11,7 +10,7 @@ use sp_core::{
 };
 
 use halongbay_runtime as halongbay;
-use halongbay::{SessionKeys, StakerStatus};
+use halongbay::{SessionKeys};
 
 use crate::chain_spec::{Extensions};
 use hex_literal::hex;
@@ -24,41 +23,20 @@ pub fn halongbay_config() -> Result<HalongbayChainSpec, String> {
 	HalongbayChainSpec::from_json_bytes(&include_bytes!("../../res/halongbay.json")[..])
 }
 
-/// Helper function to generate stash, controller and session key
-pub fn authority_keys() -> (AccountId, AccountId, AuraId, ImOnlineId) {
+pub fn authority_keys() -> (AccountId, AuraId) {
 	(
 		hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(),
-		hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"].into(),
-		hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"].unchecked_into(),
 		hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"].unchecked_into(),
 	)
 }
 
-
-fn session_keys(aura: AuraId, im_online: ImOnlineId) -> SessionKeys {
-	SessionKeys { aura, im_online }
-}
-
 fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::GenesisConfig {
 	const ENDOWMENT: halongbay::Balance = 200_000_000 * halongbay::HLB;
-	const STASH: u128 = 1000 * halongbay::HLB;
 
 	let endowed_accounts = vec![
 		hex!["ea8e9d3cfedc8afec25785703681d424e6aba10b728927b89d87a3776b47ee32"].into(),
 	];
-	let authorities = vec![authority_keys()];
-	let stakers = authorities
-		.iter()
-		.map(|x| {
-			(
-				x.0.clone(),
-				x.1.clone(),
-				STASH,
-				StakerStatus::Validator,
-			)
-		})
-		.collect::<Vec<_>>();
-
+	let initial_authorities = vec![authority_keys()];
 
 	halongbay::GenesisConfig {
 		system: halongbay::SystemConfig {
@@ -78,35 +56,30 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 			accounts: BTreeMap::new(),
 		},
 		ethereum: halongbay::EthereumConfig {},
-		staking: halongbay::StakingConfig {
-			validator_count: 20,
-			minimum_validator_count: 1,
-			stakers,
-			invulnerables: authorities.iter().map(|x| x.0.clone()).collect(),
-			force_era: Default::default(),
-			slash_reward_fraction: Perbill::from_percent(10),
-			..Default::default()
-		},
 		session: halongbay::SessionConfig {
-			keys: authorities
+			keys: initial_authorities
 				.iter()
-				.map(|x| {
+				.cloned()
+				.map(|(acc, aura)| {
 					(
-						x.0.clone(),
-						x.0.clone(),
-						session_keys(x.2.clone(), x.3.clone()),
+						acc.clone(),          // account id
+						acc,                  // validator id
+						SessionKeys { aura }, // session keys
 					)
 				})
-				.collect::<Vec<_>>(),
+				.collect(),
 		},
 		// no need to pass anything to aura, in fact it will panic if we do. Session will take care
 		// of this.
 		aura: Default::default(),
 		aura_ext: Default::default(),
-		im_online: Default::default(),
 		treasury: Default::default(),
 		tokens: Default::default(),
-		oracle: Default::default()
+		collator_selection: halongbay::CollatorSelectionConfig {
+			desired_candidates: 200,
+			candidacy_bond: 1_000 * halongbay::HLB,
+			invulnerables: initial_authorities.iter().cloned().map(|(acc, _)| acc).collect(),
+		},
 	}
 }
 

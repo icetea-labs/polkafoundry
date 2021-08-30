@@ -67,13 +67,11 @@ pub fn create_full<C, P, BE>(
 	C: HeaderBackend<Block> + HeaderMetadata<Block, Error=BlockChainError>,
 	C: Send + Sync + 'static,
 	C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
-	C::Api: pkfp_oracle_rpc::OracleRuntimeApi<Block, AccountId, pkfp_primitives::CurrencyId, runtime_common::TimeStampedPrice>,
 	C::Api: BlockBuilder<Block>,
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
 	C::Api: fp_rpc::EthereumRuntimeRPCApi<Block>,
 	P: TransactionPool<Block=Block> + 'static,
 {
-	use pkfp_oracle_rpc::{Oracle, OracleApi};
 
 	let mut io = jsonrpc_core::IoHandler::default();
 	let FullDeps {
@@ -151,7 +149,6 @@ pub fn create_full<C, P, BE>(
 		_ => {
 			#[cfg(feature = "halongbay")]
 				{
-					io.extend_with(OracleApi::to_delegate(Oracle::new(client.clone())));
 					io.extend_with(EthApiServer::to_delegate(EthApi::new(
 						client.clone(),
 						pool.clone(),

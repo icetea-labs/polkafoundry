@@ -1,7 +1,7 @@
 {
   "relaychain": {
     "bin": "../../polkadot/target/release/polkadot",
-    "chain": "rococo-local",
+    "chain": "kusama-local",
     "nodes": [
       {
         "name": "alice",
@@ -12,6 +12,16 @@
         "name": "bob",
         "wsPort": 9955,
         "port": 30555
+      },
+      {
+        "name": "charlie",
+        "wsPort": 9966,
+        "port": 30666
+      },
+      {
+        "name": "dave",
+        "wsPort": 9977,
+        "port": 30777
       }
     ],
     "runtime_genesis_config": {
@@ -36,7 +46,6 @@
           "flags": [
             "--rpc-cors=all",
             "--rpc-methods=unsafe",
-            "--force-authoring",
             "--",
             "--execution=wasm"
           ]
