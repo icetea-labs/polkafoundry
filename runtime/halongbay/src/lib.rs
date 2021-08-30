@@ -48,8 +48,6 @@ use orml_xcm_support::{MultiCurrencyAdapter, IsNativeConcrete};
 // A few exports that help ease life for downstream crates.
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-use pallet_im_online::sr25519::AuthorityId as ImOnlineId;
-pub use pallet_staking::StakerStatus;
 pub use pallet_timestamp::Call as TimestampCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{
@@ -66,7 +64,6 @@ pub use frame_support::{
 	},
 	ConsensusEngineId
 };
-use pallet_session::historical as pallet_session_historical;
 
 pub use runtime_primitives::{
 	AccountId, AccountIndex, Balance, BlockNumber,
@@ -85,7 +82,6 @@ use runtime_common::{
 	OffchainSolutionLengthLimit, OffchainSolutionWeightLimit,
 	elections::fee_for_submit_call
 };
-use pallet_election_provider_multi_phase::WeightInfo;
 
 // Weights used in the runtime.
 mod weights;
@@ -115,7 +111,6 @@ pub fn native_version() -> NativeVersion {
 impl_opaque_keys! {
 	pub struct SessionKeys {
 	    pub aura: Aura,
-        pub im_online: ImOnline,
 	}
 }
 
@@ -449,29 +444,9 @@ impl pallet_authorship::Config for Runtime {
 	type FindAuthor = pallet_session::FindAccountFromAuthorIndex<Self, Aura>;
 	type UncleGenerations = UncleGenerations;
 	type FilterUncle = ();
-	type EventHandler = (Staking, ImOnline);
+	type EventHandler = (CollatorSelection,);
 }
 
-parameter_types! {
-    pub const ImOnlineUnsignedPriority: TransactionPriority = TransactionPriority::max_value();
-    pub const StakingUnsignedPriority: TransactionPriority = TransactionPriority::max_value() / 2;
-}
-
-impl pallet_im_online::Config for Runtime {
-	type AuthorityId = ImOnlineId;
-	type Event = Event;
-	type NextSessionRotation = pallet_session::PeriodicSessions<SessionPeriod, SessionOffset>;
-	type ValidatorSet = Historical;
-	type ReportUnresponsiveness = Offences;
-	type UnsignedPriority = ImOnlineUnsignedPriority;
-	type WeightInfo = pallet_im_online::weights::SubstrateWeight<Runtime>;
-}
-
-impl pallet_offences::Config for Runtime {
-	type Event = Event;
-	type IdentificationTuple = pallet_session::historical::IdentificationTuple<Self>;
-	type OnOffenceHandler = Staking;
-}
 
 parameter_types! {
     pub const DisabledValidatorsThreshold: Perbill = Perbill::from_percent(17);
@@ -482,138 +457,37 @@ parameter_types! {
 impl pallet_session::Config for Runtime {
 	type Event = Event;
 	type ValidatorId = <Self as frame_system::Config>::AccountId;
-	type ValidatorIdOf = pallet_staking::StashOf<Self>;
+	type ValidatorIdOf = pallet_collator_selection::IdentityCollator;
 	type ShouldEndSession = pallet_session::PeriodicSessions<SessionPeriod, SessionOffset>;
 	type NextSessionRotation = pallet_session::PeriodicSessions<SessionPeriod, SessionOffset>;
-	type SessionManager = pallet_session::historical::NoteHistoricalRoot<Self, Staking>;
+	type SessionManager = CollatorSelection;
 	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type Keys = SessionKeys;
 	type DisabledValidatorsThreshold = DisabledValidatorsThreshold;
 	type WeightInfo = pallet_session::weights::SubstrateWeight<Runtime>;
 }
 
-impl pallet_session::historical::Config for Runtime {
-	type FullIdentification = pallet_staking::Exposure<AccountId, Balance>;
-	type FullIdentificationOf = pallet_staking::ExposureOf<Runtime>;
-}
-
-pallet_staking_reward_curve::build! {
-    const REWARD_CURVE: PiecewiseLinear<'static> = curve!(
-		min_inflation: 0_025_000,
-		max_inflation: 0_100_000,
-		ideal_stake: 0_500_000,
-		falloff: 0_050_000,
-		max_piece_count: 40,
-		test_precision: 0_005_000,
-    );
-}
-
 parameter_types! {
-    pub const SessionsPerEra: sp_staking::SessionIndex = 1;
-    pub const BondingDuration: pallet_staking::EraIndex = 24 * 28;
-    pub const SlashDeferDuration: pallet_staking::EraIndex = 24 * 7; // 1/4 the bonding duration.
-    pub const RewardCurve: &'static PiecewiseLinear<'static> = &REWARD_CURVE;
-    pub const MaxNominatorRewardedPerValidator: u32 = 256;
-    pub OffchainRepeat: BlockNumber = 5;
-}
-pub const MAX_NOMINATIONS: u32 =
-	<NposCompactSolution16 as sp_npos_elections::CompactSolution>::LIMIT as u32;
-
-impl pallet_staking::Config for Runtime {
-	const MAX_NOMINATIONS: u32 = MAX_NOMINATIONS;
-	type Currency = Balances;
-	type UnixTime = Timestamp;
-	type CurrencyToVote = U128CurrencyToVote;
-	type RewardRemainder = Treasury;
-	type Event = Event;
-	type Slash = Treasury; // send the slashed funds to the treasury.
-	type Reward = (); // rewards are minted from the void
-	type SessionsPerEra = SessionsPerEra;
-	type BondingDuration = BondingDuration;
-	type SlashDeferDuration = SlashDeferDuration;
-	/// A super-majority of the council can cancel the slash.
-	type SlashCancelOrigin = frame_system::EnsureRoot<AccountId>;
-	type SessionInterface = Self;
-	type EraPayout = pallet_staking::ConvertCurve<RewardCurve>;
-	type NextNewSession = Session;
-	type MaxNominatorRewardedPerValidator = MaxNominatorRewardedPerValidator;
-	type ElectionProvider = ElectionProviderMultiPhase;
-	type GenesisElectionProvider =
-	OnChainSequentialPhragmen<pallet_election_provider_multi_phase::OnChainConfig<Self>>;
-	type WeightInfo = pallet_staking::weights::SubstrateWeight<Runtime>;
+    pub const PotId: PalletId = PalletId(*b"PotStake");
+    pub const MaxCandidates: u32 = 200;
+    pub const MinCandidates: u32 = 5;
+    pub const MaxInvulnerables: u32 = 20;
 }
 
-sp_npos_elections::generate_solution_type!(
-    #[compact]
-    pub struct NposCompactSolution16::<
-        VoterIndex = u32,
-        TargetIndex = u16,
-        Accuracy = sp_runtime::PerU16,
-    >(16)
-);
-
-parameter_types! {
-    // phase durations. 1/4 of the last session for each.
-    pub const SignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
-    pub const UnsignedPhase: u32 = EPOCH_DURATION_IN_BLOCKS / 4;
-
-	// signed config
-	pub const SignedMaxSubmissions: u32 = 16;
-	pub const SignedDepositBase: Balance = deposit(1, 0);
-	// A typical solution occupies within an order of magnitude of 50kb.
-	// This formula is currently adjusted such that a typical solution will spend an amount equal
-	// to the base deposit for every 50 kb.
-	pub const SignedDepositByte: Balance = deposit(1, 0) / (50 * 1024);
-	pub SignedRewardBase: Balance = fee_for_submit_call::<Runtime>(
-		// give 20% threshold.
-		sp_runtime::FixedU128::saturating_from_rational(12, 10),
-		// maximum weight possible.
-		weights::pallet_election_provider_multi_phase::WeightInfo::<Runtime>::submit(SignedMaxSubmissions::get()),
-		// assume a solution of 100kb length.
-		100 * 1024
-	);
-    // fallback: no need to do on-chain phragmen initially.
-    pub const Fallback: pallet_election_provider_multi_phase::FallbackStrategy =
-        pallet_election_provider_multi_phase::FallbackStrategy::OnChain;
-    pub SolutionImprovementThreshold: Perbill = Perbill::from_rational(1u32, 10_000);
-    // miner configs
-    pub const MultiPhaseUnsignedPriority: TransactionPriority = StakingUnsignedPriority::get() - 1u64;
-    pub const MinerMaxIterations: u32 = 10;
-    pub MinerMaxWeight: Weight = BlockWeights::get()
-        .get(DispatchClass::Normal)
-        .max_extrinsic.expect("Normal extrinsics have a weight limit configured; qed")
-        .saturating_sub(BlockExecutionWeight::get());
-    // Solution can occupy 90% of normal block size
-    pub MinerMaxLength: u32 = Perbill::from_rational(9u32, 10) *
-        * BlockLength::get().max.get(DispatchClass::Normal);
-}
-
-impl pallet_election_provider_multi_phase::Config for Runtime {
+impl pallet_collator_selection::Config for Runtime {
 	type Event = Event;
 	type Currency = Balances;
-	type SignedPhase = SignedPhase;
-	type UnsignedPhase = UnsignedPhase;
-	type SolutionImprovementThreshold = SolutionImprovementThreshold;
-	type OffchainRepeat = OffchainRepeat;
-	type MinerMaxIterations = MinerMaxIterations;
-	type MinerMaxWeight = OffchainSolutionWeightLimit; // For now use the one from staking.
-	type MinerMaxLength = OffchainSolutionLengthLimit;
-	type MinerTxPriority = MultiPhaseUnsignedPriority;
-	type DataProvider = Staking;
-	type OnChainAccuracy = Perbill;
-	type CompactSolution = NposCompactSolution16;
-	type Fallback = Fallback;
-	type WeightInfo = pallet_election_provider_multi_phase::weights::SubstrateWeight<Runtime>;
-	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
-	type BenchmarkingConfig = ();
-	type SignedMaxSubmissions = SignedMaxSubmissions;
-	type SignedMaxWeight = Self::MinerMaxWeight;
-	type SignedRewardBase = SignedRewardBase;
-	type SignedDepositBase = SignedDepositBase;
-	type SignedDepositByte = SignedDepositByte;
-	type SignedDepositWeight = ();
-	type SlashHandler = (); // burn slashes
-	type RewardHandler = (); // nothing to do upon rewards
+	type UpdateOrigin = frame_system::EnsureRoot<AccountId>;
+	type PotId = PotId;
+	type MaxCandidates = MaxCandidates;
+	type MinCandidates = MinCandidates;
+	type MaxInvulnerables = MaxInvulnerables;
+	// should be a multiple of session or things will get inconsistent
+	type KickThreshold = SessionPeriod;
+	type ValidatorId = <Self as frame_system::Config>::AccountId;
+	type ValidatorIdOf = pallet_collator_selection::IdentityCollator;
+	type ValidatorRegistration = Session;
+	type WeightInfo = ();
 }
 
 parameter_types! {
@@ -724,23 +598,6 @@ impl orml_unknown_tokens::Config for Runtime {
 	type Event = Event;
 }
 
-parameter_types! {
-	pub const MinimumCount: u32 = 1;
-	pub const ExpiresIn: Moment = 1000 * 60 * 60; // 60 mins
-	pub const OracleFee: u128 = 1_000_000_000_000_000;
-}
-
-type OracleInstance1 = pkfp_oracle::Instance1;
-impl pkfp_oracle::Config<OracleInstance1> for Runtime {
-	type Event = Event;
-	type Time = Timestamp;
-	type FeedKey = CurrencyId;
-	type FeedValue = Price;
-	type CombineData = pkfp_oracle::DefaultCombineData<Runtime, MinimumCount, ExpiresIn, OracleInstance1>;
-	type Currency = Balances;
-	type OracleFee = OracleFee;
-}
-
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -756,19 +613,13 @@ construct_runtime!(
 
 		// Consensus stuff. The order of the pallets below are important and shall not change.
         Authorship: pallet_authorship::{Pallet, Call, Storage, Inherent} = 10,
-		Staking: pallet_staking::{Pallet, Call, Storage, Config<T>, Event<T>} = 11,
-        Offences: pallet_offences::{Pallet, Storage, Event} = 12,
-        Historical: pallet_session_historical::{Pallet} = 13,
-        Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>} = 14,
-		Aura: pallet_aura::{Pallet, Config<T>} = 15,
-		AuraExt: cumulus_pallet_aura_ext::{Pallet, Config} = 16,
-        ImOnline: pallet_im_online::{Pallet, Call, Storage, Event<T>, ValidateUnsigned, Config<T>} = 17,
+        CollatorSelection: pallet_collator_selection::{Pallet, Call, Storage, Event<T>, Config<T>} = 11,
+        Session: pallet_session::{Pallet, Call, Storage, Event, Config<T>} = 12,
+		Aura: pallet_aura::{Pallet, Config<T>} = 13,
+		AuraExt: cumulus_pallet_aura_ext::{Pallet, Config} = 14,
 
 		// Treasury
 		Treasury: pallet_treasury::{Pallet, Call, Storage, Config, Event<T>} = 18,
-
-		// Election pallet. Only works with staking, but placed here to maintain indices.
-		ElectionProviderMultiPhase: pallet_election_provider_multi_phase::{Pallet, Call, Storage, Event<T>, ValidateUnsigned} = 19,
 
 		//SmartContract
 		EVM: pallet_evm::{Pallet, Call, Storage, Config, Event<T>} = 30,
@@ -791,9 +642,6 @@ construct_runtime!(
 		Tokens: orml_tokens::{Pallet, Call, Storage, Event<T>, Config<T>} = 70,
 		Currencies: orml_currencies::{Pallet, Call, Event<T>} = 71,
 		UnknownTokens: orml_unknown_tokens::{Pallet, Storage, Event} = 72,
-
-		// Pkfp modules
-		Oracle: pkfp_oracle::<Instance1>::{Pallet, Call, Storage, Event<T>, Config<T>} = 80,
 
 		Spambot: cumulus_ping::{Pallet, Call, Storage, Event<T>} = 99,
 	}
@@ -1068,30 +916,6 @@ impl_runtime_apis! {
 			len: u32,
 		) -> pallet_transaction_payment::FeeDetails<Balance> {
 			TransactionPayment::query_fee_details(uxt, len)
-		}
-	}
-
-	// we just need one function to get but just put 4 in case we need more instance in future
-	impl pkfp_oracle_runtime_api::OracleApi<
-		Block,
-		AccountId,
-		CurrencyId,
-		TimeStampedPrice,
-	> for Runtime {
-		fn get(key: CurrencyId) -> Option<TimeStampedPrice> {
-			Oracle::get(&key)
-		}
-
-		fn get_polkafoundry(key: CurrencyId) -> Option<TimeStampedPrice> {
-			Oracle::get_concrete(&key, hex_literal::hex!("8455b1a4c0142f4054aa00540bbdd3377bc393a428540aa44ca20dc90de12a02").into())
-		}
-
-		fn get_concrete(key: CurrencyId, feeder: AccountId) -> Option<TimeStampedPrice> {
-			Oracle::get_concrete(&key, feeder)
-		}
-
-		fn get_all_values() -> Vec<(CurrencyId, Option<TimeStampedPrice>)> {
-			Oracle::get_all_values()
 		}
 	}
 
