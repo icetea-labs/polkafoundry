@@ -11,6 +11,8 @@ RUN useradd -m -u 1000 -U -s /bin/sh -d /polkafoundry polkafoundry && \
 USER polkafoundry
 
 COPY --chown=polkafoundry bin/polkafoundry /polkafoundry/polkafoundry
+COPY --chown=polkafoundry node/res/halongbay.json /polkafoundry/halongbay.json
+COPY --chown=polkafoundry node/res/kusama-local.json /polkafoundry/kusama-local.json
 
 RUN chmod uog+x /polkafoundry/polkafoundry
 
