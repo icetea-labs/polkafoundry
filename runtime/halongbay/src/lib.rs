@@ -7,7 +7,7 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use frame_election_provider_support::onchain::OnChainSequentialPhragmen;
-use sp_std::{prelude::*, marker::PhantomData};
+use sp_std::{prelude::*, marker::PhantomData, convert::TryFrom};
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata, U256, H160, H256};
 use sp_runtime::{
 	curve::PiecewiseLinear,
@@ -78,7 +78,7 @@ use orml_traits::{
 };
 
 use runtime_common::{
-	BlockHashCount, BlockWeights, BlockLength, MAXIMUM_BLOCK_WEIGHT, DealWithFees, TimeStampedPrice,
+	BlockHashCount, BlockWeights, BlockLength, NORMAL_DISPATCH_RATIO, MAXIMUM_BLOCK_WEIGHT, DealWithFees, TimeStampedPrice,
 	OffchainSolutionLengthLimit, OffchainSolutionWeightLimit,
 	elections::fee_for_submit_call
 };
@@ -379,7 +379,8 @@ impl cumulus_ping::Config for Runtime {
 }
 
 parameter_types! {
-	pub BlockGasLimit: U256 = U256::from(u32::max_value());
+	pub BlockGasLimit: U256
+		= U256::from(NORMAL_DISPATCH_RATIO * MAXIMUM_BLOCK_WEIGHT / WEIGHT_PER_GAS);
 }
 pub struct EthereumFindAuthor<F>(PhantomData<F>);
 impl<F: FindAuthor<u32>> FindAuthor<H160> for EthereumFindAuthor<F>
@@ -412,9 +413,20 @@ impl FeeCalculator for FixedGasPrice {
 	}
 }
 
+pub struct PKFGasWeightMapping;
+
+impl pallet_evm::GasWeightMapping for PKFGasWeightMapping {
+	fn gas_to_weight(gas: u64) -> Weight {
+		gas.saturating_mul(WEIGHT_PER_GAS)
+	}
+	fn weight_to_gas(weight: Weight) -> u64 {
+		u64::try_from(weight.wrapping_div(WEIGHT_PER_GAS)).unwrap_or(u32::MAX as u64)
+	}
+}
+
 impl pallet_evm::Config for Runtime {
 	type FeeCalculator = FixedGasPrice;
-	type GasWeightMapping = ();
+	type GasWeightMapping = PKFGasWeightMapping;
 	type CallOrigin = EnsureAddressTruncated;
 	type WithdrawOrigin = EnsureAddressTruncated;
 	type AddressMapping = HashedAddressMapping<BlakeTwo256>;
