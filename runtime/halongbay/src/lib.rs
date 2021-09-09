@@ -30,6 +30,8 @@ use fp_rpc::TransactionStatus;
 use pallet_evm::{
 	Account as EVMAccount, FeeCalculator, EnsureAddressTruncated, HashedAddressMapping, Runner
 };
+use pallet_ethereum::Transaction as EthereumTransaction;
+use pallet_ethereum::Call::transact;
 use polkadot_parachain::primitives::Sibling;
 
 // XCM imports
@@ -398,7 +400,6 @@ impl<F: FindAuthor<u32>> FindAuthor<H160> for EthereumFindAuthor<F>
 
 impl pallet_ethereum::Config for Runtime {
 	type Event = Event;
-	type FindAuthor = EthereumFindAuthor<Aura>;
 	type StateRoot = pallet_ethereum::IntermediateStateRoot;
 }
 
@@ -427,6 +428,7 @@ impl pallet_evm::GasWeightMapping for PKFGasWeightMapping {
 impl pallet_evm::Config for Runtime {
 	type FeeCalculator = FixedGasPrice;
 	type GasWeightMapping = PKFGasWeightMapping;
+	type BlockHashMapping = pallet_ethereum::EthereumBlockHashMapping;
 	type CallOrigin = EnsureAddressTruncated;
 	type WithdrawOrigin = EnsureAddressTruncated;
 	type AddressMapping = HashedAddressMapping<BlakeTwo256>;
@@ -446,6 +448,7 @@ impl pallet_evm::Config for Runtime {
 	type ChainId = ChainId;
 	type BlockGasLimit = BlockGasLimit;
 	type OnChargeTransaction = ();
+	type FindAuthor = EthereumFindAuthor<Aura>;
 }
 
 parameter_types! {
@@ -816,7 +819,7 @@ impl_runtime_apis! {
 		}
 
 		fn author() -> H160 {
-			Ethereum::find_author()
+			<pallet_evm::Pallet<Runtime>>::find_author()
 		}
 
 		fn storage_at(address: H160, index: U256) -> H256 {
@@ -906,6 +909,15 @@ impl_runtime_apis! {
 				Ethereum::current_receipts(),
 				Ethereum::current_transaction_statuses()
 			)
+		}
+
+		fn extrinsic_filter(
+				xts: Vec<<Block as BlockT>::Extrinsic>,
+		) -> Vec<EthereumTransaction> {
+			xts.into_iter().filter_map(|xt| match xt.function {
+				Call::Ethereum(transact(t)) => Some(t),
+				_ => None
+			}).collect::<Vec<EthereumTransaction>>()
 		}
 	}
 

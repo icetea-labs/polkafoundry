@@ -36,7 +36,7 @@ use futures::{Stream, StreamExt};
 use fc_rpc_core::types::{FilterPool, PendingTransactions};
 use fc_consensus::FrontierBlockImport;
 use fc_rpc::EthTask;
-use fc_mapping_sync::MappingSyncWorker;
+use fc_mapping_sync::{MappingSyncWorker, SyncStrategy};
 
 use runtime_primitives::{Block, Hash};
 use cumulus_client_consensus_aura::{build_aura_consensus, BuildAuraConsensusParams, SlotProportion};
@@ -58,7 +58,6 @@ pub use polkasmith_runtime;
 #[cfg(feature = "halongbay")]
 pub use halongbay_runtime;
 use codec::{Decode};
-
 // Our native executor instance.
 #[cfg(feature = "polkafoundry")]
 native_executor_instance!(
@@ -432,6 +431,7 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 			client.clone(),
 			backend.clone(),
 			frontier_backend.clone(),
+			SyncStrategy::Parachain,
 		).for_each(|()| futures::future::ready(()))
 	);
 
@@ -714,6 +714,7 @@ pub fn start_dev(
 			client.clone(),
 			backend.clone(),
 			frontier_backend.clone(),
+			SyncStrategy::Parachain,
 		).for_each(|()| futures::future::ready(()))
 	);
 
