@@ -4,7 +4,7 @@ use std::{sync::Arc};
 use std::collections::BTreeMap;
 
 use sp_api::ProvideRuntimeApi;
-use sp_transaction_pool::TransactionPool;
+use sc_transaction_pool_api::TransactionPool;
 use sp_blockchain::{Error as BlockChainError, HeaderMetadata, HeaderBackend};
 use sp_runtime::traits::BlakeTwo256;
 use sp_block_builder::BlockBuilder;
@@ -19,13 +19,13 @@ use sc_network::NetworkService;
 use sc_consensus_manual_seal::rpc::{ManualSeal, ManualSealApi};
 use substrate_frame_rpc_system::{FullSystem, SystemApi};
 use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApi};
-use pallet_ethereum::EthereumStorageSchema;
+// use pallet_ethereum::EthereumStorageSchema;
 
-use fc_rpc::{
-	EthApi, EthApiServer, EthFilterApi, EthFilterApiServer, EthPubSubApi, EthPubSubApiServer, HexEncodedIdProvider, NetApi, NetApiServer, OverrideHandle, RuntimeApiStorageOverride,
-	SchemaV1Override, StorageOverride, Web3Api, Web3ApiServer,
-};
-use fc_rpc_core::types::{PendingTransactions, FilterPool};
+// use fc_rpc::{
+// 	EthApi, EthApiServer, EthFilterApi, EthFilterApiServer, EthPubSubApi, EthPubSubApiServer, HexEncodedIdProvider, NetApi, NetApiServer, OverrideHandle, RuntimeApiStorageOverride,
+// 	SchemaV1Override, StorageOverride, Web3Api, Web3ApiServer,
+// };
+// use fc_rpc_core::types::{PendingTransactions, FilterPool};
 use jsonrpc_pubsub::manager::SubscriptionManager;
 use runtime_primitives::{Hash, AccountId, Index, Block, Balance};
 use crate::cli;
@@ -43,13 +43,13 @@ pub struct FullDeps<C, P> {
 	/// Network service
 	pub network: Arc<NetworkService<Block, Hash>>,
 	/// Ethereum pending transactions.
-	pub pending_transactions: PendingTransactions,
+	// pub pending_transactions: PendingTransactions,
 	/// EthFilterApi pool.
-	pub filter_pool: Option<FilterPool>,
+	// pub filter_pool: Option<FilterPool>,
 	/// Manual seal command sink
 	pub command_sink: Option<futures::channel::mpsc::Sender<sc_consensus_manual_seal::rpc::EngineCommand<Hash>>>,
 	/// Frontier Backend.
-	pub frontier_backend: Arc<fc_db::Backend<Block>>,
+	// pub frontier_backend: Arc<fc_db::Backend<Block>>,
 	/// Maximum number of logs in a query.
 	pub max_past_logs: u32,
 }
@@ -69,7 +69,7 @@ pub fn create_full<C, P, BE>(
 	C::Api: substrate_frame_rpc_system::AccountNonceApi<Block, AccountId, Index>,
 	C::Api: BlockBuilder<Block>,
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
-	C::Api: fp_rpc::EthereumRuntimeRPCApi<Block>,
+	// C::Api: fp_rpc::EthereumRuntimeRPCApi<Block>,
 	P: TransactionPool<Block=Block> + 'static,
 {
 
@@ -80,23 +80,23 @@ pub fn create_full<C, P, BE>(
 		deny_unsafe,
 		is_authority,
 		network,
-		pending_transactions,
-		filter_pool,
+		// pending_transactions,
+		// filter_pool,
 		command_sink,
-		frontier_backend,
+		// frontier_backend,
 		max_past_logs,
 	} = deps;
 
-	let mut overrides_map = BTreeMap::new();
-	overrides_map.insert(
-		EthereumStorageSchema::V1,
-		Box::new(SchemaV1Override::new(client.clone())) as Box<dyn StorageOverride<_> + Send + Sync>
-	);
+	// let mut overrides_map = BTreeMap::new();
+	// overrides_map.insert(
+	// 	EthereumStorageSchema::V1,
+	// 	Box::new(SchemaV1Override::new(client.clone())) as Box<dyn StorageOverride<_> + Send + Sync>
+	// );
 
-	let overrides = Arc::new(OverrideHandle {
-		schemas: overrides_map,
-		fallback: Box::new(RuntimeApiStorageOverride::new(client.clone())),
-	});
+	// let overrides = Arc::new(OverrideHandle {
+	// 	schemas: overrides_map,
+	// 	fallback: Box::new(RuntimeApiStorageOverride::new(client.clone())),
+	// });
 
 	io.extend_with(
 		SystemApi::to_delegate(FullSystem::new(client.clone(), pool.clone(), deny_unsafe))
@@ -105,108 +105,108 @@ pub fn create_full<C, P, BE>(
 		TransactionPaymentApi::to_delegate(TransactionPayment::new(client.clone()))
 	);
 
-	let signers = Vec::new();
+	// let signers = Vec::new();
 
-	match runtime {
-		Some(cli::ForceChain::PolkaFoundry) => {
-			#[cfg(feature = "polkafoundry")]
-				{
-					io.extend_with(EthApiServer::to_delegate(EthApi::new(
-						client.clone(),
-						pool.clone(),
-						polkafoundry_runtime::TransactionConverter,
-						network.clone(),
-						pending_transactions,
-						signers,
-						overrides.clone(),
-						frontier_backend,
-						is_authority,
-						max_past_logs,
-					)));
-				}
-			#[cfg(not(feature = "polkafoundry"))]
-			panic!("PolkaFoundry runtime is not available. Please compile the node with `--features polkafoundry` to enable it.");
-		}
-		Some(cli::ForceChain::PolkaSmith) => {
-			#[cfg(feature = "polkasmith")]
-				{
-					io.extend_with(EthApiServer::to_delegate(EthApi::new(
-						client.clone(),
-						pool.clone(),
-						polkasmith_runtime::TransactionConverter,
-						network.clone(),
-						pending_transactions,
-						signers,
-						overrides.clone(),
-						frontier_backend,
-						is_authority,
-						max_past_logs,
-					)));
-				}
-			#[cfg(not(feature = "polkasmith"))]
-			panic!("PolkaSmith runtime is not available. Please compile the node with `--features polkasmith` to enable it.");
-		},
-		_ => {
-			#[cfg(feature = "halongbay")]
-				{
-					io.extend_with(EthApiServer::to_delegate(EthApi::new(
-						client.clone(),
-						pool.clone(),
-						halongbay_runtime::TransactionConverter,
-						network.clone(),
-						pending_transactions,
-						signers,
-						overrides.clone(),
-						frontier_backend,
-						is_authority,
-						max_past_logs,
-					)));
-				}
-			#[cfg(not(feature = "halongbay"))]
-			panic!("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.");
-		}
-	}
+	// match runtime {
+	// 	Some(cli::ForceChain::PolkaFoundry) => {
+	// 		#[cfg(feature = "polkafoundry")]
+	// 			{
+	// 				io.extend_with(EthApiServer::to_delegate(EthApi::new(
+	// 					client.clone(),
+	// 					pool.clone(),
+	// 					polkafoundry_runtime::TransactionConverter,
+	// 					network.clone(),
+	// 					pending_transactions,
+	// 					signers,
+	// 					overrides.clone(),
+	// 					frontier_backend,
+	// 					is_authority,
+	// 					max_past_logs,
+	// 				)));
+	// 			}
+	// 		#[cfg(not(feature = "polkafoundry"))]
+	// 		panic!("PolkaFoundry runtime is not available. Please compile the node with `--features polkafoundry` to enable it.");
+	// 	}
+	// 	Some(cli::ForceChain::PolkaSmith) => {
+	// 		#[cfg(feature = "polkasmith")]
+	// 			{
+	// 				io.extend_with(EthApiServer::to_delegate(EthApi::new(
+	// 					client.clone(),
+	// 					pool.clone(),
+	// 					polkasmith_runtime::TransactionConverter,
+	// 					network.clone(),
+	// 					pending_transactions,
+	// 					signers,
+	// 					overrides.clone(),
+	// 					frontier_backend,
+	// 					is_authority,
+	// 					max_past_logs,
+	// 				)));
+	// 			}
+	// 		#[cfg(not(feature = "polkasmith"))]
+	// 		panic!("PolkaSmith runtime is not available. Please compile the node with `--features polkasmith` to enable it.");
+	// 	},
+	// 	_ => {
+	// 		#[cfg(feature = "halongbay")]
+	// 			{
+	// 				io.extend_with(EthApiServer::to_delegate(EthApi::new(
+	// 					client.clone(),
+	// 					pool.clone(),
+	// 					halongbay_runtime::TransactionConverter,
+	// 					network.clone(),
+	// 					pending_transactions,
+	// 					signers,
+	// 					overrides.clone(),
+	// 					frontier_backend,
+	// 					is_authority,
+	// 					max_past_logs,
+	// 				)));
+	// 			}
+	// 		#[cfg(not(feature = "halongbay"))]
+	// 		panic!("Halongbay runtime is not available. Please compile the node with `--features halongbay` to enable it.");
+	// 	}
+	// }
+	//
+	// if let Some(filter_pool) = filter_pool {
+	// 	io.extend_with(
+	// 		EthFilterApiServer::to_delegate(EthFilterApi::new(
+	// 			client.clone(),
+	// 			filter_pool.clone(),
+	// 			500 as usize, // max stored filters
+	// 			overrides.clone(),
+	// 			max_past_logs,
+	// 		))
+	// 	);
+	// }
 
-	if let Some(filter_pool) = filter_pool {
-		io.extend_with(
-			EthFilterApiServer::to_delegate(EthFilterApi::new(
-				client.clone(),
-				filter_pool.clone(),
-				500 as usize, // max stored filters
-				overrides.clone(),
-				max_past_logs,
-			))
-		);
-	}
+	// io.extend_with(
+	// 	NetApiServer::to_delegate(NetApi::new(
+	// 		client.clone(),
+	// 		network.clone(),
+	// 		// Whether to format the `peer_count` response as Hex (default) or not.
+	// 		true,
+	// 	))
+	// );
 
-	io.extend_with(
-		NetApiServer::to_delegate(NetApi::new(
-			client.clone(),
-			network.clone(),
-			// Whether to format the `peer_count` response as Hex (default) or not.
-			true,
-		))
-	);
-
-	io.extend_with(
-		Web3ApiServer::to_delegate(Web3Api::new(
-			client.clone(),
-		))
-	);
-
-	io.extend_with(
-		EthPubSubApiServer::to_delegate(EthPubSubApi::new(
-			pool.clone(),
-			client.clone(),
-			network.clone(),
-			SubscriptionManager::<HexEncodedIdProvider>::with_id_provider(
-				HexEncodedIdProvider::default(),
-				Arc::new(subscription_task_executor)
-			),
-			overrides
-		))
-	);
-
+	// io.extend_with(
+	// 	Web3ApiServer::to_delegate(Web3Api::new(
+	// 		client.clone(),
+	// 	))
+	// );
+	//
+	// io.extend_with(
+	// 	EthPubSubApiServer::to_delegate(EthPubSubApi::new(
+	// 		pool.clone(),
+	// 		client.clone(),
+	// 		network.clone(),
+	// 		SubscriptionManager::<HexEncodedIdProvider>::with_id_provider(
+	// 			HexEncodedIdProvider::default(),
+	// 			Arc::new(subscription_task_executor)
+	// 		),
+	// 		overrides
+	// 	))
+	// );
+	//
 	match command_sink {
 		Some(command_sink) => {
 			io.extend_with(

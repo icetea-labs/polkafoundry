@@ -35,10 +35,10 @@ fn polkasmith_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkasmith::
 		},
 		sudo: polkasmith::SudoConfig { key: endowed_accounts[0].clone() },
 		parachain_info: polkasmith::ParachainInfoConfig { parachain_id: 2009.into() },
-		evm: polkasmith::EVMConfig {
-			accounts: BTreeMap::new(),
-		},
-		ethereum: polkasmith::EthereumConfig {},
+		// evm: polkasmith::EVMConfig {
+		// 	accounts: BTreeMap::new(),
+		// },
+		// ethereum: polkasmith::EthereumConfig {},
 		aura: polkasmith::AuraConfig {
 			authorities: vec![
 				hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"]

@@ -134,6 +134,17 @@ impl sc_client_api::StorageProvider<Block, crate::service::FullBackend> for Clie
 		}
 	}
 
+	fn child_storage_keys_iter<'a>(&self, id: &BlockId<Block>, child_info: ChildInfo, prefix: Option<&'a StorageKey>, start_key: Option<&StorageKey>) -> sp_blockchain::Result<KeyIterator<'a, <crate::service::FullBackend as sc_client_api::Backend<Block>>::State, Block>> {
+		match self {
+			#[cfg(feature = "polkafoundry")]
+			Self::PolkaFoundry(client) => client.child_storage_keys_iter(id, child_info, prefix, start_key),
+			#[cfg(feature = "polkasmith")]
+			Self::PolkaSmith(client) => client.child_storage_keys_iter(id, child_info, prefix, start_key),
+			#[cfg(feature = "halongbay")]
+			Self::Halongbay(client) => client.child_storage_keys_iter(id, child_info, prefix, start_key),
+		}
+	}
+
 	fn child_storage_hash(
 		&self,
 		id: &BlockId<Block>,
@@ -284,7 +295,7 @@ sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block>
 + sp_api::Metadata<Block>
 + sp_offchain::OffchainWorkerApi<Block>
 + sp_session::SessionKeys<Block>
-+ fp_rpc::EthereumRuntimeRPCApi<Block>
+// + fp_rpc::EthereumRuntimeRPCApi<Block>
 + cumulus_primitives_core::CollectCollationInfo<Block>
 	where
 		<Self as sp_api::ApiExt<Block>>::StateBackend: sp_api::StateBackend<BlakeTwo256>,
@@ -300,7 +311,7 @@ impl<Api> RuntimeApiCollection for Api
 		+ sp_api::Metadata<Block>
 		+ sp_offchain::OffchainWorkerApi<Block>
 		+ sp_session::SessionKeys<Block>
-		+ fp_rpc::EthereumRuntimeRPCApi<Block>
+		// + fp_rpc::EthereumRuntimeRPCApi<Block>
 		+ cumulus_primitives_core::CollectCollationInfo<Block>,
 		<Self as sp_api::ApiExt<Block>>::StateBackend: sp_api::StateBackend<BlakeTwo256>,
 {}

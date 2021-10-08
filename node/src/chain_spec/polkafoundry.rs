@@ -37,10 +37,10 @@ fn polkafoundry_staging_testnet_config_genesis(wasm_binary: &[u8]) -> polkafound
 		},
 		sudo: polkafoundry::SudoConfig { key: endowed_accounts[0].clone() },
 		parachain_info: polkafoundry::ParachainInfoConfig { parachain_id: 1111.into() },
-		evm: polkafoundry::EVMConfig {
-			accounts: BTreeMap::new(),
-		},
-		ethereum: polkafoundry::EthereumConfig {},
+		// evm: polkafoundry::EVMConfig {
+		// 	accounts: BTreeMap::new(),
+		// },
+		// ethereum: polkafoundry::EthereumConfig {},
 		aura: halongbay::AuraConfig {
 			authorities: vec![hex!["e0c50f050110813fcd53ac4478256f3e0e438d93065f4bd0a19a043d93c7cf3c"]
 				.unchecked_into()]

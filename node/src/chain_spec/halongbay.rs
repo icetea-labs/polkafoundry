@@ -52,10 +52,10 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 		},
 		sudo: halongbay::SudoConfig { key: endowed_accounts[0].clone() },
 		parachain_info: halongbay::ParachainInfoConfig { parachain_id: 2018.into() },
-		evm: halongbay::EVMConfig {
-			accounts: BTreeMap::new(),
-		},
-		ethereum: halongbay::EthereumConfig {},
+		// evm: halongbay::EVMConfig {
+		// 	accounts: BTreeMap::new(),
+		// },
+		// ethereum: halongbay::EthereumConfig {},
 		session: halongbay::SessionConfig {
 			keys: initial_authorities
 				.iter()
@@ -74,7 +74,7 @@ fn halongbay_staging_testnet_config_genesis(wasm_binary: &[u8]) -> halongbay::Ge
 		aura: Default::default(),
 		aura_ext: Default::default(),
 		treasury: Default::default(),
-		tokens: Default::default(),
+		// tokens: Default::default(),
 		collator_selection: halongbay::CollatorSelectionConfig {
 			desired_candidates: 200,
 			candidacy_bond: 1_000 * halongbay::HLB,

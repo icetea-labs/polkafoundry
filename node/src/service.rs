@@ -33,10 +33,10 @@ use cumulus_primitives_core::PersistedValidationData;
 use cumulus_test_relay_sproof_builder::RelayStateSproofBuilder;
 use futures::{Stream, StreamExt};
 
-use fc_rpc_core::types::{FilterPool, PendingTransactions};
-use fc_consensus::FrontierBlockImport;
-use fc_rpc::EthTask;
-use fc_mapping_sync::MappingSyncWorker;
+// use fc_rpc_core::types::{FilterPool, PendingTransactions};
+// use fc_consensus::FrontierBlockImport;
+// use fc_rpc::EthTask;
+// use fc_mapping_sync::MappingSyncWorker;
 
 use runtime_primitives::{Block, Hash};
 use cumulus_client_consensus_aura::{build_aura_consensus, BuildAuraConsensusParams, SlotProportion};
@@ -154,24 +154,24 @@ impl InherentDataProvider for MockParachainInherentDataProvider {
 type MaybeSelectChain = Option<LongestChain<FullBackend, Block>>;
 
 
-pub fn frontier_database_dir(config: &Configuration) -> std::path::PathBuf {
-	let config_dir = config.base_path.as_ref()
-		.map(|base_path| base_path.config_dir(config.chain_spec.id()))
-		.unwrap_or_else(|| {
-			BasePath::from_project("", "", "polkafoundry")
-				.config_dir(config.chain_spec.id())
-		});
-	config_dir.join("frontier").join("db")
-}
-
-pub fn open_frontier_backend(config: &Configuration) -> Result<Arc<fc_db::Backend<Block>>, String> {
-	Ok(Arc::new(fc_db::Backend::<Block>::new(&fc_db::DatabaseSettings {
-		source: fc_db::DatabaseSettingsSrc::RocksDb {
-			path: frontier_database_dir(&config),
-			cache_size: 0,
-		}
-	})?))
-}
+// pub fn frontier_database_dir(config: &Configuration) -> std::path::PathBuf {
+// 	let config_dir = config.base_path.as_ref()
+// 		.map(|base_path| base_path.config_dir(config.chain_spec.id()))
+// 		.unwrap_or_else(|| {
+// 			BasePath::from_project("", "", "polkafoundry")
+// 				.config_dir(config.chain_spec.id())
+// 		});
+// 	config_dir.join("frontier").join("db")
+// }
+//
+// pub fn open_frontier_backend(config: &Configuration) -> Result<Arc<fc_db::Backend<Block>>, String> {
+// 	Ok(Arc::new(fc_db::Backend::<Block>::new(&fc_db::DatabaseSettings {
+// 		source: fc_db::DatabaseSettingsSrc::RocksDb {
+// 			path: frontier_database_dir(&config),
+// 			cache_size: 0,
+// 		}
+// 	})?))
+// }
 
 /// Starts a `ServiceBuilder` for a full service.
 ///
@@ -185,14 +185,14 @@ pub fn new_partial<RuntimeApi, Executor>(
 		FullClient<RuntimeApi, Executor>,
 		FullBackend,
 		MaybeSelectChain,
-		sp_consensus::import_queue::BasicQueue<Block, PrefixedMemoryDB<BlakeTwo256>>,
+		sc_consensus::DefaultImportQueue<Block, TFullClient<Block, RuntimeApi, Executor>>,
 		sc_transaction_pool::FullPool<Block, FullClient<RuntimeApi, Executor>>,
 		(
-			PendingTransactions,
-			Option<FilterPool>,
+			// PendingTransactions,
+			// Option<FilterPool>,
 			Option<Telemetry>,
 			Option<TelemetryWorkerHandle>,
-			Arc<fc_db::Backend<Block>>,
+			// Arc<fc_db::Backend<Block>>,
 		),
 	>,
 	sc_service::Error,
@@ -236,14 +236,14 @@ pub fn new_partial<RuntimeApi, Executor>(
 		client.clone(),
 	);
 
-	let pending_transactions: PendingTransactions = Some(Arc::new(Mutex::new(HashMap::new())));
-
-	let filter_pool: Option<FilterPool> = Some(Arc::new(Mutex::new(BTreeMap::new())));
-
-	let frontier_backend = open_frontier_backend(config)?;
-
-	let frontier_block_import =
-		FrontierBlockImport::new(client.clone(), client.clone(), frontier_backend.clone());
+	// let pending_transactions: PendingTransactions = Some(Arc::new(Mutex::new(HashMap::new())));
+	//
+	// let filter_pool: Option<FilterPool> = Some(Arc::new(Mutex::new(BTreeMap::new())));
+	//
+	// let frontier_backend = open_frontier_backend(config)?;
+	//
+	// let frontier_block_import =
+	// 	FrontierBlockImport::new(client.clone(), client.clone(), frontier_backend.clone());
 
 	let slot_duration = cumulus_client_consensus_aura::slot_duration(&*client)?;
 
@@ -255,7 +255,7 @@ pub fn new_partial<RuntimeApi, Executor>(
 
 	let import_queue = if dev {
 		sc_consensus_manual_seal::import_queue(
-			Box::new(frontier_block_import.clone()),
+			Box::new(client.clone()),
 			&task_manager.spawn_essential_handle(),
 			config.prometheus_registry(),
 		)
@@ -269,7 +269,7 @@ pub fn new_partial<RuntimeApi, Executor>(
 			_,
 			_,
 		>(cumulus_client_consensus_aura::ImportQueueParams {
-			block_import: frontier_block_import.clone(),
+			block_import: client.clone(),
 			client: client.clone(),
 			create_inherent_data_providers: move |_, _| async move {
 				let time = sp_timestamp::InherentDataProvider::from_system_time();
@@ -297,7 +297,13 @@ pub fn new_partial<RuntimeApi, Executor>(
 		task_manager,
 		transaction_pool,
 		select_chain,
-		other: (pending_transactions, filter_pool, telemetry, telemetry_worker_handle, frontier_backend),
+		other: (
+			// pending_transactions,
+			// filter_pool,
+			telemetry,
+			telemetry_worker_handle,
+			// frontier_backend
+		),
 	};
 
 	Ok(params)
@@ -348,11 +354,11 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 	let validator = parachain_config.role.is_authority();
 
 	let (
-		pending_transactions,
-		filter_pool,
+		// pending_transactions,
+		// filter_pool,
 		mut telemetry,
 		telemetry_worker_handle,
-		frontier_backend,
+		// frontier_backend,
 	) = params.other;
 
 	let polkadot_full_node =
@@ -392,6 +398,7 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 			import_queue: import_queue.clone(),
 			on_demand: None,
 			block_announce_validator_builder: Some(Box::new(|_| block_announce_validator)),
+			warp_sync: None,
 		})?;
 
 	let subscription_task_executor =
@@ -401,9 +408,9 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 		let client = client.clone();
 		let pool = transaction_pool.clone();
 		let network = network.clone();
-		let pending = pending_transactions.clone();
-		let filter_pool = filter_pool.clone();
-		let frontier_backend = frontier_backend.clone();
+		// let pending = pending_transactions.clone();
+		// let filter_pool = filter_pool.clone();
+		// let frontier_backend = frontier_backend.clone();
 		let max_past_logs = cli.run.max_past_logs;
 
 		Box::new(move |deny_unsafe, _| {
@@ -413,27 +420,28 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 				deny_unsafe,
 				is_authority: validator,
 				network: network.clone(),
-				pending_transactions: pending.clone(),
-				filter_pool: filter_pool.clone(),
+				// pending_transactions: pending.clone(),
+				// filter_pool: filter_pool.clone(),
 				command_sink: None,
-				frontier_backend: frontier_backend.clone(),
+				// frontier_backend: frontier_backend.clone(),
 				max_past_logs
 			};
 
-			crate::rpc::create_full(deps, subscription_task_executor.clone(), Some(runtime.clone()))
+			let mut io = crate::rpc::create_full(deps, subscription_task_executor.clone(), Some(runtime.clone()));
+			Ok(io)
 		})
 	};
 
-	task_manager.spawn_essential_handle().spawn(
-		"frontier-mapping-sync-worker",
-		MappingSyncWorker::new(
-			client.import_notification_stream(),
-			Duration::new(6, 0),
-			client.clone(),
-			backend.clone(),
-			frontier_backend.clone(),
-		).for_each(|()| futures::future::ready(()))
-	);
+	// task_manager.spawn_essential_handle().spawn(
+	// 	"frontier-mapping-sync-worker",
+	// 	MappingSyncWorker::new(
+	// 		client.import_notification_stream(),
+	// 		Duration::new(6, 0),
+	// 		client.clone(),
+	// 		backend.clone(),
+	// 		frontier_backend.clone(),
+	// 	).for_each(|()| futures::future::ready(()))
+	// );
 
 	sc_service::spawn_tasks(sc_service::SpawnTasksParams {
 		on_demand: None,
@@ -451,31 +459,31 @@ async fn start_node_impl<RB, RuntimeApi, Executor, BIC>(
 	})?;
 
 	// Spawn Frontier EthFilterApi maintenance task.
-	if let Some(filter_pool) = filter_pool {
-		// Each filter is allowed to stay in the pool for 100 blocks.
-		const FILTER_RETAIN_THRESHOLD: u64 = 100;
-		task_manager.spawn_essential_handle().spawn(
-			"frontier-filter-pool",
-			EthTask::filter_pool_task(
-				Arc::clone(&client),
-				filter_pool,
-				FILTER_RETAIN_THRESHOLD,
-			)
-		);
-	}
+	// if let Some(filter_pool) = filter_pool {
+	// 	// Each filter is allowed to stay in the pool for 100 blocks.
+	// 	const FILTER_RETAIN_THRESHOLD: u64 = 100;
+	// 	task_manager.spawn_essential_handle().spawn(
+	// 		"frontier-filter-pool",
+	// 		EthTask::filter_pool_task(
+	// 			Arc::clone(&client),
+	// 			filter_pool,
+	// 			FILTER_RETAIN_THRESHOLD,
+	// 		)
+	// 	);
+	// }
 
 	// Spawn Frontier pending transactions maintenance task (as essential, otherwise we leak).
-	if let Some(pending_transactions) = pending_transactions {
-		const TRANSACTION_RETAIN_THRESHOLD: u64 = 5;
-		task_manager.spawn_essential_handle().spawn(
-			"frontier-pending-transactions",
-			EthTask::pending_transaction_task(
-				Arc::clone(&client),
-				pending_transactions,
-				TRANSACTION_RETAIN_THRESHOLD,
-			)
-		);
-	}
+	// if let Some(pending_transactions) = pending_transactions {
+	// 	const TRANSACTION_RETAIN_THRESHOLD: u64 = 5;
+	// 	task_manager.spawn_essential_handle().spawn(
+	// 		"frontier-pending-transactions",
+	// 		EthTask::pending_transaction_task(
+	// 			Arc::clone(&client),
+	// 			pending_transactions,
+	// 			TRANSACTION_RETAIN_THRESHOLD,
+	// 		)
+	// 	);
+	// }
 
 	let announce_block = {
 		let network = network.clone();
@@ -623,11 +631,11 @@ pub fn start_dev(
 		select_chain: _,
 		transaction_pool,
 		other: (
-			pending_transactions,
-			filter_pool,
+			// pending_transactions,
+			// filter_pool,
 			telemetry,
 			_telemetry_worker_handle,
-			frontier_backend
+			// frontier_backend
 		),
 	} = new_partial::<halongbay_runtime::RuntimeApi, HalongbayExecutor>(&config, true)?;
 	let import_queue = cumulus_client_service::SharedImportQueue::new(import_queue);
@@ -641,6 +649,7 @@ pub fn start_dev(
 			import_queue: import_queue.clone(),
 			on_demand: None,
 			block_announce_validator_builder: None,
+			warp_sync: None,
 		})?;
 	let mut command_sink = None;
 
@@ -652,13 +661,13 @@ pub fn start_dev(
 	let prometheus_registry = config.prometheus_registry().cloned();
 
 	if validator {
-		let env = sc_basic_authorship::ProposerFactory::new(
-			task_manager.spawn_handle(),
-			client.clone(),
-			transaction_pool.clone(),
-			prometheus_registry.as_ref(),
-			telemetry.as_ref().map(|x| x.handle()),
-		);
+		// let env = sc_basic_authorship::ProposerFactory::new(
+		// 	task_manager.spawn_handle(),
+		// 	client.clone(),
+		// 	transaction_pool.clone(),
+		// 	prometheus_registry.as_ref(),
+		// 	telemetry.as_ref().map(|x| x.handle()),
+		// );
 		let commands_stream: Box<dyn Stream<Item = EngineCommand<H256>> + Send + Sync + Unpin> =
 			match sealing {
 				Sealing::Instant => {
@@ -685,45 +694,45 @@ pub fn start_dev(
 
 		let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
-		task_manager.spawn_essential_handle().spawn_blocking(
-			"authorship_task",
-			run_manual_seal(ManualSealParams {
-				block_import: client.clone(),
-				env,
-				client: client.clone(),
-				pool: transaction_pool.pool().clone(),
-				commands_stream,
-				select_chain,
-				consensus_data_provider: None,
-				create_inherent_data_providers: move |_, _| async move {
-					let time = sp_timestamp::InherentDataProvider::from_system_time();
-
-					Ok((time, MockParachainInherentDataProvider))
-				},
-			}),
-		);
+		// task_manager.spawn_essential_handle().spawn_blocking(
+		// 	"authorship_task",
+		// 	run_manual_seal(ManualSealParams {
+		// 		block_import: client.clone(),
+		// 		env,
+		// 		client: client.clone(),
+		// 		pool: transaction_pool.pool().clone(),
+		// 		commands_stream,
+		// 		select_chain,
+		// 		consensus_data_provider: None,
+		// 		create_inherent_data_providers: move |_, _| async move {
+		// 			let time = sp_timestamp::InherentDataProvider::from_system_time();
+		//
+		// 			Ok((time, MockParachainInherentDataProvider))
+		// 		},
+		// 	}),
+		// );
 	};
 	let subscription_task_executor =
 		sc_rpc::SubscriptionTaskExecutor::new(task_manager.spawn_handle());
 
-	task_manager.spawn_essential_handle().spawn(
-		"frontier-mapping-sync-worker",
-		MappingSyncWorker::new(
-			client.import_notification_stream(),
-			Duration::new(6, 0),
-			client.clone(),
-			backend.clone(),
-			frontier_backend.clone(),
-		).for_each(|()| futures::future::ready(()))
-	);
+	// task_manager.spawn_essential_handle().spawn(
+	// 	"frontier-mapping-sync-worker",
+	// 	MappingSyncWorker::new(
+	// 		client.import_notification_stream(),
+	// 		Duration::new(6, 0),
+	// 		client.clone(),
+	// 		backend.clone(),
+	// 		frontier_backend.clone(),
+	// 	).for_each(|()| futures::future::ready(()))
+	// );
 
 	let rpc_extensions_builder = {
 		let client = client.clone();
 		let pool = transaction_pool.clone();
 		let network = network.clone();
-		let pending = pending_transactions.clone();
-		let filter_pool = filter_pool.clone();
-		let frontier_backend = frontier_backend.clone();
+		// let pending = pending_transactions.clone();
+		// let filter_pool = filter_pool.clone();
+		// let frontier_backend = frontier_backend.clone();
 		let max_past_logs = cli.run.max_past_logs;
 
 		Box::new(move |deny_unsafe, _| {
@@ -733,13 +742,14 @@ pub fn start_dev(
 				deny_unsafe,
 				is_authority: validator,
 				network: network.clone(),
-				pending_transactions: pending.clone(),
-				filter_pool: filter_pool.clone(),
+				// pending_transactions: pending.clone(),
+				// filter_pool: filter_pool.clone(),
 				command_sink: command_sink.clone(),
-				frontier_backend: frontier_backend.clone(),
+				// frontier_backend: frontier_backend.clone(),
 				max_past_logs
 			};
-			crate::rpc::create_full(deps, subscription_task_executor.clone(), None)
+			let mut io = crate::rpc::create_full(deps, subscription_task_executor.clone(), None);
+			Ok(io)
 		})
 	};
 
@@ -759,31 +769,31 @@ pub fn start_dev(
 	})?;
 
 	// Spawn Frontier EthFilterApi maintenance task.
-	if let Some(filter_pool) = filter_pool {
-		// Each filter is allowed to stay in the pool for 100 blocks.
-		const FILTER_RETAIN_THRESHOLD: u64 = 100;
-		task_manager.spawn_essential_handle().spawn(
-			"frontier-filter-pool",
-			EthTask::filter_pool_task(
-				Arc::clone(&client),
-				filter_pool,
-				FILTER_RETAIN_THRESHOLD,
-			)
-		);
-	}
+	// if let Some(filter_pool) = filter_pool {
+	// 	// Each filter is allowed to stay in the pool for 100 blocks.
+	// 	const FILTER_RETAIN_THRESHOLD: u64 = 100;
+	// 	task_manager.spawn_essential_handle().spawn(
+	// 		"frontier-filter-pool",
+	// 		EthTask::filter_pool_task(
+	// 			Arc::clone(&client),
+	// 			filter_pool,
+	// 			FILTER_RETAIN_THRESHOLD,
+	// 		)
+	// 	);
+	// }
 
 	// Spawn Frontier pending transactions maintenance task (as essential, otherwise we leak).
-	if let Some(pending_transactions) = pending_transactions {
-		const TRANSACTION_RETAIN_THRESHOLD: u64 = 5;
-		task_manager.spawn_essential_handle().spawn(
-			"frontier-pending-transactions",
-			EthTask::pending_transaction_task(
-				Arc::clone(&client),
-				pending_transactions,
-				TRANSACTION_RETAIN_THRESHOLD,
-			)
-		);
-	}
+	// if let Some(pending_transactions) = pending_transactions {
+	// 	const TRANSACTION_RETAIN_THRESHOLD: u64 = 5;
+	// 	task_manager.spawn_essential_handle().spawn(
+	// 		"frontier-pending-transactions",
+	// 		EthTask::pending_transaction_task(
+	// 			Arc::clone(&client),
+	// 			pending_transactions,
+	// 			TRANSACTION_RETAIN_THRESHOLD,
+	// 		)
+	// 	);
+	// }
 
 	network_starter.start_network();
 
@@ -799,7 +809,7 @@ pub fn new_chain_ops(
 	(
 		Arc<Client>,
 		Arc<FullBackend>,
-		sp_consensus::import_queue::BasicQueue<Block, PrefixedMemoryDB<BlakeTwo256>>,
+		sc_consensus::BasicQueue<Block, PrefixedMemoryDB<BlakeTwo256>>,
 		TaskManager,
 	),
 	sc_service::error::Error

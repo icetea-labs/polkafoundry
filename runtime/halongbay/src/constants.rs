@@ -40,23 +40,9 @@ pub mod weights {
 /// Money matters.
 pub mod currency {
 	use runtime_primitives::Balance;
-	use pkfp_primitives::CurrencyId;
-	use pkfp_primitives::currency::TokenInfo;
 	pub const DOLLARS: Balance = 1_000_000_000_000_000_000;
 	pub const CENTS: Balance = DOLLARS / 1_000;
 	pub const MILLICENTS: Balance = CENTS / 1_000;
-
-	pub fn dollars(currency: CurrencyId) -> Balance {
-		1u128.saturating_mul(currency.decimals().expect("TokenInfo must be implemented qed").into())
-	}
-
-	pub fn cent(currency: CurrencyId) -> Balance {
-		dollars(currency) / 1000
-	}
-
-	pub fn millicent(currency: CurrencyId) -> Balance {
-		cent(currency) / 1000
-	}
 
 	pub const fn deposit(items: u32, bytes: u32) -> Balance {
 		items as Balance * 69 * CENTS + (bytes as Balance) * 10 * MILLICENTS
